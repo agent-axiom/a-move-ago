@@ -1,8 +1,9 @@
-import { MeResponseSchema } from "@a-move-ago/api-contract";
+import { MeResponseSchema, StatsResponseSchema } from "@a-move-ago/api-contract";
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
 import { requireSession } from "../middleware/session";
+import { statsForActor } from "../services/stats-service";
 
 type PlayerRow = {
   telegram_user_id: string;
@@ -12,6 +13,17 @@ type PlayerRow = {
 };
 
 export const me = new Hono<AppEnv>();
+
+me.get("/stats", requireSession, async (context) => {
+  const session = context.get("session");
+  if (!session || (session.kind === "telegram" && !session.playerId)) {
+    throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
+  }
+  const today = new Date(Date.now()).toISOString().slice(0, 10);
+  return context.json(
+    StatsResponseSchema.parse(await statsForActor(context.env.DB, session, today)),
+  );
+});
 
 me.get("/", requireSession, async (context) => {
   context.header("cache-control", "no-store");
