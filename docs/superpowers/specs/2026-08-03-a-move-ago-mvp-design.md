@@ -12,8 +12,11 @@ A MOVE AGO — ежедневная ретро-шахматная игра. Иг
 MVP использует один TypeScript-клиент для трёх оболочек:
 
 1. обычный web на GitHub Pages;
-2. Telegram Mini App, открывающий тот же web build;
-3. Android-приложение, упаковывающее тот же build через Capacitor.
+2. Telegram Mini App, открывающий Pages artifact;
+3. Android-приложение, упаковывающее Android artifact через Capacitor.
+
+Оба artifact собираются из одного UI и одного исходного кода, но не обязаны быть побайтно
+одинаковыми: GitHub Pages требует `base: /a-move-ago/`, а Capacitor — корневой `base: /`.
 
 Все клиенты обращаются к единому Hono API на Cloudflare Workers. Production-данные хранятся в Cloudflare D1. Играть можно без регистрации; единственный необязательный аккаунт — Telegram.
 
@@ -278,6 +281,10 @@ GET  /v1/me/stats
 
 `POST /v1/attempts` требует client-generated attempt UUID. Повтор с тем же UUID в той же сессии возвращает прежний результат и не увеличивает счётчики.
 
+Ответ попытки содержит отдельный server-generated attempt ID. Именно он используется в URL
+подсказок. `POST /v1/attempts/:id/hints` принимает явный следующий `level`; повтор того же уровня
+возвращает сохранённый ответ, а пропуск уровня отклоняется как конфликт.
+
 ### 8.4. Contract and errors
 
 `api-contract` содержит Zod-схемы request/response и типизированный fetch client. Все ошибки используют envelope:
@@ -532,8 +539,8 @@ FEN недостаточен для доказательства истории 
 MVP считается архитектурно завершённым, когда:
 
 1. один sample case можно открыть и пройти в обычном браузере;
-2. тот же build корректно адаптируется внутри Telegram WebView;
-3. тот же build собирается в Android debug application;
+2. тот же Pages artifact корректно адаптируется внутри Telegram WebView;
+3. тот же исходный UI собирается с Android base и входит в Android debug application;
 4. гость может начать игру без входа;
 5. Mini App login валидирует raw initData только backend'ом;
 6. Web/Android OIDC использует server callback, PKCE и одноразовый handoff;
