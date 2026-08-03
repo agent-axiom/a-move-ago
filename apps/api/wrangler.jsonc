@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "a-move-ago-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-03",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "a-move-ago",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "development",
+    "ALLOWED_ORIGINS": "http://localhost:5173,https://agent-axiom.github.io,https://localhost",
+    "SESSION_TTL_SECONDS": "7776000"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

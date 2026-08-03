@@ -1,7 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules", "!apps/client/android"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!apps/client/android",
+      "!apps/api/src/worker-configuration.d.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
