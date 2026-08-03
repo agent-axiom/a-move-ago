@@ -14,6 +14,10 @@ export const ErrorEnvelopeSchema = z
   })
   .strict();
 
+export const ClientChannelSchema = z.enum(["web", "telegram", "android"]);
+
+export const GuestSessionRequestSchema = z.object({ channel: ClientChannelSchema }).strict();
+
 export const SessionIssuedSchema = z
   .object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
