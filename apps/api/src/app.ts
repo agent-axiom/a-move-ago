@@ -5,6 +5,7 @@ import { errorResponse } from "./http/error-handler";
 import { exactCors } from "./middleware/cors";
 import { requestId } from "./middleware/request-id";
 import { requireSession } from "./middleware/session";
+import { createAttemptRoutes } from "./routes/attempts";
 import { createDailyRoutes } from "./routes/daily";
 import { me } from "./routes/me";
 import { logoutHandler, sessions } from "./routes/sessions";
@@ -23,6 +24,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/v1/sessions", sessions);
   app.post("/v1/auth/logout", requireSession, logoutHandler);
   app.route("/v1/daily", createDailyRoutes(options.now ? { now: options.now } : {}));
+  app.route("/v1/attempts", createAttemptRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/me", me);
 
   app.notFound(() => {
