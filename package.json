@@ -20,6 +20,7 @@
     "lint": "biome lint .",
     "test": "npm run test --workspaces --if-present",
     "test:run": "vitest run",
+    "content:validate": "npm run validate-content -w @a-move-ago/tools",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
