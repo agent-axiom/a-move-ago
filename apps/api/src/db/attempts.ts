@@ -34,6 +34,21 @@ export interface AttemptInsert {
   submittedAt: number;
 }
 
+export interface HintAttemptRow {
+  id: string;
+  puzzle_id: string;
+  correct: number;
+  max_hint_level: number;
+}
+
+export interface HintEventRow {
+  hint_json: string;
+}
+
+export interface PuzzleHintRow {
+  payload_json: string;
+}
+
 export async function findAttemptReplay(
   db: D1Database,
   sessionId: string,
@@ -129,6 +144,135 @@ function sessionActorBindings(
   now: number,
 ): [string, number, "guest" | "telegram", string | null] {
   return [actor.sessionId, now, actor.kind, actor.playerId];
+}
+
+function hintOwnershipPredicate(attemptAlias: string): string {
+  return `(
+    (s.kind = 'guest'
+      AND ${attemptAlias}.session_id = s.id
+      AND ${attemptAlias}.player_id IS NULL)
+    OR
+    (s.kind = 'telegram'
+      AND ${attemptAlias}.player_id IS s.player_id)
+  )`;
+}
+
+export async function findHintAttemptForActor(
+  db: D1Database,
+  actor: SessionActor,
+  attemptId: string,
+  now: number,
+): Promise<HintAttemptRow | null> {
+  return await db
+    .prepare(
+      `SELECT a.id, a.puzzle_id, a.correct,
+              COALESCE(
+                (SELECT MAX(he.hint_level) FROM hint_events he WHERE he.attempt_id = a.id),
+                0
+              ) AS max_hint_level
+         FROM attempts a
+         CROSS JOIN sessions s
+        WHERE a.id = ?
+          AND ${actorPredicate()}
+          AND ${hintOwnershipPredicate("a")}`,
+    )
+    .bind(attemptId, ...sessionActorBindings(actor, now))
+    .first<HintAttemptRow>();
+}
+
+export async function findHintForActor(
+  db: D1Database,
+  actor: SessionActor,
+  attemptId: string,
+  hintLevel: number,
+  now: number,
+): Promise<HintEventRow | null> {
+  return await db
+    .prepare(
+      `SELECT he.hint_json
+         FROM hint_events he
+         JOIN attempts a ON a.id = he.attempt_id
+         CROSS JOIN sessions s
+        WHERE he.attempt_id = ?
+          AND he.hint_level = ?
+          AND ${actorPredicate()}
+          AND ${hintOwnershipPredicate("a")}`,
+    )
+    .bind(attemptId, hintLevel, ...sessionActorBindings(actor, now))
+    .first<HintEventRow>();
+}
+
+export async function findPuzzleHint(
+  db: D1Database,
+  puzzleId: string,
+  hintLevel: number,
+): Promise<PuzzleHintRow | null> {
+  return await db
+    .prepare("SELECT payload_json FROM puzzle_hints WHERE puzzle_id = ? AND level = ?")
+    .bind(puzzleId, hintLevel)
+    .first<PuzzleHintRow>();
+}
+
+export async function persistHintForActor(
+  db: D1Database,
+  actor: SessionActor,
+  input: {
+    attemptId: string;
+    hintLevel: number;
+    hintJson: string;
+    now: number;
+  },
+): Promise<void> {
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO hint_events (attempt_id, hint_level, hint_json, created_at)
+         SELECT a.id, ?, ?, ?
+           FROM attempts a
+           CROSS JOIN sessions s
+          WHERE a.id = ?
+            AND a.correct = 0
+            AND ${actorPredicate()}
+            AND ${hintOwnershipPredicate("a")}
+            AND ? = COALESCE(
+              (SELECT MAX(he.hint_level) FROM hint_events he WHERE he.attempt_id = a.id),
+              0
+            ) + 1
+         ON CONFLICT(attempt_id, hint_level) DO NOTHING`,
+      )
+      .bind(
+        input.hintLevel,
+        input.hintJson,
+        input.now,
+        input.attemptId,
+        ...sessionActorBindings(actor, input.now),
+        input.hintLevel,
+      ),
+    db
+      .prepare(
+        `UPDATE attempts
+            SET hints_used = MAX(hints_used, ?)
+          WHERE attempts.id = ?
+            AND attempts.correct = 0
+            AND EXISTS (
+              SELECT 1
+                FROM sessions s
+               WHERE ${actorPredicate()}
+                 AND ${hintOwnershipPredicate("attempts")}
+            )
+            AND EXISTS (
+              SELECT 1
+                FROM hint_events he
+               WHERE he.attempt_id = attempts.id AND he.hint_level = ?
+            )`,
+      )
+      .bind(
+        input.hintLevel,
+        input.attemptId,
+        ...sessionActorBindings(actor, input.now),
+        input.hintLevel,
+      ),
+  ]);
 }
 
 export async function insertAttempt(db: D1Database, row: AttemptInsert): Promise<boolean> {
