@@ -1,4 +1,4 @@
-import { ApiError } from "@a-move-ago/api-contract";
+import { ApiContractError, ApiError } from "@a-move-ago/api-contract";
 import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -183,6 +183,25 @@ it("offers a session restart instead of retrying with an expired token", async (
 
   expect(await screen.findByRole("alert")).toHaveTextContent("guest session expired");
   expect(screen.getByRole("button", { name: "Restart guest session" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Retry case" })).not.toBeInTheDocument();
+  expect(runtime.api.getDaily).toHaveBeenCalledOnce();
+});
+
+it("offers an application reload and page heading after a contract failure", async () => {
+  const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+  runtime.api.getDaily = vi.fn().mockRejectedValue(new ApiContractError(new Error("invalid")));
+  render(
+    <RuntimeProvider runtime={runtime}>
+      <DailyCaseGate enabled caseDate="2026-08-03">
+        {(loadedDaily) => <h1>{loadedDaily.title}</h1>}
+      </DailyCaseGate>
+    </RuntimeProvider>,
+  );
+
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Case unavailable" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reload application" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Retry case" })).not.toBeInTheDocument();
   expect(runtime.api.getDaily).toHaveBeenCalledOnce();
 });

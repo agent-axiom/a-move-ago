@@ -1,0 +1,47 @@
+.game-layout {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+}
+
+.game-copy {
+  width: min(100%, 40rem);
+}
+
+.feedback-panel {
+  width: min(100%, 32rem);
+  padding: 0.8rem;
+  border: 1px solid #6d6961;
+}
+
+.hint-list {
+  padding-left: 1.5rem;
+}
+
+.reveal-board {
+  transition:
+    opacity 180ms ease,
+    transform 260ms ease;
+}
+
+.reveal-post {
+  opacity: 0.65;
+  transform: scale(0.985);
+}
+
+.reveal-previous {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.reveal-forward,
+.reveal-done {
+  opacity: 1;
+  transform: scale(1.01);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-board {
+    transition: none;
+  }
+}

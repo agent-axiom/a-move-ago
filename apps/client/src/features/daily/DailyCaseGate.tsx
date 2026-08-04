@@ -31,7 +31,7 @@ export function DailyCaseGate(props: {
     const requestId = "requestId" in state.failure ? state.failure.requestId : undefined;
     return (
       <section aria-labelledby="daily-error-heading">
-        <h2 id="daily-error-heading">Case unavailable</h2>
+        <h1 id="daily-error-heading">Case unavailable</h1>
         <p role="alert">{message(state.failure.kind)}</p>
         {requestId ? (
           <p>
@@ -41,6 +41,10 @@ export function DailyCaseGate(props: {
         {state.failure.kind === "auth" ? (
           <button type="button" onClick={() => window.location.reload()}>
             Restart guest session
+          </button>
+        ) : state.failure.kind === "contract" ? (
+          <button type="button" onClick={() => window.location.reload()}>
+            Reload application
           </button>
         ) : (
           <button type="button" onClick={retry}>

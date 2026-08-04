@@ -1,5 +1,6 @@
 @import "./host-layout.css";
 @import "./chessboard.css";
+@import "./game.css";
 
 :root {
   color-scheme: light dark;
