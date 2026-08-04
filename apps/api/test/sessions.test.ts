@@ -1,12 +1,13 @@
-import { env, exports } from "cloudflare:workers";
+import { env } from "cloudflare:workers";
 import { ErrorEnvelopeSchema, SessionIssuedSchema } from "@a-move-ago/api-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { app } from "../src/app";
 import { hashSessionToken, newOpaqueToken } from "../src/crypto/opaque-token";
 import type { Env } from "../src/env";
 import { logoutToGuest } from "../src/services/session-service";
+import { withFakeRateLimiters } from "./fake-rate-limiters";
 
-const testEnv = env as Env;
+const testEnv = withFakeRateLimiters(env as Env);
 const sessionPepper = "test-session-pepper-at-least-32-bytes";
 const sessionTtlSeconds = 7_776_000;
 
@@ -24,7 +25,7 @@ async function requestJson(path: string, init: JsonRequestInit = {}) {
     headers.set("content-type", "application/json");
     requestInit.body = JSON.stringify(init.body);
   }
-  const response = await exports.default.fetch(new Request(`https://api.test${path}`, requestInit));
+  const response = await app.fetch(new Request(`https://api.test${path}`, requestInit), testEnv);
   return { response, body: (await response.json()) as unknown };
 }
 
@@ -146,11 +147,14 @@ describe("guest session lifecycle", () => {
   });
 
   it("rejects malformed JSON and non-strict guest request bodies without inserting sessions", async () => {
-    const malformed = await exports.default.fetch("https://api.test/v1/sessions/guest", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{",
-    });
+    const malformed = await app.fetch(
+      new Request("https://api.test/v1/sessions/guest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{",
+      }),
+      testEnv,
+    );
     const invalidBodies = [
       {},
       { channel: "desktop" },
@@ -255,6 +259,9 @@ describe("guest session lifecycle", () => {
         ALLOWED_ORIGINS: testEnv.ALLOWED_ORIGINS,
         SESSION_TTL_SECONDS: ttl,
         SESSION_PEPPER: testEnv.SESSION_PEPPER,
+        GUEST_RATE_LIMITER: testEnv.GUEST_RATE_LIMITER,
+        ATTEMPT_RATE_LIMITER: testEnv.ATTEMPT_RATE_LIMITER,
+        HINT_RATE_LIMITER: testEnv.HINT_RATE_LIMITER,
       });
 
       expect(response.status).toBe(500);

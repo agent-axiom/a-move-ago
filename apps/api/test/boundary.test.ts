@@ -14,6 +14,9 @@ const boundaryEnv: Env = {
   ALLOWED_ORIGINS: " , https://allowed.test, ,",
   SESSION_TTL_SECONDS: "7776000",
   SESSION_PEPPER: "test-session-pepper-at-least-32-bytes",
+  GUEST_RATE_LIMITER: { limit: async () => ({ success: true }) },
+  ATTEMPT_RATE_LIMITER: { limit: async () => ({ success: true }) },
+  HINT_RATE_LIMITER: { limit: async () => ({ success: true }) },
 };
 
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

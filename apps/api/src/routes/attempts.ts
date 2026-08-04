@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
 import { requestJson } from "../http/request-body";
+import { enforceLimit } from "../middleware/rate-limit";
 import { requireSession } from "../middleware/session";
 import { submitAttempt } from "../services/attempt-service";
 import { requestHint } from "../services/hint-service";
@@ -18,6 +19,7 @@ export function createAttemptRoutes(options: AttemptRouteOptions = {}) {
   attempts.post("/", requireSession, async (context) => {
     const actor = context.get("session");
     if (!actor) throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
+    await enforceLimit(context.env.ATTEMPT_RATE_LIMITER, `attempt:${actor.sessionId}`);
     const input = AttemptRequestSchema.parse(await requestJson(context));
     const timestamp = Math.floor(now().getTime() / 1_000);
     const result = await submitAttempt(context.env, actor, input, timestamp);
@@ -28,6 +30,7 @@ export function createAttemptRoutes(options: AttemptRouteOptions = {}) {
   attempts.post("/:attemptId/hints", requireSession, async (context) => {
     const actor = context.get("session");
     if (!actor) throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
+    await enforceLimit(context.env.HINT_RATE_LIMITER, `hint:${actor.sessionId}`);
     const input = HintRequestSchema.parse(await requestJson(context));
     const timestamp = Math.floor(now().getTime() / 1_000);
     const hint = await requestHint(

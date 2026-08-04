@@ -10,9 +10,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
 import { hashSessionToken } from "../src/crypto/opaque-token";
 import type { Env } from "../src/env";
+import { withFakeRateLimiters } from "./fake-rate-limiters";
 import { openingPuzzleFixture, seedContentFixture } from "./fixtures/content";
 
-const testEnv = env as Env;
+const testEnv = withFakeRateLimiters(env as Env);
 const injectedNow = new Date("2026-08-03T23:30:00.000Z");
 const injectedNowSeconds = Math.floor(injectedNow.getTime() / 1_000);
 const app = createApp({ now: () => injectedNow });

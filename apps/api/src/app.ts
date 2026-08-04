@@ -5,6 +5,7 @@ import { errorResponse } from "./http/error-handler";
 import { exactCors } from "./middleware/cors";
 import { requestId } from "./middleware/request-id";
 import { requireSession } from "./middleware/session";
+import { structuredLog } from "./middleware/structured-log";
 import { createAttemptRoutes } from "./routes/attempts";
 import { createDailyRoutes } from "./routes/daily";
 import { me } from "./routes/me";
@@ -18,6 +19,7 @@ export function createApp(options: AppOptions = {}) {
   const app = new Hono<AppEnv>();
 
   app.use("*", requestId);
+  app.use("*", structuredLog);
   app.use("*", exactCors);
 
   app.get("/v1/healthz", (context) => context.json({ ok: true }));

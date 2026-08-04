@@ -11,6 +11,24 @@
       "migrations_dir": "migrations"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "GUEST_RATE_LIMITER",
+      "namespace_id": "900000001",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "ATTEMPT_RATE_LIMITER",
+      "namespace_id": "900000002",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      "name": "HINT_RATE_LIMITER",
+      "namespace_id": "900000003",
+      "simple": { "limit": 30, "period": 60 }
+    }
+  ],
+  "triggers": { "crons": ["17 0 * * *"] },
   "vars": {
     "ENVIRONMENT": "development",
     "ALLOWED_ORIGINS": "http://localhost:5173,https://agent-axiom.github.io,https://localhost",
