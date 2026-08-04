@@ -1,3 +1,5 @@
+@import "./host-layout.css";
+
 :root {
   color-scheme: light dark;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -18,9 +20,4 @@ body,
 
 button {
   font: inherit;
-}
-
-.app-shell {
-  min-height: 100vh;
-  padding: 1rem;
 }
