@@ -6,6 +6,7 @@ import { errorResponse } from "./http/error-handler";
 import { exactCors } from "./middleware/cors";
 import { requestId } from "./middleware/request-id";
 import { structuredLog } from "./middleware/structured-log";
+import { androidAssociationRoutes } from "./routes/android-association";
 import { createAttemptRoutes } from "./routes/attempts";
 import { createDailyRoutes } from "./routes/daily";
 import { me } from "./routes/me";
@@ -26,6 +27,7 @@ export function createApp(options: AppOptions = {}) {
   app.use("*", structuredLog);
   app.use("*", exactCors);
 
+  app.route("/", androidAssociationRoutes);
   app.get("/v1/healthz", (context) => context.json({ ok: true }));
   app.route("/v1/sessions", sessions);
   app.route("/v1/auth", sessionAuthRoutes);

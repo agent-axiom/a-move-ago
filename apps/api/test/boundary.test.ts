@@ -21,6 +21,9 @@ const boundaryEnv: Env = {
   API_ORIGIN: "https://api.test",
   WEB_AUTH_RETURN_URL: "https://agent-axiom.github.io/a-move-ago/",
   ANDROID_AUTH_RETURN_URL: "amoveago-debug://auth",
+  ANDROID_PACKAGE_NAME: "com.agentaxiom.amoveago",
+  ANDROID_SHA256_CERT_FINGERPRINTS:
+    "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
   TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: "3600",
   TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS: "30",
   OIDC_FLOW_TTL_SECONDS: "600",

@@ -18,6 +18,9 @@ export default defineConfig({
           API_ORIGIN: "https://api.test",
           WEB_AUTH_RETURN_URL: "https://agent-axiom.github.io/a-move-ago/",
           ANDROID_AUTH_RETURN_URL: "amoveago-debug://auth",
+          ANDROID_PACKAGE_NAME: "com.agentaxiom.amoveago",
+          ANDROID_SHA256_CERT_FINGERPRINTS:
+            "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
           TEST_MIGRATIONS: await readD1Migrations(path.join(import.meta.dirname, "migrations")),
         },
       },

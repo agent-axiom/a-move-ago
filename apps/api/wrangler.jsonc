@@ -46,6 +46,8 @@
     "API_ORIGIN": "https://a-move-ago-api.example.invalid",
     "WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/",
     "ANDROID_AUTH_RETURN_URL": "amoveago-debug://auth",
+    "ANDROID_PACKAGE_NAME": "com.agentaxiom.amoveago",
+    "ANDROID_SHA256_CERT_FINGERPRINTS": "",
     "TELEGRAM_INIT_DATA_MAX_AGE_SECONDS": "3600",
     "TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS": "30",
     "OIDC_FLOW_TTL_SECONDS": "600",
