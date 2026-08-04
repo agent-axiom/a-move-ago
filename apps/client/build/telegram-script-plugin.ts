@@ -27,7 +27,7 @@ function apiOrigin(value: string): string {
 export function hostHeadTags(mode: ClientBuildMode, apiBaseUrl: string): HtmlTagDescriptor[] {
   const content = [
     "default-src 'none'",
-    "script-src 'self' https://telegram.org",
+    mode === "pages" ? "script-src 'self' https://telegram.org" : "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     `connect-src 'self' ${apiOrigin(apiBaseUrl)}`,

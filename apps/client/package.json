@@ -8,9 +8,11 @@
     "build:android:web": "vite build --mode android",
     "build:pages": "vite build --mode pages",
     "dev": "vite --mode pages",
+    "e2e": "playwright test",
     "preview:pages": "vite preview --mode pages --host 127.0.0.1",
     "test": "vitest run --config vitest.config.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify:artifacts": "node test/verify-builds.mjs"
   },
   "dependencies": {
     "@a-move-ago/api-contract": "0.0.0",
@@ -21,6 +23,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",

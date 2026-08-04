@@ -3,10 +3,10 @@ import { hostHeadTags } from "./telegram-script-plugin";
 
 const API_BASE_URL_ERROR = "VITE_API_BASE_URL must be a bare HTTPS origin without credentials.";
 
-function expectedCsp(origin: string) {
+function expectedCsp(origin: string, allowTelegram = true) {
   return [
     "default-src 'none'",
-    "script-src 'self' https://telegram.org",
+    allowTelegram ? "script-src 'self' https://telegram.org" : "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     `connect-src 'self' ${origin}`,
@@ -17,12 +17,12 @@ function expectedCsp(origin: string) {
   ].join("; ");
 }
 
-function cspTag(origin: string) {
+function cspTag(origin: string, allowTelegram = true) {
   return {
     tag: "meta",
     attrs: {
       "http-equiv": "Content-Security-Policy",
-      content: expectedCsp(origin),
+      content: expectedCsp(origin, allowTelegram),
     },
     injectTo: "head-prepend",
   };
@@ -45,9 +45,9 @@ describe("Telegram host-head tags", () => {
     expect(content).not.toMatch(/(?:^|\s)\*(?:;|\s|$)/);
   });
 
-  it("adds the same exact CSP and no Telegram script in Android", () => {
+  it("removes the Telegram script and its CSP permission in Android", () => {
     expect(hostHeadTags("android", "https://api.example.test")).toEqual([
-      cspTag("https://api.example.test"),
+      cspTag("https://api.example.test", false),
     ]);
   });
 
