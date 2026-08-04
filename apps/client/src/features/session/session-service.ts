@@ -2,6 +2,7 @@ import { ApiError, ApiTransportError, type MeResponseSchema } from "@a-move-ago/
 import type { z } from "zod";
 import { parseEntryQuery, stripAuthReturn } from "../../app/entry-query";
 import type { AppRuntime } from "../../app/runtime";
+import { retryGet } from "../../shared/retry-get";
 
 type Me = z.infer<typeof MeResponseSchema>;
 
@@ -47,6 +48,16 @@ async function issueGuest(runtime: AppRuntime, signal: AbortSignal): Promise<Me>
   return { kind: "guest", profile: null };
 }
 
+async function readMe(runtime: AppRuntime, signal: AbortSignal): Promise<Me> {
+  return retryGet(() => runtime.api.getMe(signal), {
+    maxAttempts: 3,
+    baseDelayMs: 250,
+    random: Math.random,
+    sleep: runtime.sleep,
+    signal,
+  });
+}
+
 function retryableHandoffFailure(error: unknown): boolean {
   return (
     error instanceof ApiTransportError ||
@@ -87,7 +98,7 @@ export async function bootstrapSession(
     if (stored) {
       runtime.token.set(stored);
       try {
-        me = await runtime.api.getMe(signal);
+        me = await readMe(runtime, signal);
       } catch (error) {
         if (!(error instanceof ApiError) || error.status !== 401) {
           throw error;

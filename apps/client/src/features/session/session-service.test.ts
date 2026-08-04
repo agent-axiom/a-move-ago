@@ -78,6 +78,25 @@ describe("session service", () => {
     expect(runtime.api.createGuest).not.toHaveBeenCalled();
   });
 
+  it("retries a transient getMe failure before restoring the stored session", async () => {
+    const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+    const controller = new AbortController();
+    runtime.api.getMe = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiTransportError(new TypeError("offline")))
+      .mockResolvedValueOnce({ kind: "guest" as const, profile: null });
+
+    await expect(
+      bootstrapSession(runtime, new URL("https://app.test/"), vi.fn(), controller.signal),
+    ).resolves.toEqual({ kind: "guest", profile: null });
+
+    expect(runtime.api.getMe).toHaveBeenCalledTimes(2);
+    expect(runtime.sleep).toHaveBeenCalledOnce();
+    expect(runtime.sleep).toHaveBeenCalledWith(expect.any(Number), controller.signal);
+    expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
+    expect(runtime.api.createGuest).not.toHaveBeenCalled();
+  });
+
   it("does not exchange a stale handoff after restoring a Telegram session", async () => {
     const runtime = runtimeFixture({ storedToken: "telegram-token", platformKind: "web" });
     runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
@@ -135,6 +154,8 @@ describe("session service", () => {
     await expect(bootstrapSession(runtime, new URL("https://app.test/"), vi.fn())).rejects.toBe(
       failure,
     );
+    expect(runtime.api.getMe).toHaveBeenCalledTimes(3);
+    expect(runtime.sleep).toHaveBeenCalledTimes(2);
     expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
     expect(runtime.token.get()).toBe("guest-token");
   });
