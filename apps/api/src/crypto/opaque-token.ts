@@ -8,7 +8,11 @@ export function newOpaqueToken(): string {
     .replace(/=+$/, "");
 }
 
-export async function hashSessionToken(token: string, pepper: string): Promise<string> {
+export async function hashOpaqueToken(
+  token: string,
+  pepper: string,
+  purpose: "session" | "oidc-state" | "oidc-handoff",
+): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     encoder.encode(pepper),
@@ -16,6 +20,10 @@ export async function hashSessionToken(token: string, pepper: string): Promise<s
     false,
     ["sign"],
   );
-  const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(`session\0${token}`));
+  const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(`${purpose}\0${token}`));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function hashSessionToken(token: string, pepper: string): Promise<string> {
+  return hashOpaqueToken(token, pepper, "session");
 }
