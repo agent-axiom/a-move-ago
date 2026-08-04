@@ -9,6 +9,7 @@ import { structuredLog } from "./middleware/structured-log";
 import { createAttemptRoutes } from "./routes/attempts";
 import { createDailyRoutes } from "./routes/daily";
 import { me } from "./routes/me";
+import { miniAppAuth } from "./routes/mini-app-auth";
 import { logoutHandler, sessions } from "./routes/sessions";
 
 export interface AppOptions {
@@ -25,6 +26,7 @@ export function createApp(options: AppOptions = {}) {
   app.get("/v1/healthz", (context) => context.json({ ok: true }));
   app.route("/v1/sessions", sessions);
   app.post("/v1/auth/logout", requireSession, logoutHandler);
+  app.route("/v1/auth/telegram/mini-app", miniAppAuth);
   app.route("/v1/daily", createDailyRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/attempts", createAttemptRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/me", me);
