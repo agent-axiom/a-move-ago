@@ -1,7 +1,6 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig, type PluginOption } from "vite";
-
-export type ClientBuildMode = "pages" | "android";
+import { defineConfig, loadEnv, type PluginOption } from "vite";
+import { type ClientBuildMode, hostHeadPlugin } from "./build/telegram-script-plugin";
 
 export function clientBuildProfile(mode: ClientBuildMode) {
   return mode === "android"
@@ -10,10 +9,15 @@ export function clientBuildProfile(mode: ClientBuildMode) {
 }
 
 export default defineConfig(({ mode }) => {
-  const profile = clientBuildProfile(mode === "android" ? "android" : "pages");
+  const buildMode: ClientBuildMode = mode === "android" ? "android" : "pages";
+  const profile = clientBuildProfile(buildMode);
+  const environment = loadEnv(mode, ".", "");
   return {
     base: profile.base,
-    plugins: [react() as unknown as PluginOption],
+    plugins: [
+      hostHeadPlugin(buildMode, environment.VITE_API_BASE_URL ?? ""),
+      react() as unknown as PluginOption,
+    ],
     build: {
       outDir: profile.outDir,
       emptyOutDir: true,
