@@ -15,4 +15,5 @@ test-results/
 *.apk
 apps/client/android/.gradle/
 apps/client/android/local.properties
+apps/api/wrangler.production.jsonc
 .DS_Store
