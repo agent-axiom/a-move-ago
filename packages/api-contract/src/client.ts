@@ -5,11 +5,16 @@ import {
   DailyCaseResponseSchema,
   ErrorEnvelopeSchema,
   GuestSessionRequestSchema,
+  HandoffExchangeRequestSchema,
   HintRequestSchema,
   HintResponseSchema,
   MeResponseSchema,
+  OidcStartRequestSchema,
+  OidcStartResponseSchema,
   SessionIssuedSchema,
   StatsResponseSchema,
+  TelegramMiniAppAuthRequestSchema,
+  TelegramSessionIssuedSchema,
 } from "./api";
 
 type AttemptRequest = z.infer<typeof AttemptRequestSchema>;
@@ -171,6 +176,33 @@ export function createApiClient(options: ApiClientOptions) {
         method: "GET",
         path: "/v1/me/stats",
         responseSchema: StatsResponseSchema,
+        signal,
+      });
+    },
+    loginMiniApp(initData: string, signal?: AbortSignal) {
+      return request({
+        method: "POST",
+        path: "/v1/auth/telegram/mini-app",
+        body: TelegramMiniAppAuthRequestSchema.parse({ initData }),
+        responseSchema: TelegramSessionIssuedSchema,
+        signal,
+      });
+    },
+    startOidc(channel: "web" | "android", signal?: AbortSignal) {
+      return request({
+        method: "POST",
+        path: "/v1/auth/telegram/oidc/start",
+        body: OidcStartRequestSchema.parse({ channel }),
+        responseSchema: OidcStartResponseSchema,
+        signal,
+      });
+    },
+    exchangeHandoff(handoffCode: string, signal?: AbortSignal) {
+      return request({
+        method: "POST",
+        path: "/v1/auth/session/exchange",
+        body: HandoffExchangeRequestSchema.parse({ handoffCode }),
+        responseSchema: TelegramSessionIssuedSchema,
         signal,
       });
     },

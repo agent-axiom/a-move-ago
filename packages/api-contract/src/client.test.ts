@@ -7,6 +7,25 @@ const session = {
   kind: "guest" as const,
 };
 
+const profileFixture = {
+  telegramUserId: "42",
+  displayName: "Ada",
+  username: null,
+  avatarUrl: null,
+};
+
+const telegramSession = {
+  token: "t".repeat(43),
+  expiresAt: "2026-11-01T00:00:00.000Z",
+  kind: "telegram" as const,
+  profile: profileFixture,
+};
+
+const oidcStart = {
+  authorizationUrl: "https://oauth.telegram.org/auth?response_type=code&state=server-state",
+  expiresAt: "2026-08-03T12:10:00.000Z",
+};
+
 const attemptRequest = {
   attemptUuid: "22222222-2222-4222-8222-222222222222",
   caseId: "case-2026-08-03",
@@ -257,4 +276,122 @@ describe("ApiClient", () => {
       expect.objectContaining({ method: "POST", body: JSON.stringify({ level: 1 }) }),
     );
   });
+
+  it("sends raw Mini App initData unchanged and validates the Telegram session", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json(telegramSession, { status: 200 }));
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch,
+      getToken: () => "guest-token",
+    });
+    const raw = "query_id=AAE%2Braw&user=%7B%22id%22%3A1%7D&hash=unchanged";
+
+    await expect(api.loginMiniApp(raw)).resolves.toEqual(telegramSession);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.test/v1/auth/telegram/mini-app",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ initData: raw }),
+        headers: expect.objectContaining({ authorization: "Bearer guest-token" }),
+      }),
+    );
+    const loginInit = fetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    if (!loginInit) throw new Error("Expected Mini App login request init.");
+    expect((JSON.parse(String(loginInit.body)) as { initData: string }).initData).toBe(raw);
+  });
+
+  it("starts OIDC with only the selected channel and validates its response", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json(oidcStart));
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch,
+      getToken: () => "guest-token",
+    });
+
+    await expect(api.startOidc("web")).resolves.toEqual(oidcStart);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.test/v1/auth/telegram/oidc/start",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ channel: "web" }),
+        headers: expect.objectContaining({ authorization: "Bearer guest-token" }),
+      }),
+    );
+    const oidcInit = fetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    if (!oidcInit) throw new Error("Expected OIDC start request init.");
+    expect(JSON.parse(String(oidcInit.body))).toEqual({ channel: "web" });
+  });
+
+  it("exchanges the exact handoff body on the public session path", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json(telegramSession));
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch,
+      getToken: () => "guest-token",
+    });
+    const handoffCode = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
+
+    await expect(api.exchangeHandoff(handoffCode)).resolves.toEqual(telegramSession);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.test/v1/auth/session/exchange",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ handoffCode }),
+        headers: expect.objectContaining({ authorization: "Bearer guest-token" }),
+      }),
+    );
+  });
+
+  it("rejects a non-Telegram Mini App login response as a contract error", async () => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: vi.fn().mockResolvedValue(Response.json(session)),
+      getToken: () => "guest-token",
+    });
+
+    await expect(api.loginMiniApp("query_id=raw&hash=unchanged")).rejects.toBeInstanceOf(
+      ApiContractError,
+    );
+  });
+
+  it("rejects an OIDC response with fields outside the strict schema", async () => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ ...oidcStart, returnUrl: "https://client-controlled.test" }),
+        ),
+      getToken: () => "guest-token",
+    });
+
+    await expect(api.startOidc("android")).rejects.toBeInstanceOf(ApiContractError);
+  });
+
+  it("rejects a non-Telegram handoff exchange response as a contract error", async () => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: vi.fn().mockResolvedValue(Response.json(session)),
+      getToken: () => "guest-token",
+    });
+
+    await expect(
+      api.exchangeHandoff("abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"),
+    ).rejects.toBeInstanceOf(ApiContractError);
+  });
+
+  it.each(["a".repeat(42), "a".repeat(44), "invalid+handoff"])(
+    "rejects malformed handoff %j before fetching",
+    async (handoffCode) => {
+      const fetch = vi.fn();
+      const api = createApiClient({
+        baseUrl: "https://api.test",
+        fetch,
+        getToken: () => "guest-token",
+      });
+
+      expect(() => api.exchangeHandoff(handoffCode)).toThrow();
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
 });
