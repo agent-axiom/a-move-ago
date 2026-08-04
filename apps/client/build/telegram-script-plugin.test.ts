@@ -28,6 +28,12 @@ function cspTag(origin: string, allowTelegram = true) {
   };
 }
 
+const androidDebugCapabilityTag = {
+  tag: "meta",
+  attrs: { name: "a-move-ago-android-debug-auth", content: "enabled" },
+  injectTo: "head-prepend",
+};
+
 describe("Telegram host-head tags", () => {
   it("adds the exact bounded CSP before the Telegram script in Pages", () => {
     const tags = hostHeadTags("pages", "https://api.example.test");
@@ -49,6 +55,16 @@ describe("Telegram host-head tags", () => {
     expect(hostHeadTags("android", "https://api.example.test")).toEqual([
       cspTag("https://api.example.test", false),
     ]);
+  });
+
+  it("emits an explicit artifact marker only for a debug-enabled Android build", () => {
+    expect(hostHeadTags("android", "https://api.example.test", true)).toEqual([
+      cspTag("https://api.example.test", false),
+      androidDebugCapabilityTag,
+    ]);
+    expect(hostHeadTags("pages", "https://api.example.test", true)).not.toContainEqual(
+      androidDebugCapabilityTag,
+    );
   });
 
   it.each([

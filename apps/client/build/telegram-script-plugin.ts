@@ -24,7 +24,11 @@ function apiOrigin(value: string): string {
   return url.origin;
 }
 
-export function hostHeadTags(mode: ClientBuildMode, apiBaseUrl: string): HtmlTagDescriptor[] {
+export function hostHeadTags(
+  mode: ClientBuildMode,
+  apiBaseUrl: string,
+  allowAndroidDebugScheme = false,
+): HtmlTagDescriptor[] {
   const content = [
     "default-src 'none'",
     mode === "pages" ? "script-src 'self' https://telegram.org" : "script-src 'self'",
@@ -49,16 +53,26 @@ export function hostHeadTags(mode: ClientBuildMode, apiBaseUrl: string): HtmlTag
       attrs: { src: "https://telegram.org/js/telegram-web-app.js?63" },
       injectTo: "head-prepend",
     });
+  } else if (allowAndroidDebugScheme === true) {
+    tags.push({
+      tag: "meta",
+      attrs: { name: "a-move-ago-android-debug-auth", content: "enabled" },
+      injectTo: "head-prepend",
+    });
   }
   return tags;
 }
 
-export function hostHeadPlugin(mode: ClientBuildMode, apiBaseUrl: string): Plugin {
+export function hostHeadPlugin(
+  mode: ClientBuildMode,
+  apiBaseUrl: string,
+  allowAndroidDebugScheme = false,
+): Plugin {
   return {
     name: "a-move-ago-host-head",
     transformIndexHtml: {
       order: "pre",
-      handler: () => hostHeadTags(mode, apiBaseUrl),
+      handler: () => hostHeadTags(mode, apiBaseUrl, allowAndroidDebugScheme),
     },
   };
 }

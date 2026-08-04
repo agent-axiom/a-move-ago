@@ -15,7 +15,11 @@ export default defineConfig(({ mode }) => {
   return {
     base: profile.base,
     plugins: [
-      hostHeadPlugin(buildMode, environment.VITE_API_BASE_URL ?? ""),
+      hostHeadPlugin(
+        buildMode,
+        environment.VITE_API_BASE_URL ?? "",
+        environment.VITE_ANDROID_ALLOW_DEBUG_SCHEME === "true",
+      ),
       react() as unknown as PluginOption,
     ],
     build: {

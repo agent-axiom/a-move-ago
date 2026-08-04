@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
+import { verifyPlatformArtifactMarkers } from "./artifact-profile-verifier.ts";
 
 const pages = await readFile(new URL("../dist/pages/index.html", import.meta.url), "utf8");
 const android = await readFile(new URL("../dist/android/index.html", import.meta.url), "utf8");
@@ -27,7 +28,7 @@ assert.match(decodedAndroid, /connect-src[^;]*https:\/\/api\.test/);
 assert.doesNotMatch(decodedAndroid, /unsafe-eval|script-src[^;]*\*|connect-src[^;]*\*/);
 assert.doesNotMatch(decodedAndroid, /telegram\.org/);
 assert.match(android, /["']\/assets\//);
-assert.doesNotMatch(android, /telegram-web-app\.js|\/a-move-ago\/assets\/|@capacitor/);
+assert.doesNotMatch(android, /telegram-web-app\.js|\/a-move-ago\/assets\//);
 
 const assetDirectories = [
   new URL("../dist/pages/assets/", import.meta.url),
@@ -55,11 +56,11 @@ const bundles = await Promise.all(
     (await Promise.all(scripts.map((url) => readFile(url, "utf8")))).join("\n"),
   ),
 );
-assert.doesNotMatch(
-  bundles[1] ?? "",
-  /telegram-web-app\.js|@capacitor/,
-  "The Android web artifact must not contain Telegram bootstrap or Capacitor code",
-);
+verifyPlatformArtifactMarkers({
+  pages: [pages, bundles[0] ?? ""].join("\n"),
+  android: [android, bundles[1] ?? ""].join("\n"),
+  androidHtml: android,
+});
 assert.doesNotMatch(
   [pages, android, ...bundles].join("\n"),
   /rnbqkbnr\/ppp1pppp\/8\/3p4\/4P3\/8\/PPPP1PPP/,
