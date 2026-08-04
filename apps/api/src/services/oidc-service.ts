@@ -1,9 +1,13 @@
 import { type OidcStartResponse, OidcStartResponseSchema } from "@a-move-ago/api-contract";
+import { type OidcChannel, resolveAuthReturnTarget } from "../auth/return-target";
+import { OidcProviderError, type TelegramOidcProvider } from "../auth/telegram-oidc";
 import { hashOpaqueToken, newOpaqueToken } from "../crypto/opaque-token";
 import { newPkcePair } from "../crypto/pkce";
-import { type AuthFlowChannel, insertAuthFlow } from "../db/auth-flows";
+import { type AuthFlowChannel, claimAuthFlow, insertAuthFlow } from "../db/auth-flows";
+import { completeOidcPlayerAndAuthFlow } from "../db/players";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
+import { exchangeHandoffAndLinkGuest } from "./account-link-service";
 
 const maxIsoDateSeconds = 253_402_300_799;
 const telegramAuthorizationEndpoint = "https://oauth.telegram.org/auth";
@@ -19,6 +23,21 @@ function flowExpiry(env: Env, now: number): number {
   const expiresAt = now + ttl;
   if (!Number.isSafeInteger(expiresAt) || expiresAt > maxIsoDateSeconds) {
     throw new Error("OIDC_FLOW_TTL_SECONDS produces an unrepresentable expiry.");
+  }
+  return expiresAt;
+}
+
+function handoffExpiry(env: Env, now: number): number {
+  const ttl = Number(env.HANDOFF_TTL_SECONDS);
+  if (!Number.isSafeInteger(now) || now < 0) {
+    throw new Error("OIDC callback time must be a non-negative safe integer.");
+  }
+  if (!Number.isSafeInteger(ttl) || ttl <= 0) {
+    throw new Error("HANDOFF_TTL_SECONDS must be a positive integer.");
+  }
+  const expiresAt = now + ttl;
+  if (!Number.isSafeInteger(expiresAt) || expiresAt > maxIsoDateSeconds) {
+    throw new Error("HANDOFF_TTL_SECONDS produces an unrepresentable expiry.");
   }
   return expiresAt;
 }
@@ -78,6 +97,7 @@ export async function startOidcFlow(
     );
   }
 
+  resolveAuthReturnTarget(env, channel);
   const expiresAt = flowExpiry(env, now);
   const { clientId, callbackUrl } = oidcConfiguration(env);
   const state = newOpaqueToken();
@@ -111,4 +131,92 @@ export async function startOidcFlow(
   });
   if (!inserted) throw invalidSession();
   return response;
+}
+
+export function fixedReturnUrl(
+  env: Env,
+  channel: OidcChannel,
+  query: Record<string, string>,
+): string {
+  const url = resolveAuthReturnTarget(env, channel);
+  for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+  return url.toString();
+}
+
+export async function completeOidcCallback(input: {
+  env: Env;
+  provider: TelegramOidcProvider;
+  state: string;
+  code: string;
+  now: number;
+}): Promise<string> {
+  const expiresAt = handoffExpiry(input.env, input.now);
+  resolveAuthReturnTarget(input.env, "web");
+  resolveAuthReturnTarget(input.env, "android");
+  const configuration = oidcConfiguration(input.env);
+  const stateHash = await hashOpaqueToken(input.state, input.env.SESSION_PEPPER, "oidc-state");
+  const flow = await claimAuthFlow(input.env.DB, stateHash, input.now);
+  if (!flow) {
+    throw new ApiError(400, "OIDC_STATE_INVALID", "OIDC state is invalid or expired.");
+  }
+
+  try {
+    const identity = await input.provider.exchangeAndVerify({
+      code: input.code,
+      verifier: flow.pkce_verifier,
+      expectedNonce: flow.nonce,
+      clientId: configuration.clientId,
+      clientSecret: input.env.TELEGRAM_OIDC_CLIENT_SECRET,
+      redirectUri: configuration.callbackUrl,
+    });
+    if (!identity.oidc) {
+      throw new ApiError(401, "OIDC_TOKEN_INVALID", "OIDC token is invalid.");
+    }
+    const handoffCode = newOpaqueToken();
+    const handoffHash = await hashOpaqueToken(
+      handoffCode,
+      input.env.SESSION_PEPPER,
+      "oidc-handoff",
+    );
+    await completeOidcPlayerAndAuthFlow(
+      input.env.DB,
+      { ...identity, oidc: identity.oidc },
+      input.now,
+      {
+        flowId: flow.id,
+        handoffHash,
+        handoffExpiresAt: expiresAt,
+      },
+    );
+    return fixedReturnUrl(input.env, flow.channel, { handoff: handoffCode });
+  } catch (error) {
+    if (error instanceof OidcProviderError) {
+      throw new ApiError(
+        error.code === "OIDC_PROVIDER_ERROR" ? 503 : 401,
+        error.code,
+        "Telegram login could not be verified.",
+      );
+    }
+    throw error;
+  }
+}
+
+export async function exchangeOidcHandoff(
+  env: Env,
+  guest: SessionActor,
+  handoffCode: string,
+  now: number,
+) {
+  if (guest.kind !== "guest" || guest.playerId !== null || guest.channel === "telegram") {
+    throw new ApiError(409, "AUTH_REQUIRES_GUEST", "Exchange requires the original guest session.");
+  }
+  return await exchangeHandoffAndLinkGuest(
+    env,
+    guest,
+    {
+      handoffHash: await hashOpaqueToken(handoffCode, env.SESSION_PEPPER, "oidc-handoff"),
+      channel: guest.channel,
+    },
+    now,
+  );
 }
