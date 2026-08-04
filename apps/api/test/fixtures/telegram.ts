@@ -1,3 +1,5 @@
+import type { VerifiedTelegramIdentity } from "../../src/auth/types";
+
 const encoder = new TextEncoder();
 
 async function hmac(
@@ -21,6 +23,18 @@ export const defaultWebAppUser = {
   username: "ada",
   photo_url: "https://cdn.example/avatar.jpg",
 };
+
+export const verifiedOidcIdentity = {
+  telegramUserId: "987654321",
+  displayName: "Ada Lovelace",
+  username: "ada",
+  avatarUrl: "https://cdn.example/avatar.jpg",
+  oidc: {
+    issuer: "https://oauth.telegram.org" as const,
+    subject: "telegram-subject-987654321",
+    audience: "123456789",
+  },
+} satisfies VerifiedTelegramIdentity;
 
 export async function signedMiniAppData(input: {
   botToken: string;
