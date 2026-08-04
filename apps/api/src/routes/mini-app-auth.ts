@@ -4,13 +4,14 @@ import { TelegramProofError, verifyMiniAppInitData } from "../auth/telegram-mini
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
 import { requestJson } from "../http/request-body";
+import { requireAllowedMutationOrigin } from "../middleware/origin";
 import { enforceLimit } from "../middleware/rate-limit";
 import { requireSession } from "../middleware/session";
 import { linkGuestToPlayer } from "../services/account-link-service";
 
 export const miniAppAuth = new Hono<AppEnv>();
 
-miniAppAuth.post("/", requireSession, async (context) => {
+miniAppAuth.post("/", requireSession, requireAllowedMutationOrigin, async (context) => {
   const guest = context.get("session");
   if (guest?.kind !== "guest" || guest.channel !== "telegram") {
     throw new ApiError(409, "AUTH_CHANNEL_MISMATCH", "Use a Telegram guest session.");

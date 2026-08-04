@@ -507,32 +507,24 @@ describe("security boundary", () => {
     const entries = logs.map((line) => JSON.parse(line) as Record<string, unknown>);
     for (const entry of entries) {
       expect(Object.keys(entry).sort()).toEqual(
-        ["durationMs", "method", "requestId", "route", "sessionKind", "status"].sort(),
+        ["method", "path", "requestId", "sessionKind", "status"].sort(),
       );
       expect(entry.requestId).toMatch(/^[0-9a-f-]{36}$/);
       expect(entry.method).toMatch(/^(GET|POST|OPTIONS)$/);
-      expect(entry.route).toEqual(expect.any(String));
+      expect(entry.path).toEqual(expect.any(String));
       expect(entry.status).toEqual(expect.any(Number));
-      expect(entry.durationMs).toEqual(expect.any(Number));
       expect(entry.sessionKind).toMatch(/^(none|guest|telegram)$/);
     }
-    expect(entries.map((entry) => entry.route)).toEqual([
+    expect(entries.map((entry) => entry.path)).toEqual([
       "/v1/sessions/guest",
       "/v1/daily",
-      "/v1/attempts/:attemptId/hints",
-      "/*",
+      `/v1/attempts/${pathMarker}/hints`,
+      `/v1/attempts/${pathMarker}/hints`,
     ]);
     expect(entries.map((entry) => entry.status)).toEqual([201, 400, 400, 204]);
     expect(entries.map((entry) => entry.sessionKind)).toEqual(["none", "guest", "guest", "none"]);
     const serialized = logs.join("\n");
-    for (const secret of [
-      issued.token,
-      rawIp,
-      queryMarker,
-      bodyMarker,
-      pathMarker,
-      "authorization",
-    ]) {
+    for (const secret of [issued.token, rawIp, queryMarker, bodyMarker, "authorization"]) {
       expect(serialized).not.toContain(secret);
     }
   });

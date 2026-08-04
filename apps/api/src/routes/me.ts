@@ -1,16 +1,10 @@
 import { MeResponseSchema, StatsResponseSchema } from "@a-move-ago/api-contract";
 import { Hono } from "hono";
+import { findPlayer, toTelegramProfile } from "../db/players";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
 import { requireSession } from "../middleware/session";
 import { statsForActor } from "../services/stats-service";
-
-type PlayerRow = {
-  telegram_user_id: string;
-  display_name: string;
-  username: string | null;
-  avatar_url: string | null;
-};
 
 export const me = new Hono<AppEnv>();
 
@@ -38,13 +32,7 @@ me.get("/", requireSession, async (context) => {
     throw new ApiError(401, "INVALID_SESSION", "Session player does not exist.");
   }
 
-  const player = await context.env.DB.prepare(
-    `SELECT telegram_user_id, display_name, username, avatar_url
-       FROM players
-      WHERE id = ?`,
-  )
-    .bind(session.playerId)
-    .first<PlayerRow>();
+  const player = await findPlayer(context.env.DB, session.playerId);
   if (!player) {
     throw new ApiError(401, "INVALID_SESSION", "Session player does not exist.");
   }
@@ -52,12 +40,7 @@ me.get("/", requireSession, async (context) => {
   return context.json(
     MeResponseSchema.parse({
       kind: "telegram",
-      profile: {
-        telegramUserId: player.telegram_user_id,
-        displayName: player.display_name,
-        username: player.username,
-        avatarUrl: player.avatar_url,
-      },
+      profile: toTelegramProfile(player),
     }),
   );
 });

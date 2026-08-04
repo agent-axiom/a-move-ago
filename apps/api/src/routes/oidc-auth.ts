@@ -8,6 +8,7 @@ import { claimAuthFlow } from "../db/auth-flows";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
 import { requestJson } from "../http/request-body";
+import { requireAllowedMutationOrigin } from "../middleware/origin";
 import { enforceLimit } from "../middleware/rate-limit";
 import { requireSession } from "../middleware/session";
 import { completeOidcCallback, fixedReturnUrl, startOidcFlow } from "../services/oidc-service";
@@ -51,7 +52,7 @@ function parseCallbackQuery(url: string): z.infer<typeof CallbackQuerySchema> {
   return parsed.data;
 }
 
-oidcStartRoutes.post("/start", requireSession, async (context) => {
+oidcStartRoutes.post("/start", requireSession, requireAllowedMutationOrigin, async (context) => {
   const guest = context.get("session");
   if (!guest) {
     throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");

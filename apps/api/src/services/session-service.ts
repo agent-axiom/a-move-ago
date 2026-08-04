@@ -10,6 +10,9 @@ const maxIsoDateSeconds = 253_402_300_799;
 
 function sessionExpiry(env: Env, now: number): number {
   const ttl = Number(env.SESSION_TTL_SECONDS);
+  if (!Number.isSafeInteger(now) || now < 0) {
+    throw new Error("Session time must be a non-negative safe integer.");
+  }
   if (!Number.isSafeInteger(ttl) || ttl <= 0) {
     throw new Error("SESSION_TTL_SECONDS must be a positive integer.");
   }
@@ -26,6 +29,40 @@ function issuedGuest(token: string, expiresAt: number): SessionIssued {
     expiresAt: new Date(expiresAt * 1000).toISOString(),
     kind: "guest",
   });
+}
+
+function invalidSession(): ApiError {
+  return new ApiError(401, "INVALID_SESSION", "The session is no longer active.");
+}
+
+async function classifyLogoutFailure(
+  env: Env,
+  actor: SessionActor,
+  now: number,
+  error: unknown,
+): Promise<never> {
+  let successor: { id: string } | null;
+  let original: { id: string } | null;
+  try {
+    successor = await env.DB.prepare("SELECT id FROM sessions WHERE rotated_from_session_id = ?")
+      .bind(actor.sessionId)
+      .first<{ id: string }>();
+    original = await env.DB.prepare(
+      `SELECT id FROM sessions
+        WHERE id = ?
+          AND kind = ?
+          AND player_id IS ?
+          AND channel = ?
+          AND revoked_at IS NULL
+          AND expires_at > ?`,
+    )
+      .bind(actor.sessionId, actor.kind, actor.playerId, actor.channel, now)
+      .first<{ id: string }>();
+  } catch {
+    throw error;
+  }
+  if (successor || !original) throw invalidSession();
+  throw error;
 }
 
 export async function issueGuest(
@@ -54,8 +91,9 @@ export async function logoutToGuest(
   const token = newOpaqueToken();
   const tokenHash = await hashSessionToken(token, env.SESSION_PEPPER);
   const replacementId = crypto.randomUUID();
+  const response = issuedGuest(token, expiresAt);
 
-  let results: D1Result[];
+  let results: D1Result[] | undefined;
   try {
     results = await env.DB.batch([
       env.DB.prepare(
@@ -64,7 +102,12 @@ export async function logoutToGuest(
            created_at, expires_at, revoked_at, last_seen_at)
          SELECT ?, NULL, ?, 'guest', ?, ?, ?, ?, NULL, ?
            FROM sessions
-          WHERE id = ? AND revoked_at IS NULL AND expires_at > ?`,
+          WHERE id = ?
+            AND kind = ?
+            AND player_id IS ?
+            AND channel = ?
+            AND revoked_at IS NULL
+            AND expires_at > ?`,
       ).bind(
         replacementId,
         tokenHash,
@@ -74,35 +117,80 @@ export async function logoutToGuest(
         expiresAt,
         now,
         actor.sessionId,
+        actor.kind,
+        actor.playerId,
+        actor.channel,
         now,
       ),
       env.DB.prepare(
-        "UPDATE sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL AND expires_at > ?",
-      ).bind(now, actor.sessionId, now),
+        `UPDATE sessions
+            SET revoked_at = ?
+          WHERE id = ?
+            AND kind = ?
+            AND player_id IS ?
+            AND channel = ?
+            AND revoked_at IS NULL
+            AND expires_at > ?`,
+      ).bind(now, actor.sessionId, actor.kind, actor.playerId, actor.channel, now),
+      env.DB.prepare(
+        `INSERT INTO sessions
+          (id, player_id, token_hash, kind, channel,
+           created_at, expires_at, revoked_at, last_seen_at)
+         SELECT ?, NULL, ?, 'logout-transaction-guard', ?, ?, ?, NULL, ?
+          WHERE NOT (
+            EXISTS (
+              SELECT 1 FROM sessions replacement
+               WHERE replacement.id = ?
+                 AND replacement.kind = 'guest'
+                 AND replacement.player_id IS NULL
+                 AND replacement.channel = ?
+                 AND replacement.rotated_from_session_id = ?
+            )
+            AND EXISTS (
+              SELECT 1 FROM sessions original
+               WHERE original.id = ?
+                 AND original.kind = ?
+                 AND original.player_id IS ?
+                 AND original.channel = ?
+                 AND original.revoked_at = ?
+            )
+          )`,
+      ).bind(
+        crypto.randomUUID(),
+        `logout-guard:${replacementId}`,
+        actor.channel,
+        now,
+        expiresAt,
+        now,
+        replacementId,
+        actor.channel,
+        actor.sessionId,
+        actor.sessionId,
+        actor.kind,
+        actor.playerId,
+        actor.channel,
+        now,
+      ),
     ]);
   } catch (error) {
-    const successor = await env.DB.prepare(
-      "SELECT id FROM sessions WHERE rotated_from_session_id = ?",
-    )
-      .bind(actor.sessionId)
-      .first<{ id: string }>()
-      .catch(() => null);
-    if (successor) {
-      throw new ApiError(401, "INVALID_SESSION", "The session is no longer active.");
-    }
-    throw error;
+    await classifyLogoutFailure(env, actor, now, error);
+  }
+  if (results?.length !== 3) {
+    throw new Error("Session rotation returned an unexpected result count.");
   }
   const insertResult = results[0];
   const revokeResult = results[1];
-  if (!insertResult || !revokeResult) {
-    throw new Error("Session rotation did not return both statement results.");
-  }
-  if (insertResult.meta.changes === 0 && revokeResult.meta.changes === 0) {
-    throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
-  }
-  if (insertResult.meta.changes !== 1 || revokeResult.meta.changes !== 1) {
+  const guardResult = results[2];
+  if (
+    !insertResult ||
+    !revokeResult ||
+    !guardResult ||
+    insertResult.meta.changes !== 1 ||
+    revokeResult.meta.changes !== 1 ||
+    guardResult.meta.changes !== 0
+  ) {
     throw new Error("Session rotation changed an unexpected number of rows.");
   }
 
-  return issuedGuest(token, expiresAt);
+  return response;
 }
