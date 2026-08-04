@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   AttemptRequestSchema,
+  HandoffExchangeRequestSchema,
+  OidcStartRequestSchema,
+  OidcStartResponseSchema,
   PuzzlePrivateSchema,
   PuzzlePublicSchema,
   RetractionSchema,
   SquareSchema,
+  TelegramMiniAppAuthRequestSchema,
   TelegramProfileSchema,
+  TelegramSessionIssuedSchema,
 } from "./index";
 
 describe("shared contracts", () => {
@@ -60,6 +65,77 @@ describe("shared contracts", () => {
     expect(
       TelegramProfileSchema.safeParse({ ...profile, avatarUrl: "data:image/png;base64,AAAA" })
         .success,
+    ).toBe(false);
+  });
+
+  it("accepts only the intended Telegram login payloads", () => {
+    expect(TelegramMiniAppAuthRequestSchema.parse({ initData: "auth_date=1&hash=aa" })).toEqual({
+      initData: "auth_date=1&hash=aa",
+    });
+    expect(OidcStartRequestSchema.parse({ channel: "android" })).toEqual({ channel: "android" });
+    expect(OidcStartRequestSchema.safeParse({ channel: "telegram" }).success).toBe(false);
+    expect(
+      OidcStartRequestSchema.safeParse({ channel: "web", returnUrl: "https://evil.test" }).success,
+    ).toBe(false);
+    expect(HandoffExchangeRequestSchema.safeParse({ handoffCode: "a".repeat(43) }).success).toBe(
+      true,
+    );
+  });
+
+  it("rejects extra auth keys and malformed one-time tokens", () => {
+    expect(TelegramMiniAppAuthRequestSchema.safeParse({ initData: "" }).success).toBe(false);
+    expect(TelegramMiniAppAuthRequestSchema.safeParse({ initData: "a".repeat(8193) }).success).toBe(
+      false,
+    );
+    expect(
+      TelegramMiniAppAuthRequestSchema.safeParse({ initData: "auth_date=1", extra: true }).success,
+    ).toBe(false);
+    expect(HandoffExchangeRequestSchema.safeParse({ handoffCode: "a".repeat(42) }).success).toBe(
+      false,
+    );
+    expect(HandoffExchangeRequestSchema.safeParse({ handoffCode: "a".repeat(44) }).success).toBe(
+      false,
+    );
+    expect(
+      HandoffExchangeRequestSchema.safeParse({ handoffCode: `${"a".repeat(42)}+` }).success,
+    ).toBe(false);
+    expect(
+      HandoffExchangeRequestSchema.safeParse({ handoffCode: `${"a".repeat(42)}=` }).success,
+    ).toBe(false);
+    expect(
+      HandoffExchangeRequestSchema.safeParse({ handoffCode: ` ${"a".repeat(43)}` }).success,
+    ).toBe(false);
+  });
+
+  it("shares one flat authenticated-session response", () => {
+    const value = {
+      token: "a".repeat(43),
+      expiresAt: "2026-11-01T00:00:00.000Z",
+      kind: "telegram",
+      profile: {
+        telegramUserId: "987654321",
+        displayName: "Ada Lovelace",
+        username: "ada",
+        avatarUrl: "https://cdn.example/avatar.jpg",
+      },
+    } as const;
+    expect(TelegramSessionIssuedSchema.parse(value)).toEqual(value);
+    expect(
+      OidcStartResponseSchema.parse({
+        authorizationUrl: "https://oauth.telegram.org/auth?response_type=code",
+        expiresAt: "2026-08-03T12:10:00.000Z",
+      }).authorizationUrl,
+    ).toContain("oauth.telegram.org");
+    expect(TelegramSessionIssuedSchema.safeParse({ ...value, token: "a".repeat(42) }).success).toBe(
+      false,
+    );
+    expect(TelegramSessionIssuedSchema.safeParse({ ...value, extra: true }).success).toBe(false);
+    expect(TelegramSessionIssuedSchema.safeParse({ ...value, kind: "guest" }).success).toBe(false);
+    expect(
+      TelegramSessionIssuedSchema.safeParse({
+        ...value,
+        profile: { ...value.profile, extra: true },
+      }).success,
     ).toBe(false);
   });
 

@@ -14,9 +14,21 @@ const boundaryEnv: Env = {
   ALLOWED_ORIGINS: " , https://allowed.test, ,",
   SESSION_TTL_SECONDS: "7776000",
   SESSION_PEPPER: "test-session-pepper-at-least-32-bytes",
+  TELEGRAM_BOT_TOKEN: "123456:test-bot-secret",
+  TELEGRAM_OIDC_CLIENT_ID: "123456789",
+  TELEGRAM_OIDC_CLIENT_SECRET: "test-oidc-client-secret",
+  TELEGRAM_OIDC_CALLBACK_URL: "https://api.test/v1/auth/telegram/oidc/callback",
+  API_ORIGIN: "https://api.test",
+  WEB_AUTH_RETURN_URL: "https://agent-axiom.github.io/a-move-ago/",
+  ANDROID_AUTH_RETURN_URL: "amoveago-debug://auth",
+  TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: "3600",
+  TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS: "30",
+  OIDC_FLOW_TTL_SECONDS: "600",
+  HANDOFF_TTL_SECONDS: "60",
   GUEST_RATE_LIMITER: { limit: async () => ({ success: true }) },
   ATTEMPT_RATE_LIMITER: { limit: async () => ({ success: true }) },
   HINT_RATE_LIMITER: { limit: async () => ({ success: true }) },
+  AUTH_RATE_LIMITER: { limit: async () => ({ success: true }) },
 };
 
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

@@ -11,6 +11,9 @@
       "migrations_dir": "migrations"
     }
   ],
+  "secrets": {
+    "required": ["SESSION_PEPPER", "TELEGRAM_BOT_TOKEN", "TELEGRAM_OIDC_CLIENT_SECRET"]
+  },
   "ratelimits": [
     {
       "name": "GUEST_RATE_LIMITER",
@@ -26,15 +29,32 @@
       "name": "HINT_RATE_LIMITER",
       "namespace_id": "900000003",
       "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "900000004",
+      "simple": { "limit": 10, "period": 60 }
     }
   ],
   "triggers": { "crons": ["17 0 * * *"] },
   "vars": {
     "ENVIRONMENT": "development",
     "ALLOWED_ORIGINS": "http://localhost:5173,https://agent-axiom.github.io,https://localhost",
-    "SESSION_TTL_SECONDS": "7776000"
+    "SESSION_TTL_SECONDS": "7776000",
+    "TELEGRAM_OIDC_CLIENT_ID": "123456789",
+    "TELEGRAM_OIDC_CALLBACK_URL": "https://a-move-ago-api.example.invalid/v1/auth/telegram/oidc/callback",
+    "API_ORIGIN": "https://a-move-ago-api.example.invalid",
+    "WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/",
+    "ANDROID_AUTH_RETURN_URL": "amoveago-debug://auth",
+    "TELEGRAM_INIT_DATA_MAX_AGE_SECONDS": "3600",
+    "TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS": "30",
+    "OIDC_FLOW_TTL_SECONDS": "600",
+    "HANDOFF_TTL_SECONDS": "60"
   },
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "logs": {
+      "invocation_logs": false
+    }
   }
 }

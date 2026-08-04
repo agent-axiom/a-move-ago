@@ -35,6 +35,47 @@ export const TelegramProfileSchema = z
   })
   .strict();
 
+export const TelegramMiniAppAuthRequestSchema = z
+  .object({
+    initData: z.string().min(1).max(8192),
+  })
+  .strict();
+
+export const OidcStartRequestSchema = z
+  .object({
+    channel: z.enum(["web", "android"]),
+  })
+  .strict();
+
+export const OidcStartResponseSchema = z
+  .object({
+    authorizationUrl: z.url(),
+    expiresAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const HandoffExchangeRequestSchema = z
+  .object({
+    handoffCode: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  })
+  .strict();
+
+export const TelegramSessionIssuedSchema = z
+  .object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    expiresAt: z.iso.datetime(),
+    kind: z.literal("telegram"),
+    profile: TelegramProfileSchema,
+  })
+  .strict();
+
+export type TelegramProfile = z.infer<typeof TelegramProfileSchema>;
+export type TelegramMiniAppAuthRequest = z.infer<typeof TelegramMiniAppAuthRequestSchema>;
+export type OidcStartRequest = z.infer<typeof OidcStartRequestSchema>;
+export type OidcStartResponse = z.infer<typeof OidcStartResponseSchema>;
+export type HandoffExchangeRequest = z.infer<typeof HandoffExchangeRequestSchema>;
+export type TelegramSessionIssued = z.infer<typeof TelegramSessionIssuedSchema>;
+
 export const MeResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("guest"), profile: z.null() }).strict(),
   z.object({ kind: z.literal("telegram"), profile: TelegramProfileSchema }).strict(),

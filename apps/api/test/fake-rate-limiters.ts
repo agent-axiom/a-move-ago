@@ -9,5 +9,6 @@ export function withFakeRateLimiters(source: Env): Env {
     GUEST_RATE_LIMITER: permissiveLimiter,
     ATTEMPT_RATE_LIMITER: permissiveLimiter,
     HINT_RATE_LIMITER: permissiveLimiter,
+    AUTH_RATE_LIMITER: permissiveLimiter,
   });
 }

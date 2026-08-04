@@ -16,6 +16,7 @@ const gameplayTables = [
   "content_imports",
 ];
 const digest = "a".repeat(64);
+const migrationNames = [{ name: "0001_initial.sql" }, { name: "0002_telegram_auth.sql" }];
 const testEnv = env as Env & { TEST_MIGRATIONS: D1Migration[] };
 type SqlCase = [sql: string, values?: unknown[]];
 
@@ -126,6 +127,7 @@ async function fixture() {
 beforeEach(async () => {
   await execute("PRAGMA foreign_keys = ON");
   for (const table of [
+    "auth_flows",
     "hint_events",
     "attempts",
     "content_imports",
@@ -164,16 +166,151 @@ describe("D1 migrations", () => {
     ]);
   });
 
-  it("records the initial migration once and reapplies it as a no-op", async () => {
+  it("records each migration once and reapplies them as a no-op", async () => {
     expect(await results<{ name: string }>("SELECT name FROM d1_migrations ORDER BY name")).toEqual(
-      [{ name: "0001_initial.sql" }],
+      migrationNames,
     );
 
     await applyD1Migrations(testEnv.DB, testEnv.TEST_MIGRATIONS);
 
     expect(await results<{ name: string }>("SELECT name FROM d1_migrations ORDER BY name")).toEqual(
-      [{ name: "0001_initial.sql" }],
+      migrationNames,
     );
+  });
+
+  it("stores hashed one-time OIDC state and handoff data", async () => {
+    const columns = await env.DB.prepare("PRAGMA table_info(auth_flows)").all<{ name: string }>();
+    const names = columns.results.map((column) => column.name);
+
+    expect(names).toEqual([
+      "id",
+      "state_hash",
+      "guest_session_id",
+      "channel",
+      "nonce",
+      "pkce_verifier",
+      "expires_at",
+      "callback_claimed_at",
+      "player_id",
+      "handoff_hash",
+      "handoff_expires_at",
+      "handoff_consumed_at",
+      "handoff_session_id",
+      "created_at",
+    ]);
+    expect(names).not.toContain("state");
+    expect(names).not.toContain("handoff_code");
+  });
+
+  it("enforces auth-flow references, state checks, uniqueness, and lookup indexes", async () => {
+    const foreignKeys = await results<{
+      from: string;
+      on_delete: string;
+      table: string;
+      to: string;
+    }>("PRAGMA foreign_key_list(auth_flows)");
+    expect(
+      foreignKeys
+        .map(({ from, on_delete, table, to }) => ({ from, on_delete, table, to }))
+        .sort((left, right) => left.from.localeCompare(right.from)),
+    ).toEqual([
+      { from: "guest_session_id", on_delete: "CASCADE", table: "sessions", to: "id" },
+      { from: "player_id", on_delete: "CASCADE", table: "players", to: "id" },
+    ]);
+
+    const indexes = await results<{ name: string; sql: string | null }>(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'auth_flows' ORDER BY name",
+    );
+    expect(indexes.filter((index) => index.sql !== null)).toEqual([
+      {
+        name: "auth_flows_expiry_idx",
+        sql: "CREATE INDEX auth_flows_expiry_idx ON auth_flows(expires_at)",
+      },
+      {
+        name: "auth_flows_guest_idx",
+        sql: "CREATE INDEX auth_flows_guest_idx ON auth_flows(guest_session_id, created_at)",
+      },
+    ]);
+
+    const value = await fixture();
+    await execute(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, created_at)
+       VALUES ('flow', 'state-hash', ?, 'web', 'nonce', 'verifier', 2, 1)`,
+      [value.guest],
+    );
+    await rejects(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, created_at)
+       VALUES ('duplicate-state', 'state-hash', ?, 'web', 'nonce', 'verifier', 2, 1)`,
+      [value.otherGuest],
+    );
+    await rejects(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, created_at)
+       VALUES ('bad-guest', 'bad-guest-state', 'missing-session', 'web', 'nonce', 'verifier', 2, 1)`,
+    );
+    await rejects(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, created_at)
+       VALUES ('bad-channel', 'bad-channel-state', ?, 'telegram', 'nonce', 'verifier', 2, 1)`,
+      [value.guest],
+    );
+    await rejects(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at,
+          handoff_hash, created_at)
+       VALUES ('partial-handoff', 'partial-handoff-state', ?, 'android', 'nonce', 'verifier', 2,
+               'partial-handoff-hash', 1)`,
+      [value.otherGuest],
+    );
+    await rejects(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, player_id,
+          handoff_hash, handoff_expires_at, created_at)
+       VALUES ('bad-player', 'bad-player-state', ?, 'web', 'nonce', 'verifier', 2,
+               'missing-player', 'bad-player-handoff', 3, 1)`,
+      [value.otherGuest],
+    );
+    await execute(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, player_id,
+          handoff_hash, handoff_expires_at, created_at)
+       VALUES ('handoff', 'handoff-state', ?, 'android', 'nonce', 'verifier', 2, ?,
+               'handoff-hash', 3, 1)`,
+      [value.otherGuest, value.player],
+    );
+    await rejects("UPDATE auth_flows SET handoff_consumed_at = 4 WHERE id = 'handoff'");
+    await execute(
+      "UPDATE auth_flows SET handoff_consumed_at = 4, handoff_session_id = 'issued-session' WHERE id = 'handoff'",
+    );
+    await rejects(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, player_id,
+          handoff_hash, handoff_expires_at, handoff_consumed_at, handoff_session_id, created_at)
+       VALUES ('duplicate-handoff', 'duplicate-handoff-state', ?, 'web', 'nonce', 'verifier', 2, ?,
+               'handoff-hash', 3, 4, 'other-issued-session', 1)`,
+      [value.guest, value.player],
+    );
+    await rejects(
+      `INSERT INTO auth_flows
+         (id, state_hash, guest_session_id, channel, nonce, pkce_verifier, expires_at, player_id,
+          handoff_hash, handoff_expires_at, handoff_consumed_at, handoff_session_id, created_at)
+       VALUES ('duplicate-session', 'duplicate-session-state', ?, 'web', 'nonce', 'verifier', 2, ?,
+               'other-handoff-hash', 3, 4, 'issued-session', 1)`,
+      [value.guest, value.player],
+    );
+    expect(await results<Record<string, never>>("PRAGMA foreign_key_check")).toEqual([]);
+
+    await execute("DELETE FROM sessions WHERE id = ?", [value.guest]);
+    expect(await results<{ id: string }>("SELECT id FROM auth_flows WHERE id = 'flow'")).toEqual(
+      [],
+    );
+    await execute("DELETE FROM players WHERE id = ?", [value.player]);
+    expect(await results<{ id: string }>("SELECT id FROM auth_flows WHERE id = 'handoff'")).toEqual(
+      [],
+    );
+    expect(await results<Record<string, never>>("PRAGMA foreign_key_check")).toEqual([]);
   });
 
   it("accepts a valid relational fixture and reports valid foreign keys", async () => {
