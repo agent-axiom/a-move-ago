@@ -6,7 +6,7 @@ import {
   type Retraction,
   SessionIssuedSchema,
 } from "@a-move-ago/api-contract";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app";
 import { hashSessionToken } from "../src/crypto/opaque-token";
 import type { Env } from "../src/env";
@@ -137,6 +137,7 @@ async function hintState(attemptId: string): Promise<{ events: number; hintsUsed
 }
 
 beforeEach(async () => {
+  vi.spyOn(Date, "now").mockReturnValue(injectedNow.getTime());
   for (const table of [
     "hint_events",
     "attempts",
@@ -152,6 +153,10 @@ beforeEach(async () => {
     await testEnv.DB.prepare(`DELETE FROM ${table}`).run();
   }
   await seedContentFixture(testEnv.DB);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("POST /v1/attempts/:id/hints", () => {
