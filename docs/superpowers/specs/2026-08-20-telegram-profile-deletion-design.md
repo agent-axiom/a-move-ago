@@ -1,6 +1,6 @@
 # A MOVE AGO — удаление Telegram-профиля
 
-- Статус: решения согласованы; письменный spec прошёл внутренний review и ожидает review пользователя
+- Статус: утверждён пользователем; готов к реализации
 - Дата: 2026-08-20
 - Репозиторий: `agent-axiom/a-move-ago`
 - Связанный release blocker: `PRIVACY.md`, раздел «Player controls and deletion requirement»
