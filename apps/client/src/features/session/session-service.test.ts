@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { runtimeFixture } from "../../test/runtime-fixture";
 import {
   bootstrapSession,
+  deleteProfile,
   RetryableHandoffError,
   retryHandoff,
   saveProgress,
@@ -25,6 +26,34 @@ const telegramSession = {
 };
 
 describe("session service", () => {
+  it("deletes a Telegram profile without rotating or clearing the current token", async () => {
+    const runtime = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+    const beforeRuntimeToken = runtime.token.get();
+    const beforeStoredToken = await runtime.platform.tokenStore.read();
+    const signal = new AbortController().signal;
+
+    await expect(deleteProfile(runtime, signal)).resolves.toEqual({
+      kind: "guest",
+      profile: null,
+    });
+    expect(runtime.api.deleteProfile).toHaveBeenCalledWith(signal);
+    expect(runtime.token.get()).toBe(beforeRuntimeToken);
+    expect(await runtime.platform.tokenStore.read()).toBe(beforeStoredToken);
+    expect(runtime.platform.tokenStore.write).not.toHaveBeenCalled();
+    expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
+  });
+
+  it("propagates an unconfirmed deletion failure without touching token storage", async () => {
+    const runtime = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+    const failure = new ApiTransportError(new TypeError("response lost"));
+    runtime.api.deleteProfile = vi.fn().mockRejectedValue(failure);
+
+    await expect(deleteProfile(runtime)).rejects.toBe(failure);
+    expect(runtime.token.get()).toBe("t".repeat(43));
+    expect(runtime.platform.tokenStore.write).not.toHaveBeenCalled();
+    expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
+  });
+
   it("creates a channel-specific guest without requesting Telegram identity", async () => {
     const runtime = runtimeFixture({ storedToken: null, platformKind: "telegram" });
 

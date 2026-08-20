@@ -25,6 +25,10 @@ export function runtimeFixture(options: {
       kind: "guest" as const,
     })),
     getMe: vi.fn(async () => ({ kind: "guest" as const, profile: null })),
+    deleteProfile: vi.fn(async () => ({
+      kind: "guest" as const,
+      profile: null,
+    })),
     getDaily: vi.fn(async () => ({
       id: "case-2026-08-03",
       date: "2026-08-03",
