@@ -377,3 +377,70 @@ it("advances server-ordered acts and fetches stats only after the final reveal",
   await waitFor(() => expect(runtime.api.getStats).toHaveBeenCalledOnce());
   expect(runtime.platform.haptic).toHaveBeenCalledTimes(2);
 });
+
+it("keeps deletion mounted through Telegram-to-guest success and refreshes identity data", async () => {
+  const user = userEvent.setup();
+  const storedToken = "t".repeat(43);
+  const runtime = runtimeFixture({ storedToken, platformKind: "web" });
+  const markerProfile = {
+    telegramUserId: "42",
+    displayName: "Deletion marker",
+    username: null,
+    avatarUrl: null,
+  };
+  const guestDaily = { ...daily, title: "Guest case after deletion" };
+  const emptyStats = {
+    attempts: 0,
+    hintsUsed: 0,
+    solvedPuzzles: 0,
+    completedCases: 0,
+    currentStreak: 0,
+    bestStreak: 0,
+    lastCompletedDate: null,
+  };
+  runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile: markerProfile }));
+  runtime.api.getDaily = vi.fn().mockResolvedValueOnce(daily).mockResolvedValueOnce(guestDaily);
+  runtime.api.getStats = vi.fn().mockResolvedValueOnce(stats).mockResolvedValueOnce(emptyStats);
+  const runtimeTokenSnapshot = runtime.token.get();
+  const storedTokenSnapshot = await runtime.platform.tokenStore.read();
+
+  renderApp(runtime);
+  expect(await screen.findByRole("heading", { name: puzzle.title })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Delete Telegram profile" })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Progress" }));
+  expect(await screen.findByText("Connected as Deletion marker")).toBeInTheDocument();
+  await waitFor(() => expect(runtime.api.getStats).toHaveBeenCalledOnce());
+
+  const opener = screen.getByRole("button", { name: "Delete Telegram profile" });
+  await user.click(opener);
+  expect(runtime.api.deleteProfile).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Delete permanently" }));
+  await waitFor(() => expect(runtime.api.deleteProfile).toHaveBeenCalledOnce());
+
+  const success = await screen.findByText(
+    "Telegram profile deleted. You are now playing as a guest.",
+  );
+  expect(success).toHaveAttribute("role", "status");
+  expect(success).toHaveFocus();
+  expect(screen.getByText("Playing as a guest")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Save progress with Telegram" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Delete Telegram profile" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Connected as Deletion marker")).not.toBeInTheDocument();
+
+  await waitFor(() => expect(runtime.api.getStats).toHaveBeenCalledTimes(2));
+  await waitFor(() => {
+    expect(screen.getByText("Current streak").nextElementSibling).toHaveTextContent("0");
+    expect(screen.getByText("Best streak").nextElementSibling).toHaveTextContent("0");
+  });
+  expect(runtime.token.get()).toBe(runtimeTokenSnapshot);
+  expect(await runtime.platform.tokenStore.read()).toBe(storedTokenSnapshot);
+  expect(runtime.platform.tokenStore.write).not.toHaveBeenCalled();
+  expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
+
+  await user.click(screen.getByRole("button", { name: "Back to case" }));
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Guest case after deletion" }),
+  ).toBeInTheDocument();
+  expect(runtime.api.getDaily).toHaveBeenCalledTimes(2);
+});
