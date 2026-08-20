@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AttemptRequestSchema,
+  GuestMeResponseSchema,
   HandoffExchangeRequestSchema,
   OidcStartRequestSchema,
   OidcStartResponseSchema,
@@ -319,6 +320,23 @@ describe("shared contracts", () => {
     for (const [description, retraction, expected] of retractionCases) {
       expect(RetractionSchema.safeParse(retraction).success, description).toBe(expected);
     }
+  });
+
+  it("keeps profile deletion success guest-only and strict", () => {
+    const guest = { kind: "guest", profile: null } as const;
+    const telegram = {
+      kind: "telegram",
+      profile: {
+        telegramUserId: "42",
+        displayName: "Ada",
+        username: null,
+        avatarUrl: null,
+      },
+    } as const;
+
+    expect(GuestMeResponseSchema.parse(guest)).toEqual(guest);
+    expect(GuestMeResponseSchema.safeParse(telegram).success).toBe(false);
+    expect(GuestMeResponseSchema.safeParse({ ...guest, deletedRows: 7 }).success).toBe(false);
   });
 });
 
