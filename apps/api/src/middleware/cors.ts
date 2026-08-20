@@ -34,7 +34,7 @@ function applyCorsHeaders(context: Context<AppEnv>): void {
   if (origin !== undefined && allowedOrigins(context.env.ALLOWED_ORIGINS).has(origin)) {
     context.header("access-control-allow-origin", origin);
     context.header("access-control-allow-headers", "authorization,content-type");
-    context.header("access-control-allow-methods", "GET,POST,OPTIONS");
+    context.header("access-control-allow-methods", "GET,POST,DELETE,OPTIONS");
   }
   if (context.req.raw.headers.has("Origin")) {
     const vary = mergedOriginVary(context.res.headers.get("vary"));

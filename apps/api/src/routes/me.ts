@@ -1,9 +1,16 @@
-import { MeResponseSchema, StatsResponseSchema } from "@a-move-ago/api-contract";
+import {
+  GuestMeResponseSchema,
+  MeResponseSchema,
+  StatsResponseSchema,
+} from "@a-move-ago/api-contract";
 import { Hono } from "hono";
 import { findPlayer, toTelegramProfile } from "../db/players";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
+import { requireAllowedMutationOrigin } from "../middleware/origin";
+import { enforceLimit } from "../middleware/rate-limit";
 import { requireSession } from "../middleware/session";
+import { deleteProfileForActor } from "../services/profile-deletion-service";
 import { statsForActor } from "../services/stats-service";
 
 export const me = new Hono<AppEnv>();
@@ -42,5 +49,19 @@ me.get("/", requireSession, async (context) => {
       kind: "telegram",
       profile: toTelegramProfile(player),
     }),
+  );
+});
+
+me.delete("/", requireSession, requireAllowedMutationOrigin, async (context) => {
+  context.header("cache-control", "no-store");
+  const actor = context.get("session");
+  if (!actor) {
+    throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
+  }
+  await enforceLimit(context.env.AUTH_RATE_LIMITER, `profile-delete:${actor.sessionId}`);
+  return context.json(
+    GuestMeResponseSchema.parse(
+      await deleteProfileForActor(context.env, actor, Math.floor(Date.now() / 1_000)),
+    ),
   );
 });
