@@ -1,3 +1,4 @@
+import type { AcceptedSolution } from "@a-move-ago/api-contract";
 import type { SessionActor } from "../../src/env";
 import { seedContentFixture } from "../fixtures/content";
 import { issueGuest, testEnv } from "./http";
@@ -12,6 +13,12 @@ export interface ProfileDeletionGraph {
   ancestorId: string;
   predecessorId: string;
   independentGuest: { token: string; sessionId: string };
+  content: {
+    caseId: string;
+    puzzleId: string;
+    retraction: AcceptedSolution["retraction"];
+  };
+  independentGuestAttemptId: string;
   linkedAttemptIds: string[];
   unrelatedPlayerId: string;
   unrelatedAttemptId: string;
@@ -34,6 +41,7 @@ export async function seedProfileDeletionGraph(): Promise<ProfileDeletionGraph> 
   const unrelatedSessionId = "keep-session";
   const linkedAttemptIds = ["delete-attempt-current", "delete-attempt-transferred"];
   const unrelatedAttemptId = "keep-attempt";
+  const independentGuestAttemptId = "keep-independent-guest-attempt";
   const unrelatedFlowId = "keep-unrelated-linked-flow";
   const linkedFlowId = "delete-linked-flow";
   const unlinkedFlowId = "keep-unlinked-flow";
@@ -229,6 +237,23 @@ export async function seedProfileDeletionGraph(): Promise<ProfileDeletionGraph> 
   )
     .bind("f".repeat(64), content.caseId, deletionNow - 40, deletionNow - 35)
     .run();
+  await testEnv.DB.prepare(
+    `INSERT INTO attempts
+      (id, attempt_uuid, session_id, player_id, case_id, puzzle_id,
+       normalized_answer_json, correct, response_json, hints_used, submitted_at)
+     VALUES (?, ?, ?, NULL, ?, ?, ?, 0, ?, 0, ?)`,
+  )
+    .bind(
+      independentGuestAttemptId,
+      crypto.randomUUID(),
+      independentGuest.sessionId,
+      content.caseId,
+      content.puzzle.rowId,
+      JSON.stringify({ source: "independent-guest" }),
+      JSON.stringify({ correct: false }),
+      deletionNow,
+    )
+    .run();
 
   const currentRow = await testEnv.DB.prepare("SELECT token_hash FROM sessions WHERE id = ?")
     .bind(current.sessionId)
@@ -250,6 +275,12 @@ export async function seedProfileDeletionGraph(): Promise<ProfileDeletionGraph> 
       token: independentGuest.token,
       sessionId: independentGuest.sessionId,
     },
+    content: {
+      caseId: content.caseId,
+      puzzleId: content.puzzle.rowId,
+      retraction: content.puzzle.solution.retraction,
+    },
+    independentGuestAttemptId,
     linkedAttemptIds,
     unrelatedPlayerId,
     unrelatedAttemptId,

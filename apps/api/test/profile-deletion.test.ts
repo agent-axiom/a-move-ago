@@ -115,6 +115,11 @@ describe("deleteProfileForActor", () => {
         .first(),
     ).toEqual({ id: graph.unrelatedAttemptId });
     expect(
+      await testEnv.DB.prepare("SELECT player_id FROM attempts WHERE id = ?")
+        .bind(graph.independentGuestAttemptId)
+        .first(),
+    ).toEqual({ player_id: null });
+    expect(
       await testEnv.DB.prepare("SELECT attempt_id FROM hint_events WHERE attempt_id = ?")
         .bind(graph.unrelatedAttemptId)
         .first(),
