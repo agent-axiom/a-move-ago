@@ -5,8 +5,9 @@
 A MOVE AGO is currently a pre-public-launch MVP. This notice describes the
 data boundaries implemented by the Web, Telegram Mini App, Android adapter,
 Cloudflare Worker, and D1 schema in this repository. Deployment operators must
-replace placeholder configuration and complete the profile-deletion path
-described below before representing the service as publicly launched.
+replace placeholder configuration, configure and disclose actual platform-log
+and backup retention, and pass the production release gate before representing
+the service as publicly launched.
 
 ## Guest sessions
 
@@ -23,6 +24,19 @@ cryptographic hash with a server-side pepper, plus the session ID, channel,
 kind, creation/expiry/revocation times, and last-seen time. Clearing browser or
 app data removes the local token and can make guest progress inaccessible.
 The application does not use an authentication cookie.
+
+After a linked Telegram profile is deleted, the current opaque token is not
+replaced. Its online D1 session becomes an active unlinked guest session and
+retains the session ID, token hash, `kind = guest`, channel, creation time,
+expiry time, revocation field, and last-seen time. Its `player_id` and
+`rotated_from_session_id` are null.
+
+Previously revoked pseudonymous guest predecessor sessions can remain until
+scheduled cleanup. They retain their own session ID, token hash, `kind =
+guest`, channel, creation time, expiry time, revocation time, and last-seen
+time. A predecessor can retain `rotated_from_session_id` pointing only to an
+earlier pseudonymous guest session. These rows have no `player_id`, Telegram
+identity, or attempts belonging to the deleted profile.
 
 ## Optional Telegram profile
 
@@ -59,6 +73,12 @@ Guest attempts belong to the guest session. When the player explicitly links
 Telegram, server-recorded guest attempts are attached to the verified profile so
 progress can synchronize across clients.
 
+Profile deletion removes every attempt linked to the deleted player, including
+attempts first created as guest progress and later attached to that profile.
+Related hint events and derived statistics disappear with those attempts.
+Attempts accumulated independently by an unlinked guest after deletion remain
+guest data and can be attached only by a later explicit Telegram sign-in.
+
 ## Logs and network processing
 
 Application structured logs contain request ID, HTTP method, path, status, and
@@ -85,20 +105,41 @@ raw IP in its D1 application tables.
 - Hint-event records older than 31,536,000 seconds (one year) are removed by
   the scheduled cleanup.
 
-Cloudflare platform logs, GitHub delivery logs, and operator backups can have
-separate retention configured by the deployment operator; those settings must
-be disclosed by any public deployment.
+Profile deletion removes the active online D1 records immediately. It does not
+promise immediate physical erasure from Cloudflare platform logs, GitHub
+delivery logs, or operator backups, which can have separate retention set by
+the deployment operator. A public operator must configure and disclose those
+periods and must ensure that restoring a backup does not reintroduce deleted
+profile rows into the active service.
 
-## Player controls and deletion requirement
+## Player controls and profile deletion
 
 Logging out revokes the current app session and returns the client to a new
 guest session. Clearing local storage removes the local guest token, but
 neither action by itself deletes a linked Telegram profile.
 
-A usable profile-deletion path that removes the Telegram profile and associated
-personal data is a release requirement before public launch. The current
-repository does not yet expose that path, so public launch is blocked until it
-is implemented, tested, documented, and wired to the deployed service.
+A linked player can open **Progress**, choose **Delete Telegram profile**,
+review the permanent warning, and choose **Delete permanently**. The
+authenticated `DELETE /v1/me` immediately and irreversibly removes from active
+online D1 the Telegram profile fields, every other Telegram session linked to
+that player, player-linked attempts, their hint events, linked auth flows, and
+derived statistics. The current token survives only as an empty unlinked guest
+session. The operation does not delete the Telegram account, Telegram-hosted
+content, chess content, or content-import history.
+
+The client reports success only after a guest-only Worker response. A network
+or contract failure remains unconfirmed and can be retried with the same token
+while that session remains active; it is never presented as successful
+deletion. An `INVALID_SESSION` response instead requires an app
+reload/bootstrap before the player explicitly signs in with Telegram to verify
+the profile. A later explicit **Save progress with Telegram** creates a new
+profile and never restores deleted profile data.
+
+An OIDC flow started before deletion but not yet linked to the profile, or a
+Mini App login already running from another guest session, can still finish
+after deletion and create a new profile. This is a new account-creation event:
+deleted profile data is not restored, although independently accumulated
+progress from that separate guest session can be linked.
 
 Security vulnerabilities involving personal data should be reported privately
 as described in [SECURITY.md](SECURITY.md).
