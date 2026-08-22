@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
-import { verifyPlatformArtifactMarkers } from "./artifact-profile-verifier.ts";
+import {
+  verifyNoSensitiveArtifactMarkers,
+  verifyPlatformArtifactMarkers,
+} from "./artifact-profile-verifier.ts";
 
 const pages = await readFile(new URL("../dist/pages/index.html", import.meta.url), "utf8");
 const android = await readFile(new URL("../dist/android/index.html", import.meta.url), "utf8");
@@ -66,4 +69,20 @@ assert.doesNotMatch(
   /rnbqkbnr\/ppp1pppp\/8\/3p4\/4P3\/8\/PPPP1PPP/,
   "The known previous-position answer must not enter either production frontend bundle",
 );
+const profileDirectories = [
+  new URL("../dist/pages/", import.meta.url),
+  new URL("../dist/android/", import.meta.url),
+];
+const profileEntries = await Promise.all(
+  profileDirectories.map((directory) => readdir(directory, { recursive: true })),
+);
+const deployableTextPattern = /\.(?:html|js|css|json|txt|webmanifest|svg)$/i;
+const deployableText = await Promise.all(
+  profileDirectories.flatMap((directory, index) =>
+    (profileEntries[index] ?? [])
+      .filter((name) => deployableTextPattern.test(name))
+      .map((name) => readFile(new URL(name, directory), "utf8")),
+  ),
+);
+verifyNoSensitiveArtifactMarkers(deployableText.join("\n"));
 console.log("Pages and Android web artifacts verified.");

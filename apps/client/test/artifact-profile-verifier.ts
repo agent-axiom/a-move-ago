@@ -21,3 +21,16 @@ export function verifyPlatformArtifactMarkers(contents: PlatformArtifactContents
     throw new Error("Android artifact contains Telegram bootstrap.");
   }
 }
+
+const sensitiveArtifactMarkers = [
+  /\bBearer [A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/,
+  /SESSION_PEPPER|TELEGRAM_BOT_TOKEN|TELEGRAM_OIDC_CLIENT_SECRET|CLOUDFLARE_API_TOKEN/,
+  /test-session-pepper-at-least-32-bytes|123456:test-bot-secret|test-oidc-client-secret/,
+  /profile-deletion-e2e-marker|query_id=raw%2Bproof&hash=unchanged/,
+];
+
+export function verifyNoSensitiveArtifactMarkers(contents: string): void {
+  if (sensitiveArtifactMarkers.some((pattern) => pattern.test(contents))) {
+    throw new Error("Production artifact contains a sensitive static marker.");
+  }
+}
