@@ -305,6 +305,124 @@ it("deletes a Mini App profile linked before the deletion commits", async () => 
   await expectOldAttemptsAbsent(graph.linkedAttemptIds);
 });
 
+it("retries OIDC completion when profile deletion commits after its identity read", async () => {
+  const provider = {
+    exchangeAndVerify: vi.fn(async () => verifiedOidcIdentity),
+  } satisfies TelegramOidcProvider;
+  const oidcApp = createApp({
+    now: () => new Date(deletionNow * 1_000),
+    oidcProvider: provider,
+  });
+  const graph = await seedProfileDeletionGraph();
+  expect(verifiedOidcIdentity.telegramUserId).toBe(graph.telegramUserId);
+  await testEnv.DB.prepare("UPDATE players SET oidc_audience = ? WHERE id = ?")
+    .bind(verifiedOidcIdentity.oidc.audience, graph.playerId)
+    .run();
+  const webGuest = await issueGuest("web");
+  await keepGuestActiveForD1Auth(webGuest.sessionId);
+  const oidcAttemptId = "oidc-race-independent-attempt";
+  await testEnv.DB.prepare(
+    `INSERT INTO attempts
+      (id, attempt_uuid, session_id, player_id, case_id, puzzle_id,
+       normalized_answer_json, correct, response_json, hints_used, submitted_at)
+     VALUES (?, ?, ?, NULL, ?, ?, ?, 0, ?, 0, ?)`,
+  )
+    .bind(
+      oidcAttemptId,
+      crypto.randomUUID(),
+      webGuest.sessionId,
+      graph.content.caseId,
+      graph.content.puzzleId,
+      JSON.stringify({ retraction: graph.content.retraction }),
+      JSON.stringify({ correct: false }),
+      deletionNow,
+    )
+    .run();
+
+  const startResponse = await oidcApp.fetch(
+    new Request("https://api.test/v1/auth/telegram/oidc/start", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${webGuest.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ channel: "web" }),
+    }),
+    testEnv,
+  );
+  expect(startResponse.status).toBe(200);
+  const authorizationUrl = new URL(
+    OidcStartResponseSchema.parse(await startResponse.json()).authorizationUrl,
+  );
+  const state = authorizationUrl.searchParams.get("state");
+  if (!state) throw new Error("OIDC start did not return state.");
+
+  let completionBatchCount = 0;
+  const proxyDb = new Proxy(testEnv.DB, {
+    get(target, property, receiver) {
+      if (property === "batch") {
+        return async (statements: D1PreparedStatement[]) => {
+          if (statements.length === 4) {
+            completionBatchCount += 1;
+            if (completionBatchCount === 1) {
+              await expect(
+                deleteProfileForActor(testEnv, telegramDeletionActor(graph), deletionNow),
+              ).resolves.toEqual({ kind: "guest", profile: null });
+            }
+          }
+          return await target.batch(statements);
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const callbackEnv = Object.assign(Object.create(testEnv) as Env, { DB: proxyDb });
+  const callbackResponse = await oidcApp.fetch(
+    new Request(
+      `https://api.test/v1/auth/telegram/oidc/callback?state=${encodeURIComponent(state)}&code=provider-code`,
+    ),
+    callbackEnv,
+  );
+
+  expect(callbackResponse.status).toBe(302);
+  expect(completionBatchCount).toBe(2);
+  expect(provider.exchangeAndVerify).toHaveBeenCalledTimes(1);
+  const location = callbackResponse.headers.get("location");
+  if (!location) throw new Error("OIDC callback did not return a redirect.");
+  const handoffCode = new URL(location).searchParams.get("handoff");
+  if (!handoffCode) throw new Error("OIDC callback did not return a handoff.");
+
+  const exchangeResponse = await oidcApp.fetch(
+    new Request("https://api.test/v1/auth/session/exchange", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${webGuest.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ handoffCode }),
+    }),
+    testEnv,
+  );
+  expect(exchangeResponse.status).toBe(200);
+  TelegramSessionIssuedSchema.parse(await exchangeResponse.json());
+
+  const newPlayerId = await playerIdForTelegramUser(graph.telegramUserId);
+  expect(newPlayerId).not.toBe(graph.playerId);
+  const newPlayerAttempts = await testEnv.DB.prepare(
+    "SELECT id FROM attempts WHERE player_id = ? ORDER BY id",
+  )
+    .bind(newPlayerId)
+    .all<{ id: string }>();
+  expect(newPlayerAttempts.results).toEqual([{ id: oidcAttemptId }]);
+  expect(
+    await testEnv.DB.prepare("SELECT player_id FROM attempts WHERE id = ?")
+      .bind(graph.independentGuestAttemptId)
+      .first(),
+  ).toEqual({ player_id: null });
+  await expectOldAttemptsAbsent(graph.linkedAttemptIds);
+});
+
 it("finishes an OIDC flow started before deletion against a fresh player", async () => {
   const provider = {
     exchangeAndVerify: vi.fn(async () => verifiedOidcIdentity),

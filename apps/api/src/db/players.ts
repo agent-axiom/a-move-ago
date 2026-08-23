@@ -456,7 +456,10 @@ export async function completeOidcPlayerAndAuthFlow(
       concurrentByTelegram.oidc_subject === null &&
       concurrentByTelegram.oidc_audience === null &&
       concurrentBySubject === null;
-    if ((exactConvergence || unchangedUnclaimedPlayer) && attempt === 0) continue;
+    const deletedBeforeCompletion =
+      byTelegram !== null && concurrentByTelegram === null && concurrentBySubject === null;
+    if ((exactConvergence || unchangedUnclaimedPlayer || deletedBeforeCompletion) && attempt === 0)
+      continue;
     if (exactConvergence || unchangedUnclaimedPlayer) throw lastError;
     if (concurrentByTelegram || concurrentBySubject) identityConflict();
     throw lastError;
