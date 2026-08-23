@@ -5,6 +5,7 @@ import { useRuntime } from "./app/runtime";
 import { useHostBack } from "./app/use-host-back";
 import { CaseGame } from "./features/daily/CaseGame";
 import { DailyCaseGate } from "./features/daily/DailyCaseGate";
+import { ProfileDeletion } from "./features/session/ProfileDeletion";
 import { SaveProgressButton } from "./features/session/SaveProgressButton";
 import { SessionProvider, useSession } from "./features/session/SessionProvider";
 import type { Me } from "./features/session/session-state";
@@ -73,6 +74,7 @@ function AppContent() {
         </p>
         <SaveProgressButton />
         {sessionReady ? <StatsPanel refreshKey={identity} title="Statistics" /> : null}
+        <ProfileDeletion />
       </section>
     );
   } else {

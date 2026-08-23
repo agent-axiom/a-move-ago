@@ -1,4 +1,9 @@
-import { ApiError, ApiTransportError, type MeResponseSchema } from "@a-move-ago/api-contract";
+import {
+  ApiError,
+  ApiTransportError,
+  type GuestMeResponse,
+  type MeResponseSchema,
+} from "@a-move-ago/api-contract";
 import type { z } from "zod";
 import { parseEntryQuery, stripAuthReturn } from "../../app/entry-query";
 import type { AppRuntime } from "../../app/runtime";
@@ -56,6 +61,13 @@ async function readMe(runtime: AppRuntime, signal: AbortSignal): Promise<Me> {
     sleep: runtime.sleep,
     signal,
   });
+}
+
+export async function deleteProfile(
+  runtime: AppRuntime,
+  signal = new AbortController().signal,
+): Promise<GuestMeResponse> {
+  return runtime.api.deleteProfile(signal);
 }
 
 function retryableHandoffFailure(error: unknown): boolean {

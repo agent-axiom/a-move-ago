@@ -394,4 +394,90 @@ describe("ApiClient", () => {
       expect(fetch).not.toHaveBeenCalled();
     },
   );
+
+  it("deletes the current profile with an authenticated bodyless DELETE", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(Response.json({ kind: "guest", profile: null }, { status: 200 }));
+    const signal = new AbortController().signal;
+    const api = createApiClient({
+      baseUrl: "https://api.test/",
+      fetch,
+      getToken: () => "x".repeat(43),
+    });
+
+    await expect(api.deleteProfile(signal)).resolves.toEqual({ kind: "guest", profile: null });
+    expect(fetch).toHaveBeenCalledWith("https://api.test/v1/me", {
+      method: "DELETE",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${"x".repeat(43)}`,
+      },
+      signal,
+    });
+    const init = fetch.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBeUndefined();
+    expect(new Headers(init.headers).has("content-type")).toBe(false);
+  });
+
+  it("rejects a Telegram-shaped profile deletion success", async () => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: vi
+        .fn()
+        .mockResolvedValue(Response.json({ kind: "telegram", profile: profileFixture })),
+      getToken: () => "x".repeat(43),
+    });
+
+    await expect(api.deleteProfile()).rejects.toBeInstanceOf(ApiContractError);
+  });
+
+  it.each([{ kind: "guest" }, { kind: "guest", profile: null, deletedRows: 1 }])(
+    "rejects malformed deletion response %#",
+    async (payload) => {
+      const api = createApiClient({
+        baseUrl: "https://api.test",
+        fetch: vi.fn().mockResolvedValue(Response.json(payload)),
+        getToken: () => "x".repeat(43),
+      });
+
+      await expect(api.deleteProfile()).rejects.toBeInstanceOf(ApiContractError);
+    },
+  );
+
+  it("preserves deletion error-envelope, transport, and AbortError semantics", async () => {
+    const apiErrorClient = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { error: { code: "INVALID_SESSION", message: "Expired.", requestId: "req-delete" } },
+            { status: 401 },
+          ),
+        ),
+      getToken: () => "x".repeat(43),
+    });
+    await expect(apiErrorClient.deleteProfile()).rejects.toEqual(
+      new ApiError(401, "INVALID_SESSION", "Expired.", "req-delete", null),
+    );
+
+    const networkFailure = new TypeError("response lost");
+    const transportClient = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: vi.fn().mockRejectedValue(networkFailure),
+      getToken: () => "x".repeat(43),
+    });
+    const transportError = await transportClient.deleteProfile().catch((error: unknown) => error);
+    expect(transportError).toBeInstanceOf(ApiTransportError);
+    expect((transportError as ApiTransportError).cause).toBe(networkFailure);
+
+    const abortError = new DOMException("aborted", "AbortError");
+    const abortClient = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: vi.fn().mockRejectedValue(abortError),
+      getToken: () => "x".repeat(43),
+    });
+    await expect(abortClient.deleteProfile()).rejects.toBe(abortError);
+  });
 });

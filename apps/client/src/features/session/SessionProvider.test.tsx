@@ -1,7 +1,7 @@
 import { ApiError, ApiTransportError } from "@a-move-ago/api-contract";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StrictMode } from "react";
+import { StrictMode, useEffect, useLayoutEffect, useRef } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { RuntimeProvider } from "../../app/runtime";
 import { runtimeFixture } from "../../test/runtime-fixture";
@@ -56,9 +56,309 @@ function DoubleRetryButton() {
   );
 }
 
+function DeleteProbe({
+  twice = false,
+  onResult,
+}: {
+  twice?: boolean;
+  onResult?(result: Promise<boolean>): void;
+}) {
+  const { state, deleteProfile } = useSession();
+  return (
+    <>
+      <output data-testid="session-state">
+        {state.tag}:{"me" in state ? state.me.kind : "none"}
+      </output>
+      <button
+        type="button"
+        onClick={() => {
+          const result = deleteProfile();
+          onResult?.(result);
+          if (twice) {
+            const duplicate = deleteProfile();
+            onResult?.(duplicate);
+          }
+        }}
+      >
+        Delete through provider
+      </button>
+    </>
+  );
+}
+
+function CaptureDeleteAction({ onCapture }: { onCapture(action: () => Promise<boolean>): void }) {
+  const { state, deleteProfile } = useSession();
+  useEffect(() => {
+    if (state.tag === "ready" && state.me.kind === "telegram") {
+      onCapture(deleteProfile);
+    }
+  }, [deleteProfile, onCapture, state]);
+  return (
+    <output data-testid="session-state">
+      {state.tag}:{"me" in state ? state.me.kind : "none"}
+    </output>
+  );
+}
+
+function LayoutDeleteProbe({
+  trigger,
+  onResult,
+}: {
+  trigger: boolean;
+  onResult(result: Promise<boolean>): void;
+}) {
+  const { state, deleteProfile } = useSession();
+  const invokedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!trigger || invokedRef.current) return;
+    invokedRef.current = true;
+    onResult(deleteProfile());
+  }, [deleteProfile, onResult, trigger]);
+  return (
+    <output data-testid="session-state">
+      {state.tag}:{"me" in state ? state.me.kind : "none"}
+    </output>
+  );
+}
+
+function CatchingDeleteProbe({ onError }: { onError(error: unknown): void }) {
+  const { state, deleteProfile } = useSession();
+  return (
+    <>
+      <output data-testid="session-state">
+        {state.tag}:{"me" in state ? state.me.kind : "none"}
+      </output>
+      <button
+        type="button"
+        onClick={() => {
+          void deleteProfile().catch(onError);
+        }}
+      >
+        Delete through provider
+      </button>
+    </>
+  );
+}
+
 afterEach(() => {
   cleanup();
   window.history.replaceState(null, "", "/");
+});
+
+it("keeps profile deletion single-flight and applies only the confirmed guest result", async () => {
+  const user = userEvent.setup();
+  const runtime = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+  runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
+  const deletion = deferred<{ kind: "guest"; profile: null }>();
+  runtime.api.deleteProfile = vi.fn(() => deletion.promise);
+  const results: Array<Promise<boolean>> = [];
+  render(
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <DeleteProbe twice onResult={(result) => results.push(result)} />
+      </SessionProvider>
+    </RuntimeProvider>,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram"),
+  );
+  await user.click(screen.getByRole("button", { name: "Delete through provider" }));
+  await waitFor(() => expect(runtime.api.deleteProfile).toHaveBeenCalledOnce());
+  expect(results).toHaveLength(2);
+  await expect(results[1]).resolves.toBe(false);
+  expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram");
+
+  await act(async () => {
+    deletion.resolve({ kind: "guest", profile: null });
+    await expect(results[0]).resolves.toBe(true);
+  });
+  await waitFor(() => expect(screen.getByTestId("session-state")).toHaveTextContent("ready:guest"));
+});
+
+it("rejects a retained deletion action after the provider runtime changes", async () => {
+  const first = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+  first.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
+  const second = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+  const captured: Array<() => Promise<boolean>> = [];
+  const onCapture = (action: () => Promise<boolean>) => captured.push(action);
+  const tree = (runtime: typeof first) => (
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <CaptureDeleteAction onCapture={onCapture} />
+      </SessionProvider>
+    </RuntimeProvider>
+  );
+  const view = render(tree(first));
+
+  await waitFor(() =>
+    expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram"),
+  );
+  await waitFor(() => expect(captured).not.toHaveLength(0));
+  const retainedDelete = captured.at(-1);
+
+  view.rerender(tree(second));
+  await waitFor(() => expect(second.api.getMe).toHaveBeenCalledOnce());
+  await waitFor(() => expect(screen.getByTestId("session-state")).toHaveTextContent("ready:guest"));
+
+  await expect(retainedDelete?.()).resolves.toBe(false);
+  expect(first.api.deleteProfile).not.toHaveBeenCalled();
+  expect(second.api.deleteProfile).not.toHaveBeenCalled();
+  expect(screen.getByTestId("session-state")).toHaveTextContent("ready:guest");
+});
+
+it("rejects a new runtime deletion action before the replacement effect activates", async () => {
+  const first = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+  first.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
+  const second = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+  const results: Array<Promise<boolean>> = [];
+  let bootstrapCallsAtInvocation: number | undefined;
+  const onResult = (result: Promise<boolean>) => {
+    bootstrapCallsAtInvocation = vi.mocked(second.api.getMe).mock.calls.length;
+    results.push(result);
+  };
+  const tree = (runtime: typeof first, trigger: boolean) => (
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <LayoutDeleteProbe trigger={trigger} onResult={onResult} />
+      </SessionProvider>
+    </RuntimeProvider>
+  );
+  const view = render(tree(first, false));
+
+  await waitFor(() =>
+    expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram"),
+  );
+  view.rerender(tree(second, true));
+
+  expect(results).toHaveLength(1);
+  expect(bootstrapCallsAtInvocation).toBe(0);
+  await expect(results[0]).resolves.toBe(false);
+  expect(first.api.deleteProfile).not.toHaveBeenCalled();
+  expect(second.api.deleteProfile).not.toHaveBeenCalled();
+  await waitFor(() => expect(second.api.getMe).toHaveBeenCalledOnce());
+  await waitFor(() => expect(screen.getByTestId("session-state")).toHaveTextContent("ready:guest"));
+});
+
+it("rejects a retained deletion action after the provider unmounts", async () => {
+  const runtime = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+  runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
+  const captured: Array<() => Promise<boolean>> = [];
+  const view = render(
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <CaptureDeleteAction onCapture={(action) => captured.push(action)} />
+      </SessionProvider>
+    </RuntimeProvider>,
+  );
+
+  await waitFor(() => expect(captured).not.toHaveLength(0));
+  const retainedDelete = captured.at(-1);
+  view.unmount();
+
+  await expect(retainedDelete?.()).resolves.toBe(false);
+  expect(runtime.api.deleteProfile).not.toHaveBeenCalled();
+});
+
+it("keeps Telegram ready and rejects an unconfirmed profile deletion", async () => {
+  const user = userEvent.setup();
+  const runtime = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+  runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
+  const failure = new ApiError(503, "UNAVAILABLE", "Try again.", "req-delete", null);
+  runtime.api.deleteProfile = vi.fn().mockRejectedValue(failure);
+  const recordError = vi.fn();
+  render(
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <CatchingDeleteProbe onError={recordError} />
+      </SessionProvider>
+    </RuntimeProvider>,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram"),
+  );
+  await user.click(screen.getByRole("button", { name: "Delete through provider" }));
+
+  await waitFor(() => expect(recordError).toHaveBeenCalledWith(failure));
+  expect(recordError.mock.calls[0]?.[0]).toBe(failure);
+  expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram");
+});
+
+it("aborts an in-flight profile deletion when the provider unmounts", async () => {
+  const user = userEvent.setup();
+  const runtime = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+  runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
+  const deletion = deferred<{ kind: "guest"; profile: null }>();
+  let deletionSignal: AbortSignal | undefined;
+  runtime.api.deleteProfile = vi.fn((signal) => {
+    deletionSignal = signal;
+    return deletion.promise;
+  });
+  const results: Array<Promise<boolean>> = [];
+  const view = render(
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <DeleteProbe onResult={(result) => results.push(result)} />
+      </SessionProvider>
+    </RuntimeProvider>,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram"),
+  );
+  await user.click(screen.getByRole("button", { name: "Delete through provider" }));
+  await waitFor(() => expect(runtime.api.deleteProfile).toHaveBeenCalledOnce());
+  view.unmount();
+  expect(deletionSignal?.aborted).toBe(true);
+
+  await act(async () => {
+    deletion.resolve({ kind: "guest", profile: null });
+    await expect(results[0]).resolves.toBe(false);
+  });
+});
+
+it("accepts a fresh OIDC handoff after deletion returns the session to guest", async () => {
+  const user = userEvent.setup();
+  const runtime = runtimeFixture({ storedToken: "t".repeat(43), platformKind: "web" });
+  runtime.api.getMe = vi
+    .fn()
+    .mockResolvedValueOnce({ kind: "telegram" as const, profile })
+    .mockResolvedValueOnce({ kind: "guest" as const, profile: null });
+  let listener: ((url: string) => void) | undefined;
+  runtime.platform.authReturn.subscribe = vi.fn(async (next) => {
+    listener = next;
+    return () => undefined;
+  });
+  render(
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <DeleteProbe />
+        <SaveProgressButton />
+      </SessionProvider>
+    </RuntimeProvider>,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram"),
+  );
+  await user.click(screen.getByRole("button", { name: "Delete through provider" }));
+  await waitFor(() => expect(screen.getByTestId("session-state")).toHaveTextContent("ready:guest"));
+  await user.click(screen.getByRole("button", { name: "Save progress with Telegram" }));
+  await waitFor(() => expect(runtime.platform.openAuthorization).toHaveBeenCalledOnce());
+
+  act(() => {
+    listener?.(`/?handoff=${"B".repeat(43)}`);
+  });
+  await waitFor(() =>
+    expect(runtime.api.exchangeHandoff).toHaveBeenCalledWith(
+      "B".repeat(43),
+      expect.any(AbortSignal),
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("session-state")).toHaveTextContent("ready:telegram"),
+  );
 });
 
 it("returns to guest-ready after opening OIDC without an immediate callback", async () => {

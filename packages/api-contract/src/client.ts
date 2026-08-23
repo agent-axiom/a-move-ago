@@ -4,6 +4,7 @@ import {
   AttemptResultSchema,
   DailyCaseResponseSchema,
   ErrorEnvelopeSchema,
+  GuestMeResponseSchema,
   GuestSessionRequestSchema,
   HandoffExchangeRequestSchema,
   HintRequestSchema,
@@ -63,7 +64,7 @@ export function createApiClient(options: ApiClientOptions) {
   const baseUrl = options.baseUrl.replace(/\/$/, "");
 
   async function request<TSchema extends z.ZodType>(input: {
-    method: "GET" | "POST";
+    method: "GET" | "POST" | "DELETE";
     path: string;
     responseSchema: TSchema;
     body?: unknown;
@@ -131,6 +132,14 @@ export function createApiClient(options: ApiClientOptions) {
     },
     getMe(signal?: AbortSignal) {
       return request({ method: "GET", path: "/v1/me", responseSchema: MeResponseSchema, signal });
+    },
+    deleteProfile(signal?: AbortSignal) {
+      return request({
+        method: "DELETE",
+        path: "/v1/me",
+        responseSchema: GuestMeResponseSchema,
+        signal,
+      });
     },
     getDaily(date?: string, signal?: AbortSignal) {
       const query = date ? `?date=${encodeURIComponent(date)}` : "";

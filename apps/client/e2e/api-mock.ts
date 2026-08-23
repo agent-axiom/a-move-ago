@@ -2,7 +2,7 @@ import type { Page, Route } from "@playwright/test";
 
 const profile = {
   telegramUserId: "42",
-  displayName: "Ada",
+  displayName: "profile-deletion-e2e-marker",
   username: "ada",
   avatarUrl: null,
 };
@@ -12,6 +12,9 @@ export interface ApiObservations {
   guestChannels: string[];
   hintRequests: Array<{ attemptId: string; level: number }>;
   miniAppProofs: string[];
+  dailyIdentities: Array<"guest" | "telegram">;
+  statsIdentities: Array<"guest" | "telegram">;
+  profileDeleteRequests: Array<{ authorization: string | null; body: string | null }>;
   statsRequests: number;
 }
 
@@ -32,6 +35,8 @@ export async function installApiMock(
   options: {
     loseFirstAttempt?: boolean;
     loseFirstHint?: boolean;
+    initialIdentity?: "guest" | "telegram";
+    loseFirstProfileDeletionResponse?: boolean;
   } = {},
 ): Promise<ApiObservations> {
   const observed: ApiObservations = {
@@ -39,11 +44,15 @@ export async function installApiMock(
     guestChannels: [],
     hintRequests: [],
     miniAppProofs: [],
+    dailyIdentities: [],
+    statsIdentities: [],
+    profileDeleteRequests: [],
     statsRequests: 0,
   };
   let attemptLost = false;
   let hintLost = false;
-  let identity: "guest" | "telegram" = "guest";
+  let identity: "guest" | "telegram" = options.initialIdentity ?? "guest";
+  let profileDeletionResponseLost = false;
 
   await page.route("https://telegram.org/js/telegram-web-app.js?63", async (route) => {
     await route.fulfill({
@@ -60,7 +69,7 @@ export async function installApiMock(
         headers: {
           "access-control-allow-origin": "*",
           "access-control-allow-headers": "authorization,content-type",
-          "access-control-allow-methods": "GET,POST,OPTIONS",
+          "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
         },
       });
       return;
@@ -75,6 +84,20 @@ export async function installApiMock(
       });
       return;
     }
+    if (url.pathname === "/v1/me" && request.method() === "DELETE") {
+      observed.profileDeleteRequests.push({
+        authorization: request.headers()["authorization"] ?? null,
+        body: request.postData(),
+      });
+      identity = "guest";
+      if (options.loseFirstProfileDeletionResponse && !profileDeletionResponseLost) {
+        profileDeletionResponseLost = true;
+        await route.abort("internetdisconnected");
+        return;
+      }
+      await json(route, 200, { kind: "guest", profile: null });
+      return;
+    }
     if (url.pathname === "/v1/me" && request.method() === "GET") {
       await json(
         route,
@@ -84,6 +107,7 @@ export async function installApiMock(
       return;
     }
     if (url.pathname === "/v1/daily" && request.method() === "GET") {
+      observed.dailyIdentities.push(identity);
       await json(route, 200, {
         id: "case-2026-08-03",
         date: "2026-08-03",
@@ -172,15 +196,30 @@ export async function installApiMock(
     }
     if (url.pathname === "/v1/me/stats" && request.method() === "GET") {
       observed.statsRequests += 1;
-      await json(route, 200, {
-        attempts: 2,
-        hintsUsed: 1,
-        solvedPuzzles: 7,
-        completedCases: 5,
-        currentStreak: 4,
-        bestStreak: 9,
-        lastCompletedDate: "2026-08-03",
-      });
+      observed.statsIdentities.push(identity);
+      await json(
+        route,
+        200,
+        identity === "telegram"
+          ? {
+              attempts: 2,
+              hintsUsed: 1,
+              solvedPuzzles: 7,
+              completedCases: 5,
+              currentStreak: 4,
+              bestStreak: 9,
+              lastCompletedDate: "2026-08-03",
+            }
+          : {
+              attempts: 0,
+              hintsUsed: 0,
+              solvedPuzzles: 0,
+              completedCases: 0,
+              currentStreak: 0,
+              bestStreak: 0,
+              lastCompletedDate: null,
+            },
+      );
       return;
     }
     if (url.pathname === "/v1/auth/telegram/mini-app" && request.method() === "POST") {

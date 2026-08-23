@@ -9,9 +9,10 @@ import {
   useState,
 } from "react";
 import { parseEntryQuery, stripAuthReturn } from "../../app/entry-query";
-import { useRuntime } from "../../app/runtime";
+import { type AppRuntime, useRuntime } from "../../app/runtime";
 import {
   bootstrapSession,
+  deleteProfile as deleteTelegramProfile,
   retryHandoff as exchangePendingHandoff,
   RetryableHandoffError,
   saveProgress,
@@ -23,11 +24,13 @@ interface SessionContextValue {
   state: SessionState;
   save(): Promise<void>;
   retryHandoff(): Promise<void>;
+  deleteProfile(): Promise<boolean>;
 }
 
 interface ActionSlot {
   controller: AbortController;
   lifecycle: number;
+  runtime: AppRuntime;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -81,11 +84,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const sessionWorkLifecycleRef = useRef<number | null>(null);
   const handledReturnKeysRef = useRef(new Set<string>());
   const handledRuntimeRef = useRef(runtime);
+  const hasTelegramIdentityRef = useRef(false);
+  const currentRuntimeRef = useRef(runtime);
+  const currentStateRef = useRef(state);
+  const providerMountedRef = useRef(false);
+  currentRuntimeRef.current = runtime;
+  currentStateRef.current = state;
 
   useEffect(() => {
+    providerMountedRef.current = true;
     if (handledRuntimeRef.current !== runtime) {
       handledRuntimeRef.current = runtime;
       handledReturnKeysRef.current.clear();
+      hasTelegramIdentityRef.current = false;
       setState({ tag: "booting" });
     }
     const lifecycle = lifecycleRef.current + 1;
@@ -94,7 +105,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     const pendingKeys = new Set<string>();
     let acceptedAuthReturn = false;
-    let authenticated = false;
     let disposed = false;
     let setupPending = true;
     let unsubscribe: () => void = () => undefined;
@@ -129,7 +139,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ) {
         window.history.replaceState(null, "", stripAuthReturn(source));
       }
-      if (authenticated) return;
+      if (hasTelegramIdentityRef.current) return;
       if (pendingKeys.has(key) || handledReturnKeysRef.current.has(key)) return;
       actionRef.current?.controller.abort();
       actionRef.current = null;
@@ -140,7 +150,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pendingKeys.add(key);
       queue = queue.then(async () => {
         try {
-          if (!active() || authenticated) return;
+          if (!active() || hasTelegramIdentityRef.current) return;
           const me = await bootstrapSession(
             runtime,
             source,
@@ -150,7 +160,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             controller.signal,
           );
           if (!active()) return;
-          if (me.kind === "telegram") authenticated = true;
+          hasTelegramIdentityRef.current = me.kind === "telegram";
           handledReturnKeysRef.current.add(key);
           setState({ tag: "ready", me });
         } catch (error) {
@@ -183,6 +193,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
 
     return () => {
+      providerMountedRef.current = false;
       disposed = true;
       controller.abort();
       if (sessionWorkLifecycleRef.current === lifecycle) {
@@ -199,10 +210,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SessionContextValue>(() => {
     function beginAction(): ActionSlot | null {
-      if (actionRef.current || sessionWorkLifecycleRef.current !== null) return null;
+      if (
+        !providerMountedRef.current ||
+        handledRuntimeRef.current !== runtime ||
+        currentRuntimeRef.current !== runtime ||
+        currentStateRef.current !== state ||
+        actionRef.current ||
+        sessionWorkLifecycleRef.current !== null
+      ) {
+        return null;
+      }
       const action = {
         controller: new AbortController(),
         lifecycle: lifecycleRef.current,
+        runtime,
       };
       actionRef.current = action;
       return action;
@@ -212,7 +233,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return (
         actionRef.current === action &&
         !action.controller.signal.aborted &&
-        lifecycleRef.current === action.lifecycle
+        lifecycleRef.current === action.lifecycle &&
+        providerMountedRef.current &&
+        currentRuntimeRef.current === action.runtime
       );
     }
 
@@ -232,7 +255,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setState({ tag: "authenticating", me: previous });
         try {
           const me = await saveProgress(runtime, action.controller.signal);
-          if (actionIsCurrent(action)) setState({ tag: "ready", me: me ?? previous });
+          if (actionIsCurrent(action)) {
+            const next = me ?? previous;
+            hasTelegramIdentityRef.current = next.kind === "telegram";
+            setState({ tag: "ready", me: next });
+          }
         } catch (error) {
           if (!actionIsCurrent(action)) return;
           const apiError = error instanceof ApiError ? error : null;
@@ -258,7 +285,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             { handoffCode },
             action.controller.signal,
           );
-          if (actionIsCurrent(action)) setState({ tag: "ready", me });
+          if (actionIsCurrent(action)) {
+            hasTelegramIdentityRef.current = true;
+            setState({ tag: "ready", me });
+          }
         } catch (error) {
           if (!actionIsCurrent(action)) return;
           if (error instanceof RetryableHandoffError) {
@@ -277,6 +307,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             message: "Telegram return expired or was already consumed. Start Save progress again.",
             ...(apiError ? { requestId: apiError.requestId } : {}),
           });
+        } finally {
+          finishAction(action);
+        }
+      },
+      async deleteProfile() {
+        if (state.tag !== "ready" || state.me.kind !== "telegram") return false;
+        const action = beginAction();
+        if (!action) return false;
+        try {
+          const me = await deleteTelegramProfile(runtime, action.controller.signal);
+          if (!actionIsCurrent(action)) return false;
+          hasTelegramIdentityRef.current = false;
+          setState({ tag: "ready", me });
+          return true;
+        } catch (error) {
+          if (!actionIsCurrent(action)) return false;
+          throw error;
         } finally {
           finishAction(action);
         }

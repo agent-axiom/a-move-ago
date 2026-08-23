@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { verifyPlatformArtifactMarkers } from "./artifact-profile-verifier";
+import {
+  verifyNoSensitiveArtifactMarkers,
+  verifyPlatformArtifactMarkers,
+} from "./artifact-profile-verifier";
 
 const separatedProfiles = {
   pages: "web application bundle",
@@ -80,5 +83,34 @@ describe("platform artifact markers", () => {
         android: `${separatedProfiles.android} https://telegram.org/js/telegram-web-app.js?63`,
       }),
     ).toThrow("Android artifact contains Telegram bootstrap");
+  });
+});
+
+describe("sensitive artifact markers", () => {
+  it("accepts runtime field names without embedded credential values", () => {
+    expect(() =>
+      verifyNoSensitiveArtifactMarkers(
+        "authorization telegramUserId displayName Bearer runtimeValue",
+      ),
+    ).not.toThrow();
+  });
+
+  it.each([
+    `Bearer ${"s".repeat(43)}`,
+    `Bearer ${"s".repeat(42)}-`,
+    `Bearer ${"s".repeat(42)}_`,
+    "SESSION_PEPPER",
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_OIDC_CLIENT_SECRET",
+    "CLOUDFLARE_API_TOKEN",
+    "test-session-pepper-at-least-32-bytes",
+    "123456:test-bot-secret",
+    "test-oidc-client-secret",
+    "profile-deletion-e2e-marker",
+    "query_id=raw%2Bproof&hash=unchanged",
+  ])("rejects sensitive static artifact marker %j", (marker) => {
+    expect(() => verifyNoSensitiveArtifactMarkers(`bundle ${marker} bundle`)).toThrow(
+      "Production artifact contains a sensitive static marker",
+    );
   });
 });

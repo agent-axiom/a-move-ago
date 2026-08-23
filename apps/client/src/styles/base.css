@@ -1,6 +1,7 @@
 @import "./host-layout.css";
 @import "./chessboard.css";
 @import "./game.css";
+@import "./profile-deletion.css";
 
 :root {
   color-scheme: light dark;

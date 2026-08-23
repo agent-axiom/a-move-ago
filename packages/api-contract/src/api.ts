@@ -76,8 +76,17 @@ export type OidcStartResponse = z.infer<typeof OidcStartResponseSchema>;
 export type HandoffExchangeRequest = z.infer<typeof HandoffExchangeRequestSchema>;
 export type TelegramSessionIssued = z.infer<typeof TelegramSessionIssuedSchema>;
 
+export const GuestMeResponseSchema = z
+  .object({
+    kind: z.literal("guest"),
+    profile: z.null(),
+  })
+  .strict();
+
+export type GuestMeResponse = z.infer<typeof GuestMeResponseSchema>;
+
 export const MeResponseSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("guest"), profile: z.null() }).strict(),
+  GuestMeResponseSchema,
   z.object({ kind: z.literal("telegram"), profile: TelegramProfileSchema }).strict(),
 ]);
 

@@ -145,6 +145,29 @@ verified Telegram profile. The requested OIDC scopes are only
 See [PRIVACY.md](PRIVACY.md) for stored fields and retention and
 [SECURITY.md](SECURITY.md) for the security boundary and private reporting.
 
+## Delete a Telegram profile
+
+A player with a linked Telegram profile can open **Progress**, choose **Delete
+Telegram profile**, review the permanent-deletion warning, and choose **Delete
+permanently**. A confirmed deletion removes the A MOVE AGO Telegram profile,
+saved attempts, hint history, and derived statistics on every device. It does
+not delete the player's Telegram account and cannot be undone.
+
+The authenticated API operation is `DELETE /v1/me`. It has no request body and
+returns `{"kind":"guest","profile":null}` with `Cache-Control: no-store`.
+After the Worker confirms deletion, the current app continues as an empty guest
+with the same opaque session token; other sessions linked to the deleted
+profile stop working. An unconfirmed response is never shown as success. An
+interrupted transport response or invalid success payload can be
+retried with the same token while that session remains active. A `401
+INVALID_SESSION` is not deletion proof: reload the app to bootstrap an
+available guest session, then explicitly choose **Save progress with Telegram**
+to verify the profile.
+
+A later explicit **Save progress with Telegram** creates a new profile. Deleted
+profile progress is not restored, although progress accumulated independently
+after deletion can be linked normally.
+
 ## Configuration
 
 The checked-in values are development defaults or explicit deployment
@@ -184,6 +207,27 @@ fingerprints before a production deployment.
 Cloudflare secrets belong in Wrangler/GitHub secret storage; local Worker
 secrets belong in ignored `.dev.vars`. Client variables are public build
 configuration and must never contain secrets.
+
+## Production release gate
+
+Before opening the public Pages version, the operator must verify all of these
+against the deployed Worker and production D1:
+
+- Cloudflare bindings, Telegram configuration, exact origins, callbacks, and
+  current daily content are production-ready.
+- A synthetic Telegram account has attempt and hint history from at least two
+  linked sessions.
+- The deployed UI completes both deletion steps and returns the current client
+  to guest without changing its opaque token.
+- Reloaded guest statistics contain none of the deleted profile history, daily
+  gameplay still works, and the other linked session no longer reaches the old
+  profile.
+- Response and application logs for the deletion request ID contain no bearer
+  token, Telegram fields, request body, SQL details, or deleted-row counts.
+- Actual platform-log and backup retention is configured and disclosed, and a
+  restore drill does not reintroduce deleted profile rows into active D1.
+- GitHub Private Vulnerability Reporting and the private process documented in
+  `SECURITY.md` are available.
 
 ## Implementation references
 

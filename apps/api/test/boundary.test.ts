@@ -241,7 +241,7 @@ describe("HTTP boundaries", () => {
     }
     expect(allowed.headers.get("access-control-allow-origin")).toBe("https://allowed.test");
     expect(allowed.headers.get("access-control-allow-headers")).toBe("authorization,content-type");
-    expect(allowed.headers.get("access-control-allow-methods")).toBe("GET,POST,OPTIONS");
+    expect(allowed.headers.get("access-control-allow-methods")).toBe("GET,POST,DELETE,OPTIONS");
     expect(denied.headers.get("access-control-allow-origin")).toBeNull();
     expect(denied.headers.get("access-control-allow-headers")).toBeNull();
     expect(denied.headers.get("access-control-allow-methods")).toBeNull();
