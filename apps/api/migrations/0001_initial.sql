@@ -128,22 +128,22 @@ CREATE TRIGGER attempts_validate_session_before_insert
 BEFORE INSERT ON attempts
 FOR EACH ROW
 BEGIN
-  SELECT CASE
+  SELECT (CASE
     WHEN NEW.session_id IS NULL THEN RAISE(ABORT, 'attempt_session_required')
-  END;
-  SELECT CASE
+  END);
+  SELECT (CASE
     WHEN NOT EXISTS (SELECT 1 FROM sessions WHERE id = NEW.session_id)
       THEN RAISE(ABORT, 'attempt_session_missing')
-  END;
-  SELECT CASE
+  END);
+  SELECT (CASE
     WHEN (SELECT kind FROM sessions WHERE id = NEW.session_id) = 'guest'
       AND NEW.player_id IS NOT NULL THEN RAISE(ABORT, 'attempt_guest_player_mismatch')
-  END;
-  SELECT CASE
+  END);
+  SELECT (CASE
     WHEN (SELECT kind FROM sessions WHERE id = NEW.session_id) = 'telegram'
       AND NEW.player_id IS NOT (SELECT player_id FROM sessions WHERE id = NEW.session_id)
       THEN RAISE(ABORT, 'attempt_telegram_player_mismatch')
-  END;
+  END);
 END;
 
 CREATE INDEX sessions_expiry_idx ON sessions(expires_at) WHERE revoked_at IS NULL;

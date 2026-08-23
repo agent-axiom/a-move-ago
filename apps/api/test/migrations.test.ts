@@ -154,6 +154,17 @@ describe("D1 migrations", () => {
     expect(puzzleColumns.map((column) => column.name)).toContain("content_digest");
   });
 
+  it("parenthesizes trigger CASE expressions for the remote D1 parser", () => {
+    const initialMigration = testEnv.TEST_MIGRATIONS.find(
+      (migration) => migration.name === "0001_initial.sql",
+    );
+    const triggerSql = initialMigration?.queries.join("\n") ?? "";
+
+    expect(triggerSql).toContain("CREATE TRIGGER attempts_validate_session_before_insert");
+    expect(triggerSql).not.toMatch(/\bSELECT\s+CASE\b/);
+    expect(triggerSql.match(/\bSELECT\s+\(CASE\b/g)).toHaveLength(4);
+  });
+
   it("starts the first test with no gameplay rows", async () => {
     expect(await results<{ count: number }>("SELECT count(*) AS count FROM players")).toEqual([
       { count: 0 },
