@@ -3,6 +3,7 @@
   "files": {
     "includes": [
       "**",
+      "!**/.superpowers",
       "!**/.wrangler",
       "!**/coverage",
       "!**/dist",
@@ -25,6 +26,18 @@
       "preset": "recommended"
     }
   },
+  "overrides": [
+    {
+      "includes": ["assets/branding/telegram-mini-app-splash-icon.svg"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noSvgWithoutTitle": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "double",
