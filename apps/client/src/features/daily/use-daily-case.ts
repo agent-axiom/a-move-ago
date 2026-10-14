@@ -18,7 +18,39 @@ export function useDailyCase(enabled: boolean, caseDate: string | null) {
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState<DailyLoadState>({ tag: "idle" });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: revision intentionally retriggers explicit retries.
+  useEffect(() => {
+    if (!enabled || caseDate !== null) return;
+    let observedDate = new Date(runtime.now()).toISOString().slice(0, 10);
+    let midnightTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const checkDate = () => {
+      const now = runtime.now();
+      const currentDate = new Date(now).toISOString().slice(0, 10);
+      if (currentDate !== observedDate) {
+        observedDate = currentDate;
+        setRevision((value) => value + 1);
+      }
+      clearTimeout(midnightTimer);
+      const midnight = new Date(now);
+      midnight.setUTCHours(24, 0, 0, 0);
+      midnightTimer = setTimeout(checkDate, midnight.valueOf() - now);
+    };
+    const checkVisibleDate = () => {
+      if (document.visibilityState === "visible") checkDate();
+    };
+
+    checkDate();
+    // Suspended tabs may miss the midnight timer; check again when the host resumes them.
+    document.addEventListener("visibilitychange", checkVisibleDate);
+    window.addEventListener("focus", checkDate);
+    return () => {
+      clearTimeout(midnightTimer);
+      document.removeEventListener("visibilitychange", checkVisibleDate);
+      window.removeEventListener("focus", checkDate);
+    };
+  }, [caseDate, enabled, runtime]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: revision retries or rolls over daily.
   useEffect(() => {
     if (!enabled) {
       setState({ tag: "idle" });

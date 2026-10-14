@@ -40,3 +40,58 @@ jobs:
       - run: npm run verify:artifacts -w @a-move-ago/client
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e -w @a-move-ago/client
+      - name: Build Pages against the local Worker
+        run: npm run build:pages -w @a-move-ago/client
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8787
+      - name: Verify browser, Worker and local D1 together
+        env:
+          LIVE_API_E2E: "true"
+          WRANGLER_SEND_METRICS: "false"
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e apps/api/.dev.vars
+          worker_pid=""
+          worker_log="$RUNNER_TEMP/a-move-ago-worker.log"
+          cleanup() {
+            local status=$?
+            if [[ -n "$worker_pid" ]]; then
+              kill "$worker_pid" 2>/dev/null || true
+              wait "$worker_pid" 2>/dev/null || true
+            fi
+            rm -f apps/api/.dev.vars
+            if [[ "$status" -ne 0 && -f "$worker_log" ]]; then
+              cat "$worker_log"
+            fi
+          }
+          trap cleanup EXIT
+          # Synthetic local fixtures; this job needs no deployed credentials.
+          cat > apps/api/.dev.vars <<'VARS'
+          SESSION_PEPPER=ci-local-session-pepper
+          TELEGRAM_BOT_TOKEN=123456:ci-local-bot-token
+          TELEGRAM_OIDC_CLIENT_SECRET=ci-local-oidc-client-secret
+          VARS
+          npm run dev:seed
+          node node_modules/wrangler/bin/wrangler.js dev \
+            --local --config "$GITHUB_WORKSPACE/apps/api/wrangler.jsonc" \
+            --persist-to "$GITHUB_WORKSPACE/apps/api/.wrangler/state" \
+            --ip 127.0.0.1 --port 8787 \
+            --var ALLOWED_ORIGINS:http://127.0.0.1:4173 > "$worker_log" 2>&1 &
+          worker_pid=$!
+          ready=false
+          for attempt in {1..30}; do
+            kill -0 "$worker_pid" 2>/dev/null || exit 1
+            if curl --fail --silent --max-time 2 http://127.0.0.1:8787/v1/healthz > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != true ]]; then
+            echo "Local Worker did not become healthy within the startup window."
+            exit 1
+          fi
+          npm run deployment:check -- \
+            --api-origin http://127.0.0.1:8787 --web-origin http://127.0.0.1:4173
+          npm run e2e -w @a-move-ago/client -- e2e/live-worker.spec.ts

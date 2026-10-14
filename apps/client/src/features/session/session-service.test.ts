@@ -1,4 +1,5 @@
 import { ApiError, ApiTransportError } from "@a-move-ago/api-contract";
+import { browserPortFromWindow, createPlatformAdapter } from "@a-move-ago/platform";
 import { describe, expect, it, vi } from "vitest";
 import { runtimeFixture } from "../../test/runtime-fixture";
 import {
@@ -65,6 +66,25 @@ describe("session service", () => {
     expect(runtime.platform.requestTelegramProof).not.toHaveBeenCalled();
     expect(runtime.api.loginMiniApp).not.toHaveBeenCalled();
     expect(runtime.token.get()).toBe("g".repeat(43));
+  });
+
+  it("boots a usable guest when browser storage access is denied", async () => {
+    const runtime = runtimeFixture({ storedToken: null, platformKind: "web" });
+    const browserWindow = {
+      get localStorage(): Storage {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      },
+    } as Window;
+    runtime.platform = await createPlatformAdapter({
+      browser: browserPortFromWindow(browserWindow),
+    });
+
+    await expect(bootstrapSession(runtime, new URL("https://app.test/"), vi.fn())).resolves.toEqual(
+      { kind: "guest", profile: null },
+    );
+    expect(runtime.api.createGuest).toHaveBeenCalledWith("web", expect.any(AbortSignal));
+    expect(runtime.token.get()).toBe("g".repeat(43));
+    expect(await runtime.platform.tokenStore.read()).toBe("g".repeat(43));
   });
 
   it("strips auth query synchronously before the first await and preserves the fragment", async () => {

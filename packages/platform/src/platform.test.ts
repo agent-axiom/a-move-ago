@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { browserPortFromWindow, createPlatformAdapter } from "./factory";
 import type { TelegramWebAppLike } from "./telegram/telegram-types";
 import type { PlatformAdapter } from "./types";
+import { SESSION_TOKEN_KEY } from "./web/token-store";
 
 function browserPort(input: { href?: string; height?: number } = {}) {
   const values = new Map<string, string>();
@@ -76,8 +77,12 @@ describe("platform adapters", () => {
     expect(adapter).toMatchObject({ kind: "web", channel: "web", authMode: "oidc-web" });
     await adapter.tokenStore.write("guest-token");
     expect(await adapter.tokenStore.read()).toBe("guest-token");
+    expect(browser.storage.getItem(SESSION_TOKEN_KEY)).toBe("guest-token");
+    const restoredAdapter = await createPlatformAdapter({ browser });
+    expect(await restoredAdapter.tokenStore.read()).toBe("guest-token");
     await adapter.tokenStore.clear();
     expect(await adapter.tokenStore.read()).toBeNull();
+    expect(await restoredAdapter.tokenStore.read()).toBeNull();
     await expect(adapter.authReturn.initialUrl()).resolves.toBe(
       "https://agent-axiom.github.io/a-move-ago/#tgWebAppData=kept",
     );
@@ -92,6 +97,112 @@ describe("platform adapters", () => {
       "https://oauth.telegram.org/auth?state=server-state",
     );
   });
+
+  it("keeps session tokens in memory when the localStorage getter is denied", async () => {
+    const browserWindow = {
+      get localStorage(): Storage {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      },
+    } as Window;
+    const browser = browserPortFromWindow(browserWindow);
+    const adapter = await createPlatformAdapter({ browser });
+
+    expect(await adapter.tokenStore.read()).toBeNull();
+    await adapter.tokenStore.write("guest-token");
+    expect(await adapter.tokenStore.read()).toBe("guest-token");
+    await adapter.tokenStore.clear();
+    expect(await adapter.tokenStore.read()).toBeNull();
+  });
+
+  it.each(["web", "telegram"] as const)(
+    "keeps %s session tokens in memory when getItem is denied",
+    async (kind) => {
+      const browser = browserPort();
+      browser.storage.getItem = vi.fn(() => {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      });
+      const write = vi.spyOn(browser.storage, "setItem");
+      const remove = vi.spyOn(browser.storage, "removeItem");
+      const adapter = await createPlatformAdapter({
+        browser,
+        telegram: kind === "telegram" ? telegramFake() : undefined,
+      });
+
+      expect(await adapter.tokenStore.read()).toBeNull();
+      await adapter.tokenStore.write("guest-token");
+      expect(await adapter.tokenStore.read()).toBe("guest-token");
+      await adapter.tokenStore.clear();
+      expect(await adapter.tokenStore.read()).toBeNull();
+      expect(browser.storage.getItem).toHaveBeenCalledOnce();
+      expect(write).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps the last known token when storage access is denied after a successful read", async () => {
+    const browser = browserPort();
+    browser.storage.setItem(SESSION_TOKEN_KEY, "stored-token");
+    const adapter = await createPlatformAdapter({ browser });
+    expect(await adapter.tokenStore.read()).toBe("stored-token");
+    browser.storage.getItem = vi.fn(() => {
+      throw new DOMException("Storage is blocked", "SecurityError");
+    });
+
+    expect(await adapter.tokenStore.read()).toBe("stored-token");
+    await adapter.tokenStore.write("rotated-token");
+    expect(await adapter.tokenStore.read()).toBe("rotated-token");
+  });
+
+  it.each(["setItem", "removeItem"] as const)(
+    "keeps token changes in memory when %s is denied",
+    async (operation) => {
+      const browser = browserPort();
+      const adapter = await createPlatformAdapter({ browser });
+      await adapter.tokenStore.write("stored-token");
+      vi.spyOn(browser.storage, operation).mockImplementation(() => {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      });
+
+      if (operation === "setItem") {
+        await adapter.tokenStore.write("rotated-token");
+        expect(await adapter.tokenStore.read()).toBe("rotated-token");
+      } else {
+        await adapter.tokenStore.clear();
+        expect(await adapter.tokenStore.read()).toBeNull();
+      }
+    },
+  );
+
+  it("propagates unrelated errors from the localStorage getter", () => {
+    const failure = new TypeError("Broken storage integration");
+    const browserWindow = {
+      get localStorage(): Storage {
+        throw failure;
+      },
+    } as Window;
+
+    expect(() => browserPortFromWindow(browserWindow)).toThrow(failure);
+  });
+
+  it.each(["getItem", "setItem", "removeItem"] as const)(
+    "propagates unrelated storage errors from %s",
+    async (operation) => {
+      const browser = browserPort();
+      const failure = new TypeError("Broken storage integration");
+      vi.spyOn(browser.storage, operation).mockImplementation(() => {
+        throw failure;
+      });
+      const adapter = await createPlatformAdapter({ browser });
+      const pending =
+        operation === "getItem"
+          ? adapter.tokenStore.read()
+          : operation === "setItem"
+            ? adapter.tokenStore.write("guest-token")
+            : adapter.tokenStore.clear();
+
+      await expect(pending).rejects.toBe(failure);
+    },
+  );
 
   it("treats an unknown Telegram host as web", async () => {
     const telegram = telegramFake({ platform: "unknown" });

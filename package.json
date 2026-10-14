@@ -14,11 +14,14 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "dev:seed": "npm run dev:seed -w @a-move-ago/tools",
+    "deployment:check": "node tools/scripts/check-deployment.mjs",
     "check": "biome check .",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:deployment",
+    "test:deployment": "node --test tools/test/check-deployment.test.mjs",
     "test:run": "vitest run",
     "content:validate": "npm run validate-content -w @a-move-ago/tools",
     "typecheck": "npm run typecheck --workspaces --if-present"

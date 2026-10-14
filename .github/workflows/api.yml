@@ -92,6 +92,13 @@ jobs:
         run: >-
           npx wrangler deploy --config apps/api/wrangler.production.jsonc
           --secrets-file "$RUNNER_TEMP/worker-secrets.json"
+      - name: Check deployed API and today's daily content
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: >-
+          npm run deployment:check --
+          --api-origin "$API_ORIGIN"
+          --web-origin https://agent-axiom.github.io
       - name: Destroy ephemeral deployment files
         if: always()
         run: rm -f "$RUNNER_TEMP/worker-secrets.json" apps/api/wrangler.production.jsonc

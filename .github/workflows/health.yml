@@ -1,0 +1,33 @@
+name: Deployment health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 0 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-health
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: ${{ vars.API_ORIGIN != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Check guest access, D1 and current daily content
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: >-
+          npm run deployment:check --
+          --api-origin "$API_ORIGIN"
+          --web-origin https://agent-axiom.github.io
