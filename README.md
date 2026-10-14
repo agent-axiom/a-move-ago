@@ -244,6 +244,11 @@ fixed origin in both workflows and `WEB_AUTH_RETURN_URL` in the config template.
 Production config derives its browser origin from that return URL, retains
 the Capacitor origin, and removes the Vite development origin.
 
+On relevant pull requests from this repository, the health workflow also
+checks the currently deployed version. That check is advisory on pull
+requests, so an existing content outage does not block a fix; the local
+Worker/browser integration still verifies the proposed code independently.
+
 Before launch, verify that the private D1 corpus has today's case and at least
 the next seven UTC dates published, with validated solutions and recorded
 provenance/licenses. The local development sample is not a production corpus.

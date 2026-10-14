@@ -2,6 +2,11 @@ name: Deployment health
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/health.yml"
+      - "tools/scripts/check-deployment.mjs"
+      - "apps/api/**"
   schedule:
     - cron: "31 0 * * *"
 
@@ -14,7 +19,8 @@ concurrency:
 
 jobs:
   check:
-    if: ${{ vars.API_ORIGIN != '' }}
+    if: ${{ vars.API_ORIGIN != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
