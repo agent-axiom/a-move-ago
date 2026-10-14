@@ -110,14 +110,7 @@ export async function runSeedLocal(
     await writeFile(filename, sql, { encoding: "utf8", mode: 0o600 });
     const localOptions = ["--local", "--config", configPath, "--persist-to", stateDirectory];
     await runtime.runWrangler(["d1", "migrations", "apply", "a-move-ago", ...localOptions]);
-    await runtime.runWrangler([
-      "d1",
-      "execute",
-      "a-move-ago",
-      ...localOptions,
-      "--file",
-      filename,
-    ]);
+    await runtime.runWrangler(["d1", "execute", "a-move-ago", ...localOptions, "--file", filename]);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

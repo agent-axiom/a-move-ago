@@ -172,9 +172,7 @@ describe("runSeedLocal", () => {
 
   it("rejects invalid sample content before any database command", async () => {
     const runWrangler = vi.fn();
-    await expect(
-      runSeedLocal([], { readSample: async () => "{}", runWrangler }),
-    ).rejects.toThrow();
+    await expect(runSeedLocal([], { readSample: async () => "{}", runWrangler })).rejects.toThrow();
     expect(runWrangler).not.toHaveBeenCalled();
   });
 

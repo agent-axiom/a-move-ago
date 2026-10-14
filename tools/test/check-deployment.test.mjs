@@ -94,15 +94,18 @@ test("a release check completes the guest journey with a safe summary", async ()
   const result = await harness.run();
   assert.deepEqual(result, { ok: true, date: "2026-10-14", puzzleCount: 1 });
   assert.equal(JSON.stringify(result).includes(token), false);
-  assert.deepEqual(harness.requests.map(({ method, path }) => `${method} ${path}`), [
-    "GET /v1/healthz",
-    "OPTIONS /v1/sessions/guest",
-    "OPTIONS /v1/daily",
-    "POST /v1/sessions/guest",
-    "GET /v1/me",
-    "GET /v1/me/stats",
-    "GET /v1/daily",
-  ]);
+  assert.deepEqual(
+    harness.requests.map(({ method, path }) => `${method} ${path}`),
+    [
+      "GET /v1/healthz",
+      "OPTIONS /v1/sessions/guest",
+      "OPTIONS /v1/daily",
+      "POST /v1/sessions/guest",
+      "GET /v1/me",
+      "GET /v1/me/stats",
+      "GET /v1/daily",
+    ],
+  );
   for (const request of harness.requests) {
     const authenticated = request.method === "GET" && request.path !== "/v1/healthz";
     assert.equal(request.headers.get("authorization"), authenticated ? `Bearer ${token}` : null);
@@ -445,11 +448,14 @@ test("CLI rejects unsafe destinations and ambiguous invocation before any reques
     ],
     ["--api-origin", origins.apiOrigin, "--web-origin", origins.webOrigin, "--unknown", sensitive],
   ]) {
-    assert.throws(() => parseArguments(args), (error) => {
-      assert.match(error.message, /Usage:/);
-      assert.equal(error.message.includes(sensitive), false);
-      return true;
-    });
+    assert.throws(
+      () => parseArguments(args),
+      (error) => {
+        assert.match(error.message, /Usage:/);
+        assert.equal(error.message.includes(sensitive), false);
+        return true;
+      },
+    );
   }
   let requests = 0;
   await assert.rejects(

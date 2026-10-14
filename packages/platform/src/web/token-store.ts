@@ -4,10 +4,7 @@ export const SESSION_TOKEN_KEY = "amoveago.session.v1";
 
 export function isStorageSecurityError(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "name" in error &&
-    error.name === "SecurityError"
+    typeof error === "object" && error !== null && "name" in error && error.name === "SecurityError"
   );
 }
 

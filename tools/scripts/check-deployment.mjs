@@ -103,7 +103,10 @@ export async function checkDeployment(
     } catch {
       throw new Error(`TRANSPORT_FAILED ${method} ${path}`);
     }
-    ensure(response.headers.get("access-control-allow-origin") === webOrigin, `CORS_FAILED ${path}`);
+    ensure(
+      response.headers.get("access-control-allow-origin") === webOrigin,
+      `CORS_FAILED ${path}`,
+    );
     if (preflight) {
       ensure(response.status === 204, `PREFLIGHT_FAILED ${path}`);
       ensure(
@@ -218,7 +221,8 @@ export function parseArguments(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index];
-    const key = flag === "--api-origin" ? "apiOrigin" : flag === "--web-origin" ? "webOrigin" : null;
+    const key =
+      flag === "--api-origin" ? "apiOrigin" : flag === "--web-origin" ? "webOrigin" : null;
     const value = args[index + 1];
     ensure(key !== null && !Object.hasOwn(options, key) && typeof value === "string", usage);
     options[key] = canonicalOrigin(value);

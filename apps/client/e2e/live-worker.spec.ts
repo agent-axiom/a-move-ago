@@ -33,7 +33,11 @@ test("guest solves the seeded case through Worker and retains D1 progress after 
   ]);
   expect(daily.solvedPuzzleIds).toEqual([]);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Development sample: The missing pawn", exact: true }),
+    page.getByRole("heading", {
+      level: 1,
+      name: "Development sample: The missing pawn",
+      exact: true,
+    }),
   ).toBeVisible();
   expect(guestRequests).toBe(1);
 

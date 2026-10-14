@@ -248,10 +248,9 @@ it("fetches stats only after the player continues from the solved reveal", async
   expect(await screen.findByRole("status")).toHaveTextContent("Rewinding the last move");
   await waitFor(() => expect(runtime.platform.haptic).toHaveBeenCalledWith("success"));
   expect(runtime.api.getStats).not.toHaveBeenCalled();
-  await waitFor(
-    () => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled(),
-    { timeout: 3_000 },
-  );
+  await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled(), {
+    timeout: 3_000,
+  });
   expect(screen.getByText(reveal.explanation, { exact: false })).toBeInTheDocument();
   expect(runtime.api.getStats).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Continue" }));

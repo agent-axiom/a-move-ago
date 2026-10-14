@@ -161,9 +161,9 @@ describe("renderWranglerConfig", () => {
     expect(() => renderWranglerConfig(`${source}\n// amoveago-debug:`, productionInput)).toThrow(
       /marker/i,
     );
-    expect(() => renderWranglerConfig(`${source}\n// http://localhost:5173`, productionInput)).toThrow(
-      /marker/i,
-    );
+    expect(() =>
+      renderWranglerConfig(`${source}\n// http://localhost:5173`, productionInput),
+    ).toThrow(/marker/i);
   });
 
   it.each([
