@@ -5,7 +5,8 @@ import { isDeepStrictEqual } from "node:util";
 
 // This privileged query stays read-only. Solutions exist in memory, never in output.
 const solutionSql = `SELECT c.id AS case_id,
-  ('p-' || c.id || '-' || cp.position || '-v' || p.version) AS puzzle_id, s.solution_json
+  ('p-' || c.id || '-' || cp.position || '-v' || p.version) AS puzzle_id,
+  json_extract(p.public_json, '$.prompt') AS prompt, s.solution_json
 FROM daily_cases c
 JOIN daily_case_puzzles cp ON cp.case_id = c.id
 JOIN puzzles p ON p.id = cp.puzzle_id
@@ -179,6 +180,19 @@ function validDaily(value, date) {
     )
   );
 }
+function stablePublicPuzzle(puzzle, unlocked) {
+  if (!unlocked) return puzzle;
+  const { title: _title, prompt: _prompt, localizations, ...base } = puzzle;
+  return {
+    ...base,
+    localizations: Object.fromEntries(
+      Object.entries(localizations).map(([locale, value]) => {
+        const { title: _localizedTitle, prompt: _localizedPrompt, ...text } = value;
+        return [locale, text];
+      }),
+    ),
+  };
+}
 
 /** Two isolated guests verify first-solve pricing, clue deductions, durable awards and replay safety. */
 export async function checkProductionScoring(
@@ -269,7 +283,10 @@ export async function checkProductionScoring(
           (p, index) =>
             p.title === `Puzzle ${index + 1}` &&
             p.localizations.ru.title === `Задача ${index + 1}` &&
-            p.localizations.zh.title === `棋题 ${index + 1}`,
+            p.localizations.zh.title === `棋题 ${index + 1}` &&
+            p.prompt === "Reconstruct the last move." &&
+            p.localizations.ru.prompt === "Восстановите последний ход." &&
+            p.localizations.zh.prompt === "还原上一步棋。",
         ) &&
         daily.puzzles.every((p) => isDeepStrictEqual(daily.progressStates[p.id], progress())),
       "FRESH_DAILY_FAILED",
@@ -296,18 +313,27 @@ export async function checkProductionScoring(
         "SCORING_STATS_FAILED",
       );
     }
-    async function reload(expected, solved) {
+    async function reload(expected, solved, clue) {
       const { data } = await api(dailyPath);
+      const unlocked = expected.clueUnlocked || solved;
       ensure(
         validDaily(data, date) &&
           data.id === daily.id &&
           data.puzzles.length === daily.puzzles.length &&
-          data.puzzles.every(
-            (p, index) =>
-              p.id === daily.puzzles[index].id &&
-              p.version === daily.puzzles[index].version &&
-              p.postFen === daily.puzzles[index].postFen,
+          isDeepStrictEqual(
+            data.puzzles.map((p) => stablePublicPuzzle(p, p.id === first.id && unlocked)),
+            daily.puzzles.map((p) => stablePublicPuzzle(p, p.id === first.id && unlocked)),
           ) &&
+          (!unlocked || data.puzzles[0].prompt === row.prompt) &&
+          (!clue ||
+            (data.puzzles[0].title === clue.title &&
+              ["ru", "zh"].every(
+                (locale) =>
+                  data.puzzles[0].localizations[locale].title ===
+                    clue.localizations[locale].title &&
+                  data.puzzles[0].localizations[locale].prompt ===
+                    clue.localizations[locale].prompt,
+              ))) &&
           isDeepStrictEqual(data.solvedPuzzleIds, solved ? [first.id] : []) &&
           data.puzzles.every((p) =>
             isDeepStrictEqual(data.progressStates[p.id], p.id === first.id ? expected : progress()),
@@ -342,9 +368,10 @@ export async function checkProductionScoring(
   );
   const row = stored.result[0].results[0];
   ensure(
-    keys(row, ["case_id", "puzzle_id", "solution_json"]) &&
+    keys(row, ["case_id", "puzzle_id", "prompt", "solution_json"]) &&
       row.case_id === fresh.daily.id &&
       row.puzzle_id === fresh.first.id &&
+      nonempty(row.prompt) &&
       typeof row.solution_json === "string",
     "D1_SOLUTION_FAILED",
   );
@@ -457,19 +484,15 @@ export async function checkProductionScoring(
   ensure(
     keys(clue, ["title", "prompt", "localizations", "progress"]) &&
       nonempty(clue.title) &&
-      clue.prompt === assisted.first.prompt &&
+      clue.prompt === row.prompt &&
       translated(clue.localizations, ["title", "prompt"]) &&
-      ["ru", "zh"].every(
-        (locale) =>
-          clue.localizations[locale].prompt === assisted.first.localizations[locale].prompt,
-      ) &&
       isDeepStrictEqual(clue.progress, progress(1, 1)),
     "SCORING_CLUE_FAILED",
   );
   const repeatedClue = await assisted.api(cluePath, {});
   ensure(isDeepStrictEqual(repeatedClue.data, clue), "SCORING_CLUE_IDEMPOTENCY_FAILED");
   await assisted.stats(1, 0);
-  await assisted.reload(progress(1, 1), false);
+  await assisted.reload(progress(1, 1), false, clue);
   await solveAndReplay(assisted, 2, 1, 35, 1);
   // The other actor's clue and attempts must never alter an existing award.
   await fresh.stats(2, 100, true);
@@ -485,6 +508,8 @@ export async function checkProductionScoring(
     duplicateAwardsPrevented: true,
     reloadVerified: true,
     actorIsolationVerified: true,
+    conditionsHidden: true,
+    clueConditionsVerified: true,
   };
 }
 

@@ -1,7 +1,7 @@
 type Translation = string | { other: string; one?: string; few?: string; many?: string };
 
 const en = {
-  "game.conditions": "Conditions · no point cost",
+  "game.objective": "Reconstruct the last move.",
   "game.score.label": "Puzzle score",
   "game.score.attempt": "Attempt {number}",
   "game.score.available": {
@@ -12,7 +12,7 @@ const en = {
   "game.score.rules": "How points work",
   "game.score.rulesCopy":
     "Solve on attempt 1 / 2 / 3 / 4+ for 100 / 70 / 40 / 20 points. Each new clue or hint halves the reward, rounded down to at least 1 point. Retries of the same request never cost extra.",
-  "game.clue.hidden": "An optional title clue is hidden. You can solve using the conditions above.",
+  "game.clue.hidden": "The clue is hidden. Reveal it if you need help with the last move.",
   "game.clue.reveal": {
     one: "Reveal clue · {before} → {after} point",
     other: "Reveal clue · {before} → {after} points",
@@ -118,7 +118,7 @@ const en = {
   "game.hint.error": "Your hint couldn't be loaded. Please try again.",
   "game.hint.retry": "Retry hint",
   "game.hints": "Hints",
-  "game.evidence": "The evidence",
+  "game.evidence": "Your challenge",
   "game.reveal.previous": "Previous position reconstructed.",
   "game.reveal.post": "Position after the move.",
   "game.reveal.rewind": "Rewinding the last move.",
@@ -136,7 +136,7 @@ const en = {
 } as const;
 
 const ru = {
-  "game.conditions": "Условия · без потери очков",
+  "game.objective": "Восстановите последний ход.",
   "game.score.label": "Очки за задачу",
   "game.score.attempt": "Попытка {number}",
   "game.score.available": {
@@ -149,8 +149,7 @@ const ru = {
   "game.score.rules": "Как начисляются очки",
   "game.score.rulesCopy":
     "Решение с 1-й / 2-й / 3-й / 4-й и следующих попыток даёт 100 / 70 / 40 / 20 очков. Каждая новая улика или подсказка уменьшает награду вдвое, с округлением вниз до минимума в 1 очко. Повтор отправки того же запроса ничего не стоит.",
-  "game.clue.hidden":
-    "Дополнительная улика в названии скрыта. Задачу можно решить по условиям выше.",
+  "game.clue.hidden": "Улика скрыта. Откройте её, если нужна помощь с последним ходом.",
   "game.clue.reveal": {
     one: "Открыть улику · {before} → {after} очко",
     few: "Открыть улику · {before} → {after} очка",
@@ -263,7 +262,7 @@ const ru = {
   "game.hint.error": "Не удалось загрузить подсказку. Попробуйте ещё раз.",
   "game.hint.retry": "Повторить загрузку подсказки",
   "game.hints": "Подсказки",
-  "game.evidence": "Улики",
+  "game.evidence": "Ваша задача",
   "game.reveal.previous": "Предыдущая позиция восстановлена.",
   "game.reveal.post": "Позиция после хода.",
   "game.reveal.rewind": "Возвращаем последний ход назад.",
@@ -281,7 +280,7 @@ const ru = {
 } satisfies Record<keyof typeof en, Translation>;
 
 const zh = {
-  "game.conditions": "题目条件 · 不扣分",
+  "game.objective": "还原上一步棋。",
   "game.score.label": "棋题分数",
   "game.score.attempt": "第 {number} 次尝试",
   "game.score.available": "可得：{points} 分",
@@ -289,7 +288,7 @@ const zh = {
   "game.score.rules": "计分规则",
   "game.score.rulesCopy":
     "第 1 / 2 / 3 / 4 次及之后的尝试解出，可得 100 / 70 / 40 / 20 分。每条新线索或提示将奖励减半，向下取整，最低 1 分。重试同一请求不会额外扣分。",
-  "game.clue.hidden": "标题中的额外线索已隐藏。你可以仅根据上方条件解题。",
+  "game.clue.hidden": "线索已隐藏。如需帮助还原上一步棋，可以揭示线索。",
   "game.clue.reveal": "揭示线索 · {before} → {after} 分",
   "game.clue.loading": "正在揭示线索…",
   "game.clue.unlocked": "线索已揭示",
@@ -379,7 +378,7 @@ const zh = {
   "game.hint.error": "无法加载提示，请重试。",
   "game.hint.retry": "重试获取提示",
   "game.hints": "提示",
-  "game.evidence": "线索",
+  "game.evidence": "你的挑战",
   "game.reveal.previous": "已还原上一步之前的局面。",
   "game.reveal.post": "走完这一步后的局面。",
   "game.reveal.rewind": "正在退回最后一步。",

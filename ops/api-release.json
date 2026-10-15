@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-15-scoring-v1",
-  "reason": "Hide spoiler titles and add server-authoritative attempt, clue, hint and first-solve rating history before the updated client opts in"
+  "release": "2026-10-16-hidden-prompts",
+  "reason": "Hide detailed puzzle conditions and their translations behind the existing single clue unlock, leaving a neutral objective before disclosure"
 }

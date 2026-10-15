@@ -140,11 +140,17 @@ describe("GET /v1/daily", () => {
       date: "2026-08-03",
       title: "Daily case",
       puzzles: [
-        { ...secondPuzzle.public, id: publicPuzzleId(dailyCase.id, 1, 1), title: "Puzzle 1" },
+        {
+          ...secondPuzzle.public,
+          id: publicPuzzleId(dailyCase.id, 1, 1),
+          title: "Puzzle 1",
+          prompt: "Reconstruct the last move.",
+        },
         {
           ...openingPuzzleFixture.public,
           id: publicPuzzleId(dailyCase.id, 2, 1),
           title: "Puzzle 2",
+          prompt: "Reconstruct the last move.",
         },
       ],
       solvedPuzzleIds: [],
@@ -157,6 +163,7 @@ describe("GET /v1/daily", () => {
       secondPuzzle.public.title,
       secondPuzzle.contentKey,
       openingPuzzleFixture.contentKey,
+      openingPuzzleFixture.public.prompt,
     ]) {
       expect(serialized).not.toContain(hidden);
     }

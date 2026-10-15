@@ -15,8 +15,8 @@ Production web app: [chess.kosarevsky.dev](https://chess.kosarevsky.dev/).
    special move.
 4. Submit the reconstruction to the Worker. The client never receives accepted
    solutions before a correct attempt.
-5. Read the free puzzle conditions, optionally reveal a clue or hint, and earn
-   points for the first successful reconstruction.
+5. Reconstruct the move from the board, optionally reveal a clue or hint, and
+   earn points for the first successful reconstruction.
 6. Optionally save and synchronize progress through Telegram.
 
 Open **Archive** to browse published cases by month and see your completion
@@ -39,9 +39,10 @@ not create a profile.
 The first successful solve earns 100 points on attempt one, 70 on attempt two,
 40 on attempt three, and 20 on later attempts. Each distinct revealed clue or
 hint halves the reward, rounded down to an integer with a minimum of one point.
-The interface shows the cost before revealing help. Required puzzle conditions
-are always free; spoiler titles stay hidden until a clue is requested or the
-puzzle is solved.
+The interface shows the cost before revealing help. Puzzle titles and detailed
+conditions stay hidden until a clue is requested or the puzzle is solved. One
+clue unlock reveals both together for a single deduction; the initial objective
+only asks the player to reconstruct the last move.
 
 The Worker counts persisted attempts and assistance events in commit order.
 Retries with the same UUID do not count again, and solving an already completed
@@ -54,7 +55,7 @@ then include per-puzzle progress, attempts and hints include updated progress,
 and statistics include total `points`. `POST /v1/cases/:caseId/puzzles/:puzzleId/clue`
 records a clue unlock before returning its text. Clue retries do not charge
 again. Existing response shapes remain available without the opt-in header;
-title masking and server-side accounting apply to every client. New daily
+title and prompt masking and server-side accounting apply to every client. Daily
 puzzle identifiers and archive slugs are neutral, while in-flight requests using
 older identifiers continue to resolve to the same stored puzzle.
 

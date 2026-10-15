@@ -172,11 +172,8 @@ export function PuzzleGame(props: {
         retractingColor={props.puzzle.retractingColor}
       >
         <div className="game-copy">
-          <p className="game-eyebrow">{t(progress ? "game.conditions" : "game.evidence")}</p>
-          {!progress && props.puzzle.title !== props.caseTitle ? (
-            <h2 className="clue-title">{localizedText(props.puzzle, "title", locale)}</h2>
-          ) : null}
-          <p className="puzzle-prompt">{localizedText(props.puzzle, "prompt", locale)}</p>
+          <p className="game-eyebrow">{t("game.evidence")}</p>
+          <p className="puzzle-prompt">{t("game.objective")}</p>
           {progress ? (
             <>
               <div
@@ -209,6 +206,9 @@ export function PuzzleGame(props: {
                     <h2 className="clue-title unlocked-clue">
                       {localizedText(clueContent, "title", locale)}
                     </h2>
+                    <p className="clue-prompt">
+                      {localizedText(clueContent, "prompt", locale)}
+                    </p>
                   </>
                 ) : (
                   <>

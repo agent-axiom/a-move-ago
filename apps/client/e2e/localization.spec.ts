@@ -27,7 +27,8 @@ test("English is the default and language changes preserve the selected date and
   await language(page).selectOption("ru");
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await expect(page.getByRole("heading", { name: "Задача дня", exact: true })).toBeVisible();
-  await expect(page.getByText("Что произошло ход назад?", { exact: true })).toBeVisible();
+  await expect(page.locator(".puzzle-prompt")).toHaveText("Восстановите последний ход.");
+  await expect(page.locator(".clue-prompt")).toHaveCount(0);
   await expect(
     page.getByRole("gridcell", { name: "d5, белая пешка", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
@@ -38,7 +39,8 @@ test("English is the default and language changes preserve the selected date and
   await language(page).selectOption("zh");
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
   await expect(page.getByRole("heading", { name: "每日棋题", exact: true })).toBeVisible();
-  await expect(page.getByText("上一步发生了什么？", { exact: true })).toBeVisible();
+  await expect(page.locator(".puzzle-prompt")).toHaveText("还原上一步棋。");
+  await expect(page.locator(".clue-prompt")).toHaveCount(0);
   await expect(page.getByLabel("被吃的棋子", { exact: true })).toHaveValue("p");
   await expect(page.getByRole("button", { name: "检查走法", exact: true })).toBeEnabled();
   expect(observed.dailyDates.length).toBe(requests);

@@ -64,16 +64,27 @@ try {
   }
   async function scoring(locale) {
     const labels = {
-      en: ["Daily case", "Available: 100 points", "Reveal clue · 100 → 50 points"],
-      ru: ["Задача дня", "Доступно: 100 очков", "Открыть улику · 100 → 50 очков"],
-      zh: ["每日棋题", "可得：100 分", "揭示线索 · 100 → 50 分"],
+      en: [
+        "Daily case",
+        "Available: 100 points",
+        "Reveal clue · 100 → 50 points",
+        "Reconstruct the last move.",
+      ],
+      ru: [
+        "Задача дня",
+        "Доступно: 100 очков",
+        "Открыть улику · 100 → 50 очков",
+        "Восстановите последний ход.",
+      ],
+      zh: ["每日棋题", "可得：100 分", "揭示线索 · 100 → 50 分", "还原上一步棋。"],
     }[locale];
     await page.locator(".puzzle-score").waitFor();
     assert.equal(await page.locator("h1").innerText(), labels[0]);
     assert.equal(await page.locator(".score-potential").innerText(), labels[1]);
     await page.getByRole("button", { name: labels[2], exact: true }).waitFor();
     assert.equal(await page.locator(".unlocked-clue").count(), 0);
-    assert.ok((await page.locator(".puzzle-prompt").innerText()).trim().length > 0);
+    assert.equal(await page.locator(".clue-prompt").count(), 0);
+    assert.equal(await page.locator(".puzzle-prompt").innerText(), labels[3]);
   }
   stage = "ENGLISH_DEFAULT";
   await page.goto(pageUrl.href, { waitUntil: "domcontentloaded" });
@@ -160,6 +171,33 @@ try {
   assert.equal(await page.locator("h1").innerText(), originalTitle);
   assert.equal(attempts, 0);
   assert.equal(clueRequests, 0);
+  stage = "CLUE_CONDITIONS";
+  await page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true }).click();
+  await page.locator(".clue-prompt").waitFor();
+  const unlockedPrompts = {};
+  const unlockedLabels = {
+    en: ["Reconstruct the last move.", "Available: 50 points"],
+    ru: ["Восстановите последний ход.", "Доступно: 50 очков"],
+    zh: ["还原上一步棋。", "可得：50 分"],
+  };
+  for (const locale of ["en", "ru", "zh"]) {
+    await language().selectOption(locale);
+    await page.locator(".clue-prompt").waitFor();
+    unlockedPrompts[locale] = await page.locator(".clue-prompt").innerText();
+    assert.ok(unlockedPrompts[locale].trim().length > 0);
+    assert.equal(await page.locator(".puzzle-prompt").innerText(), unlockedLabels[locale][0]);
+    assert.equal(await page.locator(".score-potential").innerText(), unlockedLabels[locale][1]);
+    await layout();
+  }
+  stage = "CLUE_CONDITIONS_RELOADED";
+  await language().selectOption("en");
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator(".clue-prompt").waitFor();
+  assert.equal(await page.locator(".clue-prompt").innerText(), unlockedPrompts.en);
+  assert.equal(await page.locator(".puzzle-prompt").innerText(), unlockedLabels.en[0]);
+  assert.equal(await page.locator(".score-potential").innerText(), unlockedLabels.en[1]);
+  assert.equal(attempts, 0);
+  assert.equal(clueRequests, 1);
   // No traces, screenshots, response bodies, puzzle text or storage are exported.
   console.log(
     JSON.stringify({
@@ -170,6 +208,9 @@ try {
       persistedChoice: true,
       archiveAndProgress: true,
       clueHidden: true,
+      conditionsHidden: true,
+      clueConditionsVerified: true,
+      clueReloadVerified: true,
       assistanceCostShown: true,
       personalRatingVerified: true,
       viewports: [320, 390, 1440],
