@@ -83,15 +83,23 @@ function validateApiOrigin(value: string): string {
   return value;
 }
 
-function productionAllowedOrigins(source: string): string {
-  const matches = [...source.matchAll(/"WEB_AUTH_RETURN_URL"\s*:\s*("(?:\\.|[^"\\])*")/g)];
-  if (matches.length !== 1) {
-    throw new Error("Expected exactly one Web auth return URL sentinel");
+function sourceString(source: string, key: string, label: string): string {
+  const keys = source.match(new RegExp(`"${key}"\\s*:`, "g"));
+  const matches = [...source.matchAll(new RegExp(`"${key}"\\s*:\\s*("(?:\\\\.|[^"\\\\])*")`, "g"))];
+  if (keys?.length !== 1 || matches.length !== 1) {
+    throw new Error(`Expected exactly one ${label} sentinel`);
   }
-  let value: string;
+  try {
+    return JSON.parse(matches[0]?.[1] ?? "");
+  } catch {
+    throw new Error(`Invalid production ${label}`);
+  }
+}
+
+function productionAllowedOrigins(source: string): string {
+  const value = sourceString(source, "WEB_AUTH_RETURN_URL", "Web auth return URL");
   let target: URL;
   try {
-    value = JSON.parse(matches[0]?.[1] ?? "");
     target = new URL(value);
   } catch {
     throw new Error("Invalid production Web auth return URL");
@@ -107,7 +115,26 @@ function productionAllowedOrigins(source: string): string {
   ) {
     throw new Error("Invalid production Web auth return URL");
   }
-  return [...new Set([target.origin, "https://localhost"])].join(",");
+  const configured = sourceString(source, "ALLOWED_ORIGINS", "allowed origins").split(",");
+  if (configured.length === 0 || new Set(configured).size !== configured.length) {
+    throw new Error("Invalid production allowed origins");
+  }
+  const origins = configured.filter((origin) => origin !== "http://localhost:5173");
+  for (const origin of origins) {
+    try {
+      validateApiOrigin(origin);
+      if (origin.includes("*") || origin.includes(",")) throw new Error("Invalid origin");
+    } catch {
+      throw new Error("Invalid production allowed origins");
+    }
+  }
+  if (!origins.includes(target.origin)) {
+    throw new Error("Web auth return URL origin is not explicitly allowed");
+  }
+  if (!origins.includes("https://localhost")) {
+    throw new Error("Production allowed origins must retain the Capacitor origin");
+  }
+  return origins.join(",");
 }
 
 function validateFingerprints(value: string | undefined): string {
@@ -173,7 +200,7 @@ export function renderWranglerConfig(source: string, input: ProductionWranglerIn
   rendered = replaceSentinel(
     rendered,
     "allowed origins",
-    /"ALLOWED_ORIGINS"\s*:\s*"http:\/\/localhost:5173,https:\/\/agent-axiom\.github\.io,https:\/\/localhost"/g,
+    /"ALLOWED_ORIGINS"\s*:\s*"(?:\\.|[^"\\])*"/g,
     `"ALLOWED_ORIGINS": ${JSON.stringify(allowedOrigins)}`,
   );
   rendered = replaceSentinel(

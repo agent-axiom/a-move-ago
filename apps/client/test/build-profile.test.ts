@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { clientBuildProfile } from "../vite.config";
 
 describe("client build profiles", () => {
-  it("uses the repository base for Pages", () => {
+  it("uses relative assets for Pages at either a repository path or a custom domain", () => {
     expect(clientBuildProfile("pages")).toEqual({
-      base: "/a-move-ago/",
+      base: "./",
       outDir: "dist/pages",
     });
   });

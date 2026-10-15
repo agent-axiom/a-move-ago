@@ -5,7 +5,7 @@ import { type ClientBuildMode, hostHeadPlugin } from "./build/telegram-script-pl
 export function clientBuildProfile(mode: ClientBuildMode) {
   return mode === "android"
     ? { base: "/", outDir: "dist/android" }
-    : { base: "/a-move-ago/", outDir: "dist/pages" };
+    : { base: "./", outDir: "dist/pages" };
 }
 
 export default defineConfig(({ mode }) => {

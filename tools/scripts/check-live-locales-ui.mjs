@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { chromium } from "@playwright/test";
 
-const pageUrl = `https://agent-axiom.github.io/a-move-ago/?case=2026-09-10&release=${encodeURIComponent(process.env.GITHUB_SHA ?? "current")}`;
 let stage = "START";
 let browser;
 try {
+  stage = "SITE_URL";
+  const pageUrl = new URL(process.env.WEB_APP_URL ?? "https://agent-axiom.github.io/a-move-ago/");
+  assert.ok(pageUrl.protocol === "https:" && !pageUrl.username && !pageUrl.password &&
+    !pageUrl.search && !pageUrl.hash && pageUrl.pathname.endsWith("/"));
+  pageUrl.searchParams.set("case", "2026-09-10");
+  pageUrl.searchParams.set("release", process.env.GITHUB_SHA ?? "current");
   browser = await chromium.launch();
   // Navigator preference intentionally differs from the required English default.
   const context = await browser.newContext({
@@ -48,7 +53,7 @@ try {
     }
   }
   stage = "ENGLISH_DEFAULT";
-  await page.goto(pageUrl, { waitUntil: "domcontentloaded" });
+  await page.goto(pageUrl.href, { waitUntil: "domcontentloaded" });
   await page.getByRole("grid").waitFor();
   assert.equal(await page.locator("html").getAttribute("lang"), "en");
   assert.equal(await language().inputValue(), "en");
