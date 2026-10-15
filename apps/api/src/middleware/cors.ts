@@ -33,7 +33,10 @@ function applyCorsHeaders(context: Context<AppEnv>): void {
   const origin = context.req.header("Origin");
   if (origin !== undefined && allowedOrigins(context.env.ALLOWED_ORIGINS).has(origin)) {
     context.header("access-control-allow-origin", origin);
-    context.header("access-control-allow-headers", "authorization,content-type,x-content-locales");
+    context.header(
+      "access-control-allow-headers",
+      "authorization,content-type,x-content-locales,x-game-progress",
+    );
     context.header("access-control-allow-methods", "GET,POST,DELETE,OPTIONS");
   }
   if (context.req.raw.headers.has("Origin")) {

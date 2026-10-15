@@ -5,6 +5,7 @@ import {
   HintResponseSchema,
 } from "@a-move-ago/api-contract";
 import { beforeEach, describe, expect, it } from "vitest";
+import { publicPuzzleId } from "../src/db/puzzle-identity";
 import { contentDigest, seedContentFixture } from "./fixtures/content";
 import { authenticatedJson, issueGuest, resetDatabase, testEnv } from "./helpers/http";
 
@@ -85,8 +86,12 @@ describe("opt-in content localizations", () => {
       headers: localizedHeaders,
     });
     const parsed = DailyCaseResponseSchema.parse(daily.body);
-    expect(parsed.title).toBe("The missing pawn");
-    expect(parsed.localizations?.ru?.title).toBe("Case ru");
+    expect(parsed.title).toBe("Daily case");
+    expect(parsed.localizations?.ru?.title).toBe("Задача дня");
+    expect(parsed.puzzles[0]?.id).toBe(publicPuzzleId(content.caseId, 1, 1));
+    expect(parsed.puzzles[0]?.title).toBe("Puzzle 1");
+    expect(parsed.puzzles[0]?.localizations?.ru?.title).toBe("Задача 1");
+    expect(parsed.puzzles[0]?.localizations?.zh?.title).toBe("棋题 1");
     expect(parsed.puzzles[0]?.localizations?.zh?.prompt).toBe("Prompt zh");
     const publicJson = JSON.stringify(daily.body);
     for (const secret of [
@@ -96,6 +101,12 @@ describe("opt-in content localizations", () => {
       "previousFen",
       "explanations",
       "hints",
+      content.puzzle.public.title,
+      content.puzzle.contentKey,
+      "Case ru",
+      "Case zh",
+      "Puzzle ru",
+      "Puzzle zh",
     ]) {
       expect(publicJson).not.toContain(secret);
     }
@@ -103,7 +114,7 @@ describe("opt-in content localizations", () => {
       headers: localizedHeaders,
     });
     expect(ArchiveResponseSchema.parse(archive.body).cases[0]?.localizations?.zh?.title).toBe(
-      "Case zh",
+      "每日棋题",
     );
     expect(JSON.stringify(archive.body)).not.toContain(privateExplanation);
   });
@@ -202,7 +213,11 @@ describe("opt-in content localizations", () => {
       headers: localizedHeaders,
     });
     expect(daily.response.status).toBe(200);
-    expect(JSON.stringify(daily.body)).not.toContain("localizations");
+    const parsed = DailyCaseResponseSchema.parse(daily.body);
+    expect(parsed.localizations?.ru?.title).toBe("Задача дня");
+    expect(parsed.puzzles[0]?.localizations).toBeUndefined();
+    expect(JSON.stringify(daily.body)).not.toContain("Prompt ru");
+    expect(JSON.stringify(daily.body)).not.toContain("Case ru");
   });
 
   it("translates default contradiction codes while keeping private hints and explanations hidden", async () => {

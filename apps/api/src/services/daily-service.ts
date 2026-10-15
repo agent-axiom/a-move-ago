@@ -4,8 +4,11 @@ import {
   PuzzlePublicSchema,
 } from "@a-move-ago/api-contract";
 import { findPublishedDaily, findSolvedPuzzleRows } from "../db/content";
+import { readGameProgress } from "../db/gameplay";
+import { publicPuzzleId } from "../db/puzzle-identity";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
+import { neutralCaseTitles, neutralPuzzleTitles, puzzleProgressStates } from "./gameplay-service";
 import { caseTitleLocalizations, publicPuzzleLocalizations } from "./localization-service";
 
 function dailyNotFound(): ApiError {
@@ -30,12 +33,25 @@ export async function getDailyCase(
   requestedDate: string,
   today: string,
   includeLocalizations = false,
+  includeGameProgress = false,
 ) {
   if (requestedDate > today) throw dailyNotFound();
 
   const rows = await findPublishedDaily(env.DB, requestedDate, today);
   const first = rows[0];
   if (!first) throw dailyNotFound();
+  if (typeof first.title !== "string" || first.title.length === 0)
+    throw new Error("Stored daily title is invalid");
+  const rawProgress = await readGameProgress(
+    env.DB,
+    actor,
+    rows.map((row) => row.puzzle_row_id),
+  );
+  const entitled = (rowId: string) => {
+    const progress = rawProgress.get(rowId);
+    return progress !== undefined && (progress.clueUnlocked || progress.earnedPoints !== null);
+  };
+  const caseEntitled = rows.every((row) => entitled(row.puzzle_row_id));
 
   const [titles, translatedPuzzles] = includeLocalizations
     ? await Promise.all([
@@ -46,6 +62,7 @@ export async function getDailyCase(
 
   const puzzles: PuzzlePublic[] = [];
   const physicalToLogical = new Map<string, string>();
+  const physicalToPublic = new Map<string, string>();
   const logicalIds = new Set<string>();
   for (const row of rows) {
     if (
@@ -64,8 +81,27 @@ export async function getDailyCase(
     }
     logicalIds.add(puzzle.id);
     physicalToLogical.set(row.puzzle_row_id, puzzle.id);
+    const alias = publicPuzzleId(first.case_id, row.position, puzzle.version);
+    physicalToPublic.set(row.puzzle_row_id, alias);
     const localizations = translatedPuzzles?.get(row.puzzle_row_id);
-    puzzles.push(localizations === undefined ? puzzle : { ...puzzle, localizations });
+    const visible = entitled(row.puzzle_row_id);
+    const neutral = neutralPuzzleTitles(row.position);
+    const { localizations: _sourceLocalizations, ...publicFields } = puzzle;
+    puzzles.push({
+      ...publicFields,
+      id: alias,
+      title: visible ? puzzle.title : neutral.en,
+      ...(localizations === undefined
+        ? {}
+        : {
+            localizations: Object.fromEntries(
+              Object.entries(localizations).map(([locale, text]) => [
+                locale,
+                { ...text, title: visible ? text.title : neutral[locale as "ru" | "zh"] },
+              ]),
+            ),
+          }),
+    });
   }
 
   const solvedRows = await findSolvedPuzzleRows(env.DB, first.case_id, actor);
@@ -75,16 +111,38 @@ export async function getDailyCase(
     if (logicalId === undefined || logicalId !== row.content_key) {
       throw new Error("Stored solved puzzle is not part of its daily case");
     }
-    solved.add(logicalId);
+    const alias = physicalToPublic.get(row.puzzle_row_id);
+    if (!alias) throw new Error("Stored solved puzzle alias is missing");
+    solved.add(alias);
   }
 
   const response = DailyCaseResponseSchema.safeParse({
     id: first.case_id,
     date: first.case_date,
-    title: first.title,
-    ...(titles?.has(first.case_id) ? { localizations: titles.get(first.case_id) } : {}),
+    title: caseEntitled ? first.title : neutralCaseTitles.en.title,
+    ...(includeLocalizations
+      ? {
+          localizations: caseEntitled
+            ? titles?.get(first.case_id)
+            : { ru: neutralCaseTitles.ru, zh: neutralCaseTitles.zh },
+        }
+      : {}),
     puzzles,
     solvedPuzzleIds: puzzles.filter((puzzle) => solved.has(puzzle.id)).map((puzzle) => puzzle.id),
+    ...(includeGameProgress
+      ? {
+          progressStates: Object.fromEntries(
+            [
+              ...(await puzzleProgressStates(
+                env,
+                actor,
+                rows.map((row) => row.puzzle_row_id),
+                includeLocalizations,
+              )),
+            ].map(([rowId, state]) => [physicalToPublic.get(rowId), state]),
+          ),
+        }
+      : {}),
   });
   if (!response.success) throw new Error("Stored daily response is invalid");
   return response.data;

@@ -39,6 +39,7 @@ export function createDailyRoutes(options: DailyRouteOptions = {}) {
       query.date ?? today,
       today,
       context.req.header("x-content-locales") === "1",
+      context.req.header("x-game-progress") === "1",
     );
     return context.json(result);
   });

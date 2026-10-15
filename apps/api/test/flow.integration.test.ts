@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app";
 import { hashSessionToken } from "../src/crypto/opaque-token";
+import { publicPuzzleId } from "../src/db/puzzle-identity";
 import type { Env } from "../src/env";
 import {
   openingPuzzleFixture,
@@ -140,13 +141,22 @@ describe("complete guest gameplay flow", () => {
     expect(DailyCaseResponseSchema.parse(daily.body)).toMatchObject({
       id: "case-2026-08-03",
       date: "2026-08-03",
-      puzzles: [openingPuzzleFixture.public],
+      title: "Daily case",
+      puzzles: [
+        {
+          ...openingPuzzleFixture.public,
+          id: publicPuzzleId("case-2026-08-03", 1, 1),
+          title: "Puzzle 1",
+        },
+      ],
       solvedPuzzleIds: [],
     });
     const initialDaily = JSON.stringify(daily.body);
     expect(initialDaily).not.toContain("previousFen");
     expect(initialDaily).not.toContain("acceptedSolutions");
     expect(initialDaily).not.toContain(privateSolutionMarker);
+    expect(initialDaily).not.toContain(openingPuzzleFixture.contentKey);
+    expect(initialDaily).not.toContain(openingPuzzleFixture.public.title);
 
     const incorrect = await jsonRequest("/v1/attempts", requestEnv, {
       method: "POST",

@@ -4,6 +4,7 @@ import {
   StatsResponseSchema,
 } from "@a-move-ago/api-contract";
 import { Hono } from "hono";
+import { readTotalPoints } from "../db/gameplay";
 import { findPlayer, toTelegramProfile } from "../db/players";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
@@ -21,8 +22,13 @@ me.get("/stats", requireSession, async (context) => {
     throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
   }
   const today = new Date(Date.now()).toISOString().slice(0, 10);
+  const stats = await statsForActor(context.env.DB, session, today);
+  const points =
+    context.req.header("x-game-progress") === "1"
+      ? await readTotalPoints(context.env.DB, session)
+      : undefined;
   return context.json(
-    StatsResponseSchema.parse(await statsForActor(context.env.DB, session, today)),
+    StatsResponseSchema.parse({ ...stats, ...(points === undefined ? {} : { points }) }),
   );
 });
 

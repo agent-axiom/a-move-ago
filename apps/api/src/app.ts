@@ -9,6 +9,7 @@ import { structuredLog } from "./middleware/structured-log";
 import { androidAssociationRoutes } from "./routes/android-association";
 import { createArchiveRoutes } from "./routes/archive";
 import { createAttemptRoutes } from "./routes/attempts";
+import { createClueRoutes } from "./routes/clues";
 import { createDailyRoutes } from "./routes/daily";
 import { me } from "./routes/me";
 import { miniAppAuth } from "./routes/mini-app-auth";
@@ -40,6 +41,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/v1/daily", createDailyRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/archive", createArchiveRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/attempts", createAttemptRoutes(options.now ? { now: options.now } : {}));
+  app.route("/v1/cases", createClueRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/me", me);
 
   app.notFound(() => {

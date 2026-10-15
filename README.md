@@ -15,7 +15,8 @@ Production web app: [chess.kosarevsky.dev](https://chess.kosarevsky.dev/).
    special move.
 4. Submit the reconstruction to the Worker. The client never receives accepted
    solutions before a correct attempt.
-5. Use ordered hints, review the reveal, and update the streak.
+5. Read the free puzzle conditions, optionally reveal a clue or hint, and earn
+   points for the first successful reconstruction.
 6. Optionally save and synchronize progress through Telegram.
 
 Open **Archive** to browse published cases by month and see your completion
@@ -32,6 +33,30 @@ described in [ops/README.md](ops/README.md).
 
 Telegram authentication is optional. Merely opening the app in Telegram does
 not create a profile.
+
+## Rating and clues
+
+The first successful solve earns 100 points on attempt one, 70 on attempt two,
+40 on attempt three, and 20 on later attempts. Each distinct revealed clue or
+hint halves the reward, rounded down to an integer with a minimum of one point.
+The interface shows the cost before revealing help. Required puzzle conditions
+are always free; spoiler titles stay hidden until a clue is requested or the
+puzzle is solved.
+
+The Worker counts persisted attempts and assistance events in commit order.
+Retries with the same UUID do not count again, and solving an already completed
+puzzle cannot award additional points. Linking a guest to Telegram combines the
+underlying history and counts each puzzle once. Solutions recorded before the
+rating launch stay in the completion history and remain unrated.
+
+API clients opt in to progress metadata with `x-game-progress: 1`. Daily cases
+then include per-puzzle progress, attempts and hints include updated progress,
+and statistics include total `points`. `POST /v1/cases/:caseId/puzzles/:puzzleId/clue`
+records a clue unlock before returning its text. Clue retries do not charge
+again. Existing response shapes remain available without the opt-in header;
+title masking and server-side accounting apply to every client. New daily
+puzzle identifiers and archive slugs are neutral, while in-flight requests using
+older identifiers continue to resolve to the same stored puzzle.
 
 ## Architecture
 
@@ -270,6 +295,11 @@ of the same attempt UUID, reloaded progress, and unchanged statistics. It reads
 only today's first private solution from D1 in runner memory and prints no
 answers or tokens. Pages delivery checks the published HTML against that build
 and verifies its application bundle is available.
+
+A separate protected scoring check uses isolated synthetic guests to verify a
+full first-attempt award, an assisted second-attempt award, and unchanged totals
+after UUID replay and repeated solves. It keeps answers in runner memory and
+prints only scoring and compatibility results.
 
 On relevant pull requests from this repository, the health workflow also
 checks the currently deployed version. That check is advisory on pull

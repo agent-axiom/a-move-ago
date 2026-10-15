@@ -6,6 +6,7 @@ import {
   claimHandoffForSession,
   findClaimableHandoff,
 } from "../db/auth-flows";
+import { transferClueStatement } from "../db/gameplay";
 import { findPlayer, prepareMiniAppPlayerUpsert, toTelegramProfile } from "../db/players";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
@@ -121,6 +122,7 @@ export async function linkGuestToPlayer(
         guest.sessionId,
         identity.telegramUserId,
       ),
+      transferClueStatement(env.DB, guest.sessionId, sessionId, null),
       env.DB.prepare(
         `UPDATE sessions
             SET revoked_at = ?
@@ -167,6 +169,9 @@ export async function linkGuestToPlayer(
               SELECT 1 FROM attempts
                WHERE session_id = ? AND player_id IS NULL
             )
+            AND NOT EXISTS (
+              SELECT 1 FROM gameplay_events WHERE kind = 'clue' AND clue_session_id = ?
+            )
           )`,
       ).bind(
         crypto.randomUUID(),
@@ -180,16 +185,17 @@ export async function linkGuestToPlayer(
         guest.sessionId,
         identity.telegramUserId,
         guest.sessionId,
+        guest.sessionId,
       ),
     ]);
 
-    if (results.length !== 5) {
+    if (results.length !== 6) {
       throw new Error("Account link transaction returned an unexpected result count.");
     }
     const playerResult = results[0];
     const insertResult = results[1];
-    const revokeResult = results[3];
-    const guardResult = results[4];
+    const revokeResult = results[4];
+    const guardResult = results[5];
     if (
       !playerResult ||
       !insertResult ||
@@ -388,6 +394,7 @@ export async function exchangeHandoffAndLinkGuest(
         guest.sessionId,
         input.channel,
       ),
+      transferClueStatement(env.DB, guest.sessionId, replacementSessionId, player.id),
       env.DB.prepare(
         `UPDATE sessions
             SET revoked_at = ?,
@@ -470,6 +477,9 @@ export async function exchangeHandoffAndLinkGuest(
                WHERE session_id = ?
                  AND (player_id IS NULL OR player_id <> ?)
             )
+            AND NOT EXISTS (
+              SELECT 1 FROM gameplay_events WHERE kind = 'clue' AND clue_session_id = ?
+            )
           )`,
       ).bind(
         crypto.randomUUID(),
@@ -490,6 +500,7 @@ export async function exchangeHandoffAndLinkGuest(
         now,
         guest.sessionId,
         player.id,
+        guest.sessionId,
       ),
     ]);
   } catch (error) {
@@ -506,13 +517,13 @@ export async function exchangeHandoffAndLinkGuest(
     );
   }
 
-  if (results?.length !== 5) {
+  if (results?.length !== 6) {
     throw new Error("Handoff transaction returned an unexpected result count.");
   }
   const claimResult = results[0];
   const insertResult = results[1];
-  const revokeResult = results[3];
-  const guardResult = results[4];
+  const revokeResult = results[4];
+  const guardResult = results[5];
   if (
     !claimResult ||
     !insertResult ||

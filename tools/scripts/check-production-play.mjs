@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
 // Privileged read only; the public API must never provide this solution before a correct attempt.
-const solutionSql = `SELECT c.id AS case_id, p.content_key AS puzzle_id, s.solution_json
+const solutionSql = `SELECT c.id AS case_id, ('p-' || c.id || '-' || cp.position || '-v' || p.version) AS puzzle_id, s.solution_json
 FROM daily_cases c
 JOIN daily_case_puzzles cp ON cp.case_id = c.id
 JOIN puzzles p ON p.id = cp.puzzle_id
@@ -153,6 +153,24 @@ function validDaily(value, date, localized = false) {
     new Set(value.puzzles.map((p) => p.id)).size === value.puzzles.length &&
     Array.isArray(value.solvedPuzzleIds)
   );
+}
+
+// Successful solves reveal titles; every other public field must remain immutable.
+function stablePublicPuzzle(puzzle) {
+  const { title: _title, localizations, ...base } = puzzle;
+  return {
+    ...base,
+    ...(localizations
+      ? {
+          localizations: Object.fromEntries(
+            Object.entries(localizations).map(([locale, value]) => {
+              const { title: _localizedTitle, ...text } = value;
+              return [locale, text];
+            }),
+          ),
+        }
+      : {}),
+  };
 }
 
 /** Creates one synthetic guest and one correct attempt; replay must preserve its statistics. */
@@ -386,7 +404,10 @@ export async function checkProductionPlay(
   ensure(
     validDaily(reloaded, date, localized) &&
       reloaded.id === daily.id &&
-      isDeepStrictEqual(reloaded.puzzles, daily.puzzles) &&
+      isDeepStrictEqual(
+        reloaded.puzzles.map(stablePublicPuzzle),
+        daily.puzzles.map(stablePublicPuzzle),
+      ) &&
       isDeepStrictEqual(reloaded.solvedPuzzleIds, [attempt.puzzleId]),
     "RELOADED_DAILY_FAILED",
   );

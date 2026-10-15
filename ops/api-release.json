@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-15-domain-cutover-v1",
-  "reason": "Finalize chess.kosarevsky.dev as the canonical web authentication return after DNS, Pages, and TLS verification"
+  "release": "2026-10-15-scoring-v1",
+  "reason": "Hide spoiler titles and add server-authoritative attempt, clue, hint and first-solve rating history before the updated client opts in"
 }
