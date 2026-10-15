@@ -37,6 +37,19 @@ function keys(value, names) {
 function nonempty(value) {
   return typeof value === "string" && value.length > 0;
 }
+function translated(value, fields) {
+  return (
+    keys(value, ["ru", "zh"]) &&
+    ["ru", "zh"].every(
+      (locale) => keys(value[locale], fields) && fields.every((field) => nonempty(value[locale][field])),
+    )
+  );
+}
+function englishSolution(value) {
+  if (value === null || typeof value !== "object") return value;
+  const { localizations: _translations, ...base } = value;
+  return base;
+}
 function piece(value, restored = false) {
   return (
     keys(value, restored ? ["color", "type", "square"] : ["color", "type"]) &&
@@ -96,9 +109,10 @@ function validateBindings(env) {
     "INVALID_API_ORIGIN",
   );
 }
-function validDaily(value, date) {
+function validDaily(value, date, localized = false) {
   return (
-    keys(value, ["id", "date", "title", "puzzles", "solvedPuzzleIds"]) &&
+    keys(value, ["id", "date", "title", "puzzles", "solvedPuzzleIds", ...(localized ? ["localizations"] : [])]) &&
+    (!localized || translated(value.localizations, ["title"])) &&
     nonempty(value.id) &&
     nonempty(value.title) &&
     value.date === date &&
@@ -116,7 +130,9 @@ function validDaily(value, date) {
           "maxHints",
           "provenance",
           "license",
+          ...(localized ? ["localizations"] : []),
         ]) &&
+        (!localized || translated(p.localizations, ["title", "prompt", "provenance", "license"])) &&
         ["id", "title", "prompt", "postFen", "provenance", "license"].every((key) =>
           nonempty(p[key]),
         ) &&
@@ -137,6 +153,7 @@ export async function checkProductionPlay(
   { fetch: request = globalThis.fetch, now = () => new Date(), uuid = randomUUID } = {},
 ) {
   validateBindings(env);
+  const localized = env.CHECK_LOCALIZATIONS === "true";
   const date = now().toISOString().slice(0, 10);
   let token;
   async function call(service, url, options = {}, status = 200) {
@@ -163,7 +180,7 @@ export async function checkProductionPlay(
     }
     return { data, headers: response.headers };
   }
-  async function api(path, body, status = 200) {
+  async function api(path, body, status = 200, includeLocalizations = localized) {
     return call(
       "API",
       `${env.API_ORIGIN}${path}`,
@@ -174,6 +191,7 @@ export async function checkProductionPlay(
           accept: "application/json",
           ...(body === undefined ? {} : { "content-type": "application/json" }),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(includeLocalizations ? { "x-content-locales": "1" } : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       },
@@ -198,7 +216,7 @@ export async function checkProductionPlay(
   );
   const dailyPath = `/v1/daily?date=${date}`;
   const { data: daily } = await api(dailyPath);
-  ensure(validDaily(daily, date) && daily.solvedPuzzleIds.length === 0, "PUBLIC_DAILY_FAILED");
+  ensure(validDaily(daily, date, localized) && daily.solvedPuzzleIds.length === 0, "PUBLIC_DAILY_FAILED");
   async function stats(expected) {
     const { data } = await api("/v1/me/stats");
     ensure(
@@ -244,6 +262,46 @@ export async function checkProductionPlay(
     throw new DiagnosticError("D1_SOLUTION_FAILED");
   }
   ensure(validSolution(solution), "D1_SOLUTION_FAILED");
+  let wrongAttemptUuid;
+  if (localized) {
+    ensure(daily.puzzles[0].maxHints >= 1, "LOCALIZED_HINT_UNAVAILABLE");
+    const wrong = {
+      attemptUuid: uuid(),
+      caseId: daily.id,
+      puzzleId: daily.puzzles[0].id,
+      retraction: {
+        ...solution.retraction,
+        movedPiece: { ...solution.retraction.movedPiece, color: solution.retraction.movedPiece.color === "w" ? "b" : "w" },
+        restoredPiece: null,
+        special: "normal",
+      },
+    };
+    ensure(/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(wrong.attemptUuid), "INVALID_ATTEMPT_UUID");
+    wrongAttemptUuid = wrong.attemptUuid;
+    const { data: incorrect } = await api("/v1/attempts", wrong, 201);
+    ensure(
+      keys(incorrect, ["id", "attemptUuid", "correct", "contradiction"]) &&
+        typeof incorrect.id === "string" &&
+        /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(incorrect.id) &&
+        incorrect.attemptUuid === wrong.attemptUuid &&
+        incorrect.correct === false &&
+        keys(incorrect.contradiction, ["code", "message", "localizations"]) &&
+        incorrect.contradiction.code === "WRONG_COLOR" &&
+        nonempty(incorrect.contradiction.message) &&
+        translated(incorrect.contradiction.localizations, ["message"]),
+      "LOCALIZED_CONTRADICTION_FAILED",
+    );
+    const { data: hint } = await api(`/v1/attempts/${incorrect.id}/hints`, { level: 1 });
+    ensure(
+      keys(hint, ["level", "text", "exhausted", "localizations"]) &&
+        hint.level === 1 &&
+        nonempty(hint.text) &&
+        typeof hint.exhausted === "boolean" &&
+        translated(hint.localizations, ["text"]),
+      "LOCALIZED_HINT_FAILED",
+    );
+    await stats({ ...empty, attempts: 1, hintsUsed: 1 });
+  }
   const attempt = {
     attemptUuid: uuid(),
     caseId: daily.id,
@@ -254,6 +312,7 @@ export async function checkProductionPlay(
     /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(attempt.attemptUuid),
     "INVALID_ATTEMPT_UUID",
   );
+  ensure(attempt.attemptUuid !== wrongAttemptUuid, "INVALID_ATTEMPT_UUID");
   const { data: correct } = await api("/v1/attempts", attempt, 201);
   ensure(
     keys(correct, ["id", "attemptUuid", "correct", "reveal"]) &&
@@ -261,14 +320,18 @@ export async function checkProductionPlay(
       /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(correct.id) &&
       correct.attemptUuid === attempt.attemptUuid &&
       correct.correct === true &&
-      validSolution(correct.reveal) &&
-      isDeepStrictEqual(correct.reveal, solution),
+      (localized
+        ? keys(correct.reveal, ["retraction", "previousFen", "forwardSan", "explanation", "historyConstraints", "localizations"]) &&
+          translated(correct.reveal.localizations, ["explanation"]) &&
+          validSolution(englishSolution(correct.reveal))
+        : validSolution(correct.reveal)) &&
+      isDeepStrictEqual(englishSolution(correct.reveal), solution),
     "CORRECT_ATTEMPT_FAILED",
   );
   const completed = daily.puzzles.length === 1 ? 1 : 0;
   const expected = {
-    attempts: 1,
-    hintsUsed: 0,
+    attempts: localized ? 2 : 1,
+    hintsUsed: localized ? 1 : 0,
     solvedPuzzles: 1,
     completedCases: completed,
     currentStreak: completed,
@@ -276,6 +339,19 @@ export async function checkProductionPlay(
     lastCompletedDate: completed ? date : null,
   };
   await stats(expected);
+  if (localized) {
+    const englishReplay = await api("/v1/attempts", attempt, 200, false);
+    ensure(
+      englishReplay.headers.get("idempotency-replayed") === "true" &&
+        keys(englishReplay.data, ["id", "attemptUuid", "correct", "reveal"]) &&
+        englishReplay.data.id === correct.id &&
+        englishReplay.data.attemptUuid === attempt.attemptUuid &&
+        englishReplay.data.correct === true &&
+        validSolution(englishReplay.data.reveal) &&
+        isDeepStrictEqual(englishReplay.data.reveal, solution),
+      "ENGLISH_REPLAY_FAILED",
+    );
+  }
   const replay = await api("/v1/attempts", attempt);
   ensure(
     replay.headers.get("idempotency-replayed") === "true" &&
@@ -284,13 +360,16 @@ export async function checkProductionPlay(
   );
   const { data: reloaded } = await api(dailyPath);
   ensure(
-    validDaily(reloaded, date) &&
+    validDaily(reloaded, date, localized) &&
       reloaded.id === daily.id &&
       isDeepStrictEqual(reloaded.puzzles, daily.puzzles) &&
       isDeepStrictEqual(reloaded.solvedPuzzleIds, [attempt.puzzleId]),
     "RELOADED_DAILY_FAILED",
   );
   await stats(expected);
+  if (localized) {
+    return { ok: true, date, puzzlesSolved: 1, attempts: 2, hintsUsed: 1, locales: ["ru", "zh"], englishCompatible: true, idempotencyVerified: true };
+  }
   return { ok: true, date, puzzlesSolved: 1, attempts: 1, idempotencyVerified: true };
 }
 
