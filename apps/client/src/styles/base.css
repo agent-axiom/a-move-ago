@@ -71,7 +71,7 @@ button {
     color 160ms ease;
 }
 
-button:hover:not(:disabled):not(.board-cell) {
+button:hover:not(:disabled):not(.board-cell):not(.button-primary) {
   border-color: #636b5e;
   background: #30352e;
 }

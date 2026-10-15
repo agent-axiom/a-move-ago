@@ -262,7 +262,7 @@
   }
 
   .case-tagline {
-    font-size: 0.75rem;
+    display: none;
   }
 
   .stats-grid {

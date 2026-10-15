@@ -67,6 +67,11 @@ test("desktop daily, configured move and solution reveal", async ({ page }, info
   await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
   await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
   await expect(page.getByRole("button", { name: "Check move", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Check move", exact: true }).hover();
+  await expect(page.getByRole("button", { name: "Check move", exact: true })).toHaveCSS(
+    "background-color",
+    "rgb(233, 196, 152)",
+  );
   await capture(page, info, "desktop-configured");
   await checkLayout(page);
 
@@ -77,18 +82,18 @@ test("desktop daily, configured move and solution reveal", async ({ page }, info
   await checkLayout(page);
 });
 
-test("mobile daily stays usable at 390 and 320 CSS pixels", async ({ page }, info) => {
+test("mobile and tablet daily stay usable at 390, 320 and 768 pixels", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openSyntheticCase(page);
   await capture(page, info, "mobile-daily");
-  for (const width of [390, 320]) {
+  for (const width of [390, 320, 768]) {
     await page.setViewportSize({ width, height: 844 });
     await checkLayout(page);
     const grid = page.getByRole("grid", { name: "Interactive retraction board" });
     const board = await grid.boundingBox();
     expect(board).not.toBeNull();
     if (!board) throw new Error("Interactive board is unavailable");
-    expect(board.width).toBeGreaterThanOrEqual(width - 72);
+    expect(board.width).toBeGreaterThanOrEqual(Math.min(width - 72, 550));
     expect(Math.abs(board.height - board.width)).toBeLessThanOrEqual(2);
   }
 });

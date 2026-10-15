@@ -25,10 +25,18 @@ const names = {
 } as const;
 
 const pieces: Record<string, string> = {
-  wp: whitePawn, wn: whiteKnight, wb: whiteBishop,
-  wr: whiteRook, wq: whiteQueen, wk: whiteKing,
-  bp: blackPawn, bn: blackKnight, bb: blackBishop,
-  br: blackRook, bq: blackQueen, bk: blackKing,
+  wp: whitePawn,
+  wn: whiteKnight,
+  wb: whiteBishop,
+  wr: whiteRook,
+  wq: whiteQueen,
+  wk: whiteKing,
+  bp: blackPawn,
+  bn: blackKnight,
+  bb: blackBishop,
+  br: blackRook,
+  bq: blackQueen,
+  bk: blackKing,
 };
 
 function pieceLabel(piece: Piece | undefined): string {
@@ -90,9 +98,25 @@ export function Chessboard(props: {
                 tabIndex={active === index ? 0 : -1}
                 type="button"
               >
-                {piece ? <img alt="" aria-hidden="true" className="chess-piece" draggable={false} src={pieces[`${piece.color}${piece.type}`]} /> : null}
-                {column === 0 ? <span aria-hidden="true" className="square-rank">{square[1]}</span> : null}
-                {row === 7 ? <span aria-hidden="true" className="square-file">{square[0]}</span> : null}
+                {piece ? (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="chess-piece"
+                    draggable={false}
+                    src={pieces[`${piece.color}${piece.type}`]}
+                  />
+                ) : null}
+                {column === 0 ? (
+                  <span aria-hidden="true" className="square-rank">
+                    {square[1]}
+                  </span>
+                ) : null}
+                {row === 7 ? (
+                  <span aria-hidden="true" className="square-file">
+                    {square[0]}
+                  </span>
+                ) : null}
               </button>
             );
           })}

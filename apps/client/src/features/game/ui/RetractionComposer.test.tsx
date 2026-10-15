@@ -50,7 +50,9 @@ it("resets the draft when the puzzle position changes", async () => {
 
   view.rerender(tree("rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 7 3"));
 
-  expect(screen.getByText("Choose the piece that moved last.")).toBeInTheDocument();
+  expect(
+    screen.getByText("Choose the piece that moved last.", { selector: ".board-caption" }),
+  ).toBeInTheDocument();
   expect(screen.getByLabelText("Captured piece")).toBeDisabled();
   expect(screen.getByRole("button", { name: "Check move" })).toBeDisabled();
 });
@@ -72,13 +74,17 @@ it("keeps the current board editable and makes the reconstruction an explicit re
   expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toBeEnabled();
   expect(screen.getByRole("gridcell", { name: "e4, empty" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Before", exact: true }));
-  expect(screen.getByRole("grid", { name: "Your reconstruction, read-only preview" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("grid", { name: "Your reconstruction, read-only preview" }),
+  ).toBeInTheDocument();
   expect(screen.getByRole("gridcell", { name: "e4, white pawn" })).toBeDisabled();
   expect(screen.getByRole("gridcell", { name: "d5, black pawn" })).toBeDisabled();
 
   await user.click(screen.getByRole("button", { name: "Now", exact: true }));
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
-  expect(screen.getByText("Choose the square it came from.")).toBeInTheDocument();
+  expect(
+    screen.getByText("Choose the square it came from.", { selector: ".board-caption" }),
+  ).toBeInTheDocument();
   await user.click(screen.getByRole("gridcell", { name: "c4, empty" }));
   expect(screen.getByRole("button", { name: "Check move" })).toBeEnabled();
 });

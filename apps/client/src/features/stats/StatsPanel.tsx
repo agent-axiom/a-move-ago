@@ -50,7 +50,9 @@ export function StatsPanel(props: { title?: string; refreshKey?: string }) {
         <div className="stat-tile">
           <dt>Solved puzzles</dt>
           <dd>{state.stats.solvedPuzzles}</dd>
-          <span>{state.stats.solvedPuzzles === 1 ? "mystery made clear" : "mysteries made clear"}</span>
+          <span>
+            {state.stats.solvedPuzzles === 1 ? "mystery made clear" : "mysteries made clear"}
+          </span>
         </div>
         <div className="stat-tile">
           <dt>Hints used</dt>

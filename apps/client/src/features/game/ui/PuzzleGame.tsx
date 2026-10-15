@@ -10,7 +10,7 @@ import { RevealPlayer } from "./RevealPlayer";
 function retryCopy(kind: ClientFailure["kind"]): string {
   switch (kind) {
     case "offline":
-      return "Connection interrupted. Your move is saved. Please try again.";
+      return "Connection interrupted. Try again to check the same move.";
     case "auth":
       return "Your session has expired. Restart to continue.";
     case "contract":
@@ -72,7 +72,9 @@ export function PuzzleGame(props: {
             <button
               className="button-secondary"
               type="button"
-              onClick={() => { void controller.retryAttempt(); }}
+              onClick={() => {
+                void controller.retryAttempt();
+              }}
             >
               Retry attempt
             </button>
@@ -83,12 +85,16 @@ export function PuzzleGame(props: {
         <div>
           <p className="feedback-label">A clue to reconsider</p>
           <p role="alert">{controller.attempt.result.contradiction.message}</p>
-          {!exhausted && hintItems.length < props.puzzle.maxHints && controller.hints.tag !== "retry" ? (
+          {!exhausted &&
+          hintItems.length < props.puzzle.maxHints &&
+          controller.hints.tag !== "retry" ? (
             <button
               className="button-secondary"
               type="button"
               disabled={controller.hints.tag === "loading"}
-              onClick={() => { void controller.requestHint(); }}
+              onClick={() => {
+                void controller.requestHint();
+              }}
             >
               {controller.hints.tag === "loading" ? "Requesting hint…" : "Get hint"}
             </button>
@@ -108,7 +114,9 @@ export function PuzzleGame(props: {
                 <button
                   className="button-secondary"
                   type="button"
-                  onClick={() => { void controller.retryHint(); }}
+                  onClick={() => {
+                    void controller.retryHint();
+                  }}
                 >
                   Retry hint
                 </button>
@@ -119,7 +127,9 @@ export function PuzzleGame(props: {
       ) : null}
       {hintItems.length ? (
         <ol className="hint-list" aria-label="Hints">
-          {hintItems.map((hint) => <li key={hint.level}>{hint.text}</li>)}
+          {hintItems.map((hint) => (
+            <li key={hint.level}>{hint.text}</li>
+          ))}
         </ol>
       ) : null}
     </section>
@@ -130,7 +140,9 @@ export function PuzzleGame(props: {
       <RetractionComposer
         disabled={controller.attempt.tag === "submitting" || controller.attempt.tag === "retry"}
         feedback={feedback}
-        onSubmit={(retraction) => { void controller.submit(retraction); }}
+        onSubmit={(retraction) => {
+          void controller.submit(retraction);
+        }}
         post={post}
         retractingColor={props.puzzle.retractingColor}
       >

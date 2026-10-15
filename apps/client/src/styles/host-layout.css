@@ -17,7 +17,11 @@
   min-height: var(--host-stable-height);
   margin-inline: auto;
   padding-top: max(1.3rem, var(--host-safe-top), var(--host-content-safe-top));
-  padding-right: max(clamp(1rem, 4vw, 3rem), var(--host-safe-right), var(--host-content-safe-right));
+  padding-right: max(
+    clamp(1rem, 4vw, 3rem),
+    var(--host-safe-right),
+    var(--host-content-safe-right)
+  );
   padding-bottom: max(1rem, var(--host-safe-bottom), var(--host-content-safe-bottom));
   padding-left: max(clamp(1rem, 4vw, 3rem), var(--host-safe-left), var(--host-content-safe-left));
 }
@@ -215,9 +219,10 @@
   }
 
   .brand-wordmark {
-    max-inline-size: 7ch;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
     line-height: 1.4;
+    white-space: nowrap;
   }
 
   .brand-caption,

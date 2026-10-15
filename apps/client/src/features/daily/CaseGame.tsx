@@ -18,7 +18,9 @@ export function CaseGame({ daily }: { daily: DailyCase }) {
     return (
       <section className="completion-page" aria-labelledby="case-title">
         <header className="completion-header">
-          <span className="completion-seal" aria-hidden="true">✓</span>
+          <span className="completion-seal" aria-hidden="true">
+            ✓
+          </span>
           <p className="eyebrow">A mystery, made clear</p>
           <h1 id="case-title">{daily.title}</h1>
           <p className="page-description">You saw what came before. Nicely reasoned.</p>
@@ -26,7 +28,13 @@ export function CaseGame({ daily }: { daily: DailyCase }) {
         <StatsPanel />
         <div className="completion-next">
           <span>A new mystery every day, at 00:00 UTC.</span>
-          <a href={window.location.pathname}>Back to today’s case <span aria-hidden="true">↗</span></a>
+          {daily.date !== new Date().toISOString().slice(0, 10) ? (
+            <a href={window.location.pathname}>
+              Back to today’s case <span aria-hidden="true">↗</span>
+            </a>
+          ) : (
+            <span>Come back tomorrow for the next case.</span>
+          )}
         </div>
       </section>
     );
@@ -42,7 +50,9 @@ export function CaseGame({ daily }: { daily: DailyCase }) {
         </div>
         <div className="case-title-row">
           <h1 id="case-title">{daily.title}</h1>
-          <p className="case-progress">Act {index + 1} of {daily.puzzles.length}</p>
+          <p className="case-progress">
+            Act {index + 1} of {daily.puzzles.length}
+          </p>
         </div>
         <p className="case-tagline">The move is over. The mystery is yours.</p>
       </header>

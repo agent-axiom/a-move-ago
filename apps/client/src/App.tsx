@@ -137,7 +137,9 @@ function AppContent() {
           )}
           <details className="how-to-play">
             <summary aria-label="How to play">
-              <span className="help-icon" aria-hidden="true">?</span>
+              <span className="help-icon" aria-hidden="true">
+                ?
+              </span>
               <span className="help-label">How to play</span>
             </summary>
             <div className="help-panel">
@@ -145,21 +147,38 @@ function AppContent() {
               <h2>Think one move back.</h2>
               <p>The last move has already happened. Can you work out what it was?</p>
               <ol>
-                <li><strong>Choose a piece.</strong> Pick a piece of the side that moved last.</li>
-                <li><strong>Move it back.</strong> Choose the empty square it came from.</li>
-                <li><strong>Complete the story.</strong> Restore a capture or choose a special move, then check your move.</li>
+                <li>
+                  <strong>Choose a piece.</strong> Pick a piece of the side that moved last.
+                </li>
+                <li>
+                  <strong>Move it back.</strong> Choose the empty square it came from.
+                </li>
+                <li>
+                  <strong>Complete the story.</strong> Restore a capture or choose a special move,
+                  then check your move.
+                </li>
               </ol>
-              <p className="help-note">Tap or use the arrow keys and Enter. Take your time — there is no clock.</p>
+              <p className="help-note">
+                Tap or use the arrow keys and Enter. Take your time — there is no clock.
+              </p>
             </div>
           </details>
         </nav>
       </header>
-      <main className="app-body" id="main-content" tabIndex={-1}>{content}</main>
+      <main className="app-body" id="main-content" tabIndex={-1}>
+        {content}
+      </main>
       <footer className="app-footer">
         <span>A new perspective, every day.</span>
         <div>
           <span>New case at 00:00 UTC</span>
-          <a href="https://github.com/agent-axiom/a-move-ago/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a>
+          <a
+            href="https://github.com/agent-axiom/a-move-ago/blob/main/PRIVACY.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Privacy
+          </a>
         </div>
       </footer>
     </div>

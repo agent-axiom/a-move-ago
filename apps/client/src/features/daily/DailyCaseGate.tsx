@@ -28,10 +28,16 @@ export function DailyCaseGate(props: {
     return (
       <section className="loading-case" aria-label="Loading case">
         <p className="eyebrow">A daily chess mystery</p>
-        <p className="loading-title" role="status">Loading today’s case…</p>
+        <p className="loading-title" role="status">
+          Loading today’s case…
+        </p>
         <div className="loading-layout" aria-hidden="true">
           <div className="loading-board" />
-          <div className="loading-lines"><span /><span /><span /></div>
+          <div className="loading-lines">
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
       </section>
     );

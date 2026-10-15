@@ -50,5 +50,8 @@ it("keeps keyboard directions visual when the board is oriented for Black", asyn
   expect(screen.getByRole("gridcell", { name: "g1, empty" })).toHaveFocus();
   await user.keyboard("{ArrowDown}{Enter}");
   expect(select).toHaveBeenCalledWith("g2");
-  expect(screen.getByRole("gridcell", { name: "d5, black pawn" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("gridcell", { name: "d5, black pawn" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 });
