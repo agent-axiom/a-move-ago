@@ -284,8 +284,14 @@ function keyRow(value: unknown, keyId: string): KeyRow {
       public_key: base64Schema,
       fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
       expires_at: z.int().nonnegative(),
-      envelope_digest: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
-      completed_digest: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+      envelope_digest: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .nullable(),
+      completed_digest: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .nullable(),
       completed_summary: z.string().nullable(),
     })
     .strict()
@@ -343,6 +349,7 @@ async function runTransfer(
   ensure(accountId && /^[a-f0-9]{32}$/i.test(accountId), "MISSING_CLOUDFLARE_BINDINGS");
   ensure(databaseId && /^[a-f0-9-]{32,36}$/i.test(databaseId), "MISSING_CLOUDFLARE_BINDINGS");
   ensure(apiToken && /^[A-Za-z0-9_-]+$/.test(apiToken), "MISSING_CLOUDFLARE_BINDINGS");
+  const connection = { accountId, databaseId, apiToken };
   const request: typeof fetch = (input, init) =>
     runtime.fetch(input, {
       ...init,
@@ -352,9 +359,7 @@ async function runTransfer(
     });
   async function query(statements: D1Statement[]): Promise<unknown[][]> {
     const response: unknown = await executeD1Batch({
-      accountId,
-      databaseId,
-      apiToken,
+      ...connection,
       statements,
       fetch: request,
     });
