@@ -137,7 +137,10 @@ it("resets and reloads daily state when the session identity changes", async () 
   const listeners: Array<(url: string) => void> = [];
   const mergedDaily = {
     ...daily,
-    puzzles: [{ ...puzzle, title: "Progress merged from Telegram" }],
+    puzzles: [
+      { ...puzzle, title: "Progress merged from Telegram" },
+      { ...puzzle, id: "telegram-second-puzzle" },
+    ],
   };
   runtime.platform.authReturn.subscribe = vi.fn(async (listener) => {
     listeners.push(listener);
@@ -146,7 +149,9 @@ it("resets and reloads daily state when the session identity changes", async () 
   runtime.api.getDaily = vi.fn().mockResolvedValueOnce(daily).mockResolvedValueOnce(mergedDaily);
 
   renderApp(runtime);
-  expect(await screen.findByRole("heading", { name: puzzle.title })).toBeInTheDocument();
+  expect(await screen.findByText("Reconstruct the last move.")).toBeInTheDocument();
+  expect(screen.getByText("Act 1 of 1")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: puzzle.title })).not.toBeInTheDocument();
   expect(runtime.api.getDaily).toHaveBeenCalledOnce();
   expect(listeners).toHaveLength(1);
 
@@ -159,9 +164,11 @@ it("resets and reloads daily state when the session identity changes", async () 
       expect.any(AbortSignal),
     ),
   );
+  expect(await screen.findByText("Act 1 of 2")).toBeInTheDocument();
+  expect(screen.getByText("Reconstruct the last move.")).toBeInTheDocument();
   expect(
-    await screen.findByRole("heading", { name: "Progress merged from Telegram" }),
-  ).toBeInTheDocument();
+    screen.queryByRole("heading", { name: "Progress merged from Telegram" }),
+  ).not.toBeInTheDocument();
   expect(runtime.api.getDaily).toHaveBeenCalledTimes(2);
   expect(runtime.token.get()).toBe("t".repeat(43));
 
@@ -185,7 +192,9 @@ it("bootstraps a replacement runtime before loading its daily state", async () =
   secondRuntime.api.createGuest = vi.fn(() => issued.promise);
   secondRuntime.api.getDaily = vi.fn().mockResolvedValue(replacementDaily);
   const view = renderApp(firstRuntime);
-  expect(await screen.findByRole("heading", { name: puzzle.title })).toBeInTheDocument();
+  expect(await screen.findByText("Reconstruct the last move.")).toBeInTheDocument();
+  expect(screen.getByText("Act 1 of 1")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: puzzle.title })).not.toBeInTheDocument();
 
   view.rerender(
     <RuntimeProvider runtime={secondRuntime}>
@@ -204,6 +213,8 @@ it("bootstraps a replacement runtime before loading its daily state", async () =
     await issued.promise;
   });
   expect(await screen.findByRole("heading", { name: replacementDaily.title })).toBeInTheDocument();
+  expect(screen.getByText("Reconstruct the last move.")).toBeInTheDocument();
+  expect(screen.getByText("Act 1 of 1")).toBeInTheDocument();
   expect(secondRuntime.api.getDaily).toHaveBeenCalledOnce();
 });
 
@@ -370,13 +381,17 @@ it("advances acts on Continue and fetches stats after acknowledging the final re
   runtime.api.getStats = vi.fn().mockResolvedValue(stats);
 
   renderApp(runtime);
+  expect(await screen.findByText("Act 1 of 2")).toBeInTheDocument();
+  expect(screen.getByText("Reconstruct the last move.")).toBeInTheDocument();
   await composeCapture(user);
   await user.click(screen.getByRole("button", { name: "Check move" }));
 
   expect(await screen.findByRole("heading", { name: "Solved" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: secondPuzzle.title })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Continue" }));
-  expect(await screen.findByRole("heading", { name: secondPuzzle.title })).toBeInTheDocument();
+  expect(await screen.findByText("Act 2 of 2")).toBeInTheDocument();
+  expect(screen.getByText("Reconstruct the last move.")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: secondPuzzle.title })).not.toBeInTheDocument();
   expect(runtime.api.getStats).not.toHaveBeenCalled();
 
   await composeCapture(user);
@@ -387,6 +402,9 @@ it("advances acts on Continue and fetches stats after acknowledging the final re
   await user.click(screen.getByRole("button", { name: "Continue" }));
   expect(await screen.findByRole("heading", { name: "Case complete" })).toBeInTheDocument();
   await waitFor(() => expect(runtime.api.getStats).toHaveBeenCalledOnce());
+  expect(
+    vi.mocked(runtime.api.submitAttempt).mock.calls.map(([request]) => request.puzzleId),
+  ).toEqual([puzzle.id, secondPuzzle.id]);
   expect(runtime.platform.haptic).toHaveBeenCalledTimes(2);
 });
 
@@ -417,7 +435,9 @@ it("keeps deletion mounted through Telegram-to-guest success and refreshes ident
   const storedTokenSnapshot = await runtime.platform.tokenStore.read();
 
   renderApp(runtime);
-  expect(await screen.findByRole("heading", { name: puzzle.title })).toBeInTheDocument();
+  expect(await screen.findByText("Reconstruct the last move.")).toBeInTheDocument();
+  expect(screen.getByText("Act 1 of 1")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: puzzle.title })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Delete Telegram profile" })).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Progress" }));

@@ -206,9 +206,7 @@ export function PuzzleGame(props: {
                     <h2 className="clue-title unlocked-clue">
                       {localizedText(clueContent, "title", locale)}
                     </h2>
-                    <p className="clue-prompt">
-                      {localizedText(clueContent, "prompt", locale)}
-                    </p>
+                    <p className="clue-prompt">{localizedText(clueContent, "prompt", locale)}</p>
                   </>
                 ) : (
                   <>

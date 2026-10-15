@@ -179,7 +179,11 @@ it("restores the purchased title and full prompt from daily state without purcha
         <PuzzleGame
           caseId="case-day"
           puzzle={restoredPuzzle}
-          progress={progressState({ assistanceCount: 1, clueUnlocked: true, nextAttemptPoints: 50 })}
+          progress={progressState({
+            assistanceCount: 1,
+            clueUnlocked: true,
+            nextAttemptPoints: 50,
+          })}
           onSolved={vi.fn()}
         />
       </I18nProvider>

@@ -420,9 +420,7 @@ export async function checkProductionPlay(
         reloaded.puzzles.map((puzzle) =>
           stablePublicPuzzle(puzzle, puzzle.id === attempt.puzzleId),
         ),
-        daily.puzzles.map((puzzle) =>
-          stablePublicPuzzle(puzzle, puzzle.id === attempt.puzzleId),
-        ),
+        daily.puzzles.map((puzzle) => stablePublicPuzzle(puzzle, puzzle.id === attempt.puzzleId)),
       ) &&
       isDeepStrictEqual(reloaded.solvedPuzzleIds, [attempt.puzzleId]),
     "RELOADED_DAILY_FAILED",

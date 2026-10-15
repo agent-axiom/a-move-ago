@@ -105,8 +105,7 @@ function harness({ count = 2, mutate, transport } = {}) {
               index === 0 && (actor.clue || actor.solved)
                 ? `zh-title-${secret}`
                 : `棋题 ${index + 1}`,
-            prompt:
-              index === 0 && (actor.clue || actor.solved) ? "zh-prompt" : "还原上一步棋。",
+            prompt: index === 0 && (actor.clue || actor.solved) ? "zh-prompt" : "还原上一步棋。",
             provenance: "zh-author",
             license: "zh-license",
           },
@@ -513,8 +512,7 @@ test("scoring checker masks transport, payload, pricing, persistence and idempot
     [
       "reload lost original conditions",
       (r, p, _s, _h, a) => {
-        if (r.path === "/v1/daily" && a.solved)
-          p.puzzles[0].prompt = "Reconstruct the last move.";
+        if (r.path === "/v1/daily" && a.solved) p.puzzles[0].prompt = "Reconstruct the last move.";
       },
       "SCORING_RELOAD_FAILED",
     ],
