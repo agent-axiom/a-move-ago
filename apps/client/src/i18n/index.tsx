@@ -72,7 +72,11 @@ export function readPreferredLocale(): Locale {
   return browserPreference.read();
 }
 
-export function translate(locale: Locale, key: TranslationKey, params: TranslationParams = {}): string {
+export function translate(
+  locale: Locale,
+  key: TranslationKey,
+  params: TranslationParams = {},
+): string {
   const value = messages[locale][key] ?? messages.en[key];
   let template: string;
   if (typeof value === "string") {
@@ -132,7 +136,9 @@ export function localizedText<T, K extends keyof T>(object: T, field: K, locale:
   const localized = object as T & {
     localizations?: Partial<Record<Locale, Partial<Record<K, T[K]>>>>;
   };
-  return (locale !== "en" ? localized.localizations?.[locale]?.[field] : undefined) ?? object[field];
+  return (
+    (locale !== "en" ? localized.localizations?.[locale]?.[field] : undefined) ?? object[field]
+  );
 }
 
 export function LanguageSwitcher() {
@@ -148,21 +154,31 @@ export function LanguageSwitcher() {
           if (isLocale(next)) setLocale(next);
         }}
       >
-        <option value="en" lang="en">English</option>
-        <option value="ru" lang="ru">Русский</option>
-        <option value="zh" lang="zh-CN">中文</option>
+        <option value="en" lang="en">
+          English
+        </option>
+        <option value="ru" lang="ru">
+          Русский
+        </option>
+        <option value="zh" lang="zh-CN">
+          中文
+        </option>
       </select>
     </label>
   );
 }
 
 const systemMessages: Readonly<Record<string, TranslationKey>> = {
-  "Telegram profile deletion could not be confirmed. Retry to check the current profile state.": "shell.deleteUnconfirmed",
-  "Profile deletion could not be confirmed because this app session is no longer active. Reload, then choose Save progress with Telegram to verify the profile.": "shell.inactiveSession",
-  "Telegram return expired or was already consumed. Start Save progress again.": "shell.telegramExpired",
+  "Telegram profile deletion could not be confirmed. Retry to check the current profile state.":
+    "shell.deleteUnconfirmed",
+  "Profile deletion could not be confirmed because this app session is no longer active. Reload, then choose Save progress with Telegram to verify the profile.":
+    "shell.inactiveSession",
+  "Telegram return expired or was already consumed. Start Save progress again.":
+    "shell.telegramExpired",
   "Could not start a guest session.": "shell.guestStartupFailed",
   "Telegram sign-in did not finish.": "shell.telegramIncomplete",
-  "Telegram sign-in could not be exchanged. Retry when the connection recovers.": "shell.telegramRetry",
+  "Telegram sign-in could not be exchanged. Retry when the connection recovers.":
+    "shell.telegramRetry",
   "Telegram sign-in was cancelled. Guest progress is still available.": "shell.telegramCancelled",
 };
 

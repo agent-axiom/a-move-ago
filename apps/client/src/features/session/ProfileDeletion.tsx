@@ -126,9 +126,7 @@ export function ProfileDeletion() {
           <h2 ref={headingRef} id={headingId} tabIndex={-1}>
             {t("shell.deleteProfileQuestion")}
           </h2>
-          <p id={warningId}>
-            {t("shell.deleteWarning")}
-          </p>
+          <p id={warningId}>{t("shell.deleteWarning")}</p>
           {pending ? <p role="status">{t("shell.deletingProfile")}</p> : null}
           {visibleView.tag === "error" ? (
             <>

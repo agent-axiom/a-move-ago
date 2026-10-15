@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 import { type Translate, useI18n } from "../../i18n";
 import { type DailyCase, useDailyCase } from "./use-daily-case";
 
-function message(kind: "offline" | "auth" | "rate-limit" | "content" | "server" | "contract", t: Translate) {
+function message(
+  kind: "offline" | "auth" | "rate-limit" | "content" | "server" | "contract",
+  t: Translate,
+) {
   switch (kind) {
     case "offline":
       return t("shell.dailyOffline");

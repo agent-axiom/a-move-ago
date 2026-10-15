@@ -2,13 +2,17 @@ import { expect, type Page, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
 
 function language(page: Page) {
-  return page.locator("select").filter({ has: page.getByRole("option", { name: "English", exact: true }) });
+  return page
+    .locator("select")
+    .filter({ has: page.getByRole("option", { name: "English", exact: true }) });
 }
 
 // A browser's own language must not silently change the product's English default.
 test.use({ locale: "zh-CN" });
 
-test("English is the default and language changes preserve the selected date and move draft", async ({ page }) => {
+test("English is the default and language changes preserve the selected date and move draft", async ({
+  page,
+}) => {
   const observed = await installApiMock(page, { archive: true });
   await page.goto("./?case=2026-09-10");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -24,7 +28,9 @@ test("English is the default and language changes preserve the selected date and
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await expect(page.getByRole("heading", { name: "Тихое начало", exact: true })).toBeVisible();
   await expect(page.getByText("Что произошло ход назад?", { exact: true })).toBeVisible();
-  await expect(page.getByRole("gridcell", { name: "d5, белая пешка", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("gridcell", { name: "d5, белая пешка", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Взятая фигура", { exact: true })).toHaveValue("p");
   await expect(page.getByRole("button", { name: "Проверить ход", exact: true })).toBeEnabled();
   expect(new URL(page.url()).searchParams.get("case")).toBe("2026-09-10");
@@ -47,7 +53,9 @@ test("English is the default and language changes preserve the selected date and
   await expect(page.getByRole("heading", { name: "A quiet beginning", exact: true })).toBeVisible();
 });
 
-test("authorized hints and solution explanations translate without restarting an attempt", async ({ page }) => {
+test("authorized hints and solution explanations translate without restarting an attempt", async ({
+  page,
+}) => {
   const observed = await installApiMock(page, { loseFirstHint: true });
   const publicResponses: unknown[] = [];
   page.on("response", (response) => {
@@ -60,12 +68,16 @@ test("authorized hints and solution explanations translate without restarting an
   await page.getByRole("gridcell", { name: "c4, empty", exact: true }).click();
   await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
   await page.getByRole("button", { name: "Check move", exact: true }).click();
-  await expect(page.getByText("That does not explain the missing pawn.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("That does not explain the missing pawn.", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Get hint", exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry hint", exact: true })).toBeVisible();
 
   await language(page).selectOption("ru");
-  await expect(page.getByText("Этот ход не объясняет исчезновение пешки.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Этот ход не объясняет исчезновение пешки.", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Повторить загрузку подсказки", exact: true }).click();
   await expect(page.getByText("Пешка сменила вертикаль.", { exact: true })).toBeVisible();
   expect(observed.hintRequests).toEqual([
@@ -86,10 +98,14 @@ test("authorized hints and solution explanations translate without restarting an
   await expect(page.getByText("白方 e 线的兵吃掉了 d5 格的黑兵。", { exact: true })).toBeVisible();
   await language(page).selectOption("ru");
   await expect(page.getByRole("heading", { name: "Решено", exact: true })).toBeVisible();
-  await expect(page.getByText("Белая пешка с вертикали e взяла чёрную пешку на d5.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Белая пешка с вертикали e взяла чёрную пешку на d5.", { exact: true }),
+  ).toBeVisible();
   await language(page).selectOption("en");
   await expect(page.getByRole("heading", { name: "Solved", exact: true })).toBeVisible();
-  await expect(page.getByText("The white e-pawn captured the black pawn on d5.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("The white e-pawn captured the black pawn on d5.", { exact: true }),
+  ).toBeVisible();
   expect(observed.attemptBodies).toHaveLength(2);
   expect(observed.statsRequests).toBe(0);
   await expect.poll(() => publicResponses.length).toBe(1);
@@ -99,7 +115,9 @@ test("authorized hints and solution explanations translate without restarting an
   }
 });
 
-test("archive month, progress navigation and historical links remain selected across languages", async ({ page }) => {
+test("archive month, progress navigation and historical links remain selected across languages", async ({
+  page,
+}) => {
   await installApiMock(page, { archive: true });
   await page.goto("./?view=archive&month=2026-09");
   await expect(page.getByRole("heading", { name: "The archive", exact: true })).toBeVisible();
@@ -109,9 +127,13 @@ test("archive month, progress navigation and historical links remain selected ac
   await expect(page.getByLabel("Месяц архива", { exact: true })).toHaveValue("2026-09");
   await expect(page.locator(".archive-cases")).toContainText("Тихое начало");
   await expect(page.locator(".archive-cases")).not.toContainText("A quiet beginning");
-  await page.locator(".archive-cases li").filter({
-    has: page.locator('time[datetime="2026-09-10"]'),
-  }).getByRole("button").click();
+  await page
+    .locator(".archive-cases li")
+    .filter({
+      has: page.locator('time[datetime="2026-09-10"]'),
+    })
+    .getByRole("button")
+    .click();
   await expect(page.getByRole("heading", { name: "Тихое начало", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Прогресс", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Статистика", exact: true })).toBeVisible();
@@ -124,7 +146,9 @@ test("archive month, progress navigation and historical links remain selected ac
   await expect(page.getByRole("heading", { name: "谜题档案", exact: true })).toBeVisible();
 });
 
-test("a retried attempt keeps its idempotency key when the language changes offline", async ({ page }) => {
+test("a retried attempt keeps its idempotency key when the language changes offline", async ({
+  page,
+}) => {
   const observed = await installApiMock(page, { loseFirstAttempt: true });
   await page.goto("./?case=2026-08-03");
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();

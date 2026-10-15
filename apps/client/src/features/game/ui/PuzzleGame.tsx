@@ -87,7 +87,9 @@ export function PuzzleGame(props: {
       {controller.attempt.tag === "incorrect" ? (
         <div>
           <p className="feedback-label">{t("game.reconsider")}</p>
-          <p role="alert">{localizedText(controller.attempt.result.contradiction, "message", locale)}</p>
+          <p role="alert">
+            {localizedText(controller.attempt.result.contradiction, "message", locale)}
+          </p>
           {!exhausted &&
           hintItems.length < props.puzzle.maxHints &&
           controller.hints.tag !== "retry" ? (
@@ -160,7 +162,8 @@ export function PuzzleGame(props: {
         </div>
       </RetractionComposer>
       <footer className="game-provenance">
-        {localizedText(props.puzzle, "provenance", locale)} · {localizedText(props.puzzle, "license", locale)}
+        {localizedText(props.puzzle, "provenance", locale)} ·{" "}
+        {localizedText(props.puzzle, "license", locale)}
       </footer>
     </article>
   );

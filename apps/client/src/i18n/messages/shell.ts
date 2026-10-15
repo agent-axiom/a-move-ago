@@ -14,7 +14,8 @@ const en = {
   "shell.connectedAs": "Connected as {name}",
   "shell.guest": "Playing as a guest",
   "shell.connectedDescription": "Your discoveries follow you across devices.",
-  "shell.guestDescription": "No account needed. Connect Telegram to keep your progress across devices.",
+  "shell.guestDescription":
+    "No account needed. Connect Telegram to keep your progress across devices.",
   "shell.selectedArchive": "Selected archive case",
   "shell.fromArchive": "From the archive",
   "shell.browseArchive": "Browse archive",
@@ -41,7 +42,8 @@ const en = {
   "shell.privacy": "Privacy",
   "shell.brandMark": "A MOVE AGO reverse knight",
   "shell.archiveEmptyTitle": "The collection is just beginning.",
-  "shell.archiveEmptyDescription": "Published cases will appear here. Today’s case is a good place to start.",
+  "shell.archiveEmptyDescription":
+    "Published cases will appear here. Today’s case is a good place to start.",
   "shell.archiveCompleted": "{count} completed",
   "shell.archiveSince": "Since {date}",
   "shell.archiveChoose": "Choose your next mystery",
@@ -56,7 +58,8 @@ const en = {
   "shell.solvedCount": "{solved} / {total} solved",
   "shell.archiveEyebrow": "One move back, any day",
   "shell.archiveTitle": "The archive",
-  "shell.archiveDescription": "There’s always another perspective. Revisit a daily mystery, at your own pace.",
+  "shell.archiveDescription":
+    "There’s always another perspective. Revisit a daily mystery, at your own pace.",
   "shell.archiveLoading": "Opening the archive…",
   "shell.archiveUnavailable": "The archive is unavailable.",
   "shell.archiveOffline": "You appear to be offline. Reconnect to explore past cases.",
@@ -103,24 +106,29 @@ const en = {
   "shell.deleted": "Telegram profile deleted. You are now playing as a guest.",
   "shell.deleteProfile": "Delete Telegram profile",
   "shell.deleteProfileQuestion": "Delete Telegram profile?",
-  "shell.deleteWarning": "This permanently deletes your A MOVE AGO Telegram profile and all saved attempts, hints, and statistics on every device. It does not delete your Telegram account. This cannot be undone.",
+  "shell.deleteWarning":
+    "This permanently deletes your A MOVE AGO Telegram profile and all saved attempts, hints, and statistics on every device. It does not delete your Telegram account. This cannot be undone.",
   "shell.deletingProfile": "Deleting Telegram profile…",
   "shell.reloadSignIn": "Reload to sign in again",
   "shell.cancel": "Cancel",
   "shell.deleting": "Deleting…",
   "shell.deletePermanently": "Delete permanently",
-  "shell.deleteUnconfirmed": "Telegram profile deletion could not be confirmed. Retry to check the current profile state.",
-  "shell.inactiveSession": "Profile deletion could not be confirmed because this app session is no longer active. Reload, then choose Save progress with Telegram to verify the profile.",
-  "shell.telegramExpired": "Telegram return expired or was already consumed. Start Save progress again.",
+  "shell.deleteUnconfirmed":
+    "Telegram profile deletion could not be confirmed. Retry to check the current profile state.",
+  "shell.inactiveSession":
+    "Profile deletion could not be confirmed because this app session is no longer active. Reload, then choose Save progress with Telegram to verify the profile.",
+  "shell.telegramExpired":
+    "Telegram return expired or was already consumed. Start Save progress again.",
   "shell.guestStartupFailed": "Could not start a guest session.",
   "shell.telegramIncomplete": "Telegram sign-in did not finish.",
-  "shell.telegramRetry": "Telegram sign-in could not be exchanged. Retry when the connection recovers.",
+  "shell.telegramRetry":
+    "Telegram sign-in could not be exchanged. Retry when the connection recovers.",
   "shell.telegramCancelled": "Telegram sign-in was cancelled. Guest progress is still available.",
   "shell.operationFailed": "The request could not be completed. Please try again.",
-  "shell.archiveExplore": {"one": "case to explore", "other": "cases to explore"},
-  "shell.discoveryDays": {"one": "day of discovery", "other": "days of discovery"},
-  "shell.consecutiveDays": {"one": "day in a row", "other": "days in a row"},
-  "shell.mysteriesClear": {"one": "mystery made clear", "other": "mysteries made clear"},
+  "shell.archiveExplore": { one: "case to explore", other: "cases to explore" },
+  "shell.discoveryDays": { one: "day of discovery", other: "days of discovery" },
+  "shell.consecutiveDays": { one: "day in a row", other: "days in a row" },
+  "shell.mysteriesClear": { one: "mystery made clear", other: "mysteries made clear" },
 } as const;
 
 const ru = {
@@ -136,7 +144,8 @@ const ru = {
   "shell.connectedAs": "Вы вошли как {name}",
   "shell.guest": "Вы играете как гость",
   "shell.connectedDescription": "Ваши открытия доступны на всех устройствах.",
-  "shell.guestDescription": "Аккаунт не нужен. Подключите Telegram, чтобы сохранять прогресс на всех устройствах.",
+  "shell.guestDescription":
+    "Аккаунт не нужен. Подключите Telegram, чтобы сохранять прогресс на всех устройствах.",
   "shell.selectedArchive": "Выбранная архивная задача",
   "shell.fromArchive": "Из архива",
   "shell.browseArchive": "Открыть архив",
@@ -156,8 +165,10 @@ const ru = {
   "shell.helpMove": "Верните её назад.",
   "shell.helpMoveText": "Выберите пустую клетку, с которой она пришла.",
   "shell.helpComplete": "Восстановите картину.",
-  "shell.helpCompleteText": "Восстановите взятую фигуру или укажите особый ход, затем проверьте решение.",
-  "shell.helpNote": "Нажимайте на клетки или используйте стрелки и Enter. Не торопитесь — время не ограничено.",
+  "shell.helpCompleteText":
+    "Восстановите взятую фигуру или укажите особый ход, затем проверьте решение.",
+  "shell.helpNote":
+    "Нажимайте на клетки или используйте стрелки и Enter. Не торопитесь — время не ограничено.",
   "shell.footer": "Каждый день — новый взгляд.",
   "shell.newCaseTime": "Новая задача в 00:00 UTC",
   "shell.privacy": "Конфиденциальность",
@@ -178,10 +189,12 @@ const ru = {
   "shell.solvedCount": "Решено {solved} / {total}",
   "shell.archiveEyebrow": "На ход назад — в любой день",
   "shell.archiveTitle": "Архив задач",
-  "shell.archiveDescription": "Всегда есть другой взгляд. Возвращайтесь к прошлым загадкам в своём темпе.",
+  "shell.archiveDescription":
+    "Всегда есть другой взгляд. Возвращайтесь к прошлым загадкам в своём темпе.",
   "shell.archiveLoading": "Открываем архив…",
   "shell.archiveUnavailable": "Архив недоступен.",
-  "shell.archiveOffline": "Похоже, нет подключения к сети. Подключитесь, чтобы открыть прошлые задачи.",
+  "shell.archiveOffline":
+    "Похоже, нет подключения к сети. Подключитесь, чтобы открыть прошлые задачи.",
   "shell.sessionExpired": "Сессия истекла. Перезагрузите страницу, чтобы продолжить.",
   "shell.archiveFailure": "Не удалось загрузить коллекцию. Попробуйте ещё раз.",
   "shell.reload": "Перезагрузить приложение",
@@ -225,24 +238,49 @@ const ru = {
   "shell.deleted": "Профиль Telegram удалён. Теперь вы играете как гость.",
   "shell.deleteProfile": "Удалить профиль Telegram",
   "shell.deleteProfileQuestion": "Удалить профиль Telegram?",
-  "shell.deleteWarning": "Ваш профиль A MOVE AGO, связанный с Telegram, все сохранённые попытки, подсказки и статистика на всех устройствах будут удалены навсегда. Ваш аккаунт Telegram останется. Отменить удаление невозможно.",
+  "shell.deleteWarning":
+    "Ваш профиль A MOVE AGO, связанный с Telegram, все сохранённые попытки, подсказки и статистика на всех устройствах будут удалены навсегда. Ваш аккаунт Telegram останется. Отменить удаление невозможно.",
   "shell.deletingProfile": "Удаляем профиль Telegram…",
   "shell.reloadSignIn": "Перезагрузить и войти снова",
   "shell.cancel": "Отмена",
   "shell.deleting": "Удаляем…",
   "shell.deletePermanently": "Удалить навсегда",
-  "shell.deleteUnconfirmed": "Не удалось подтвердить удаление профиля Telegram. Повторите попытку, чтобы проверить его состояние.",
-  "shell.inactiveSession": "Не удалось подтвердить удаление: сессия приложения больше не активна. Перезагрузите приложение и выберите «Сохранить прогресс через Telegram», чтобы проверить профиль.",
-  "shell.telegramExpired": "Ссылка возврата из Telegram истекла или уже использована. Снова выберите сохранение прогресса.",
+  "shell.deleteUnconfirmed":
+    "Не удалось подтвердить удаление профиля Telegram. Повторите попытку, чтобы проверить его состояние.",
+  "shell.inactiveSession":
+    "Не удалось подтвердить удаление: сессия приложения больше не активна. Перезагрузите приложение и выберите «Сохранить прогресс через Telegram», чтобы проверить профиль.",
+  "shell.telegramExpired":
+    "Ссылка возврата из Telegram истекла или уже использована. Снова выберите сохранение прогресса.",
   "shell.guestStartupFailed": "Не удалось начать гостевую сессию.",
   "shell.telegramIncomplete": "Вход через Telegram не завершён.",
-  "shell.telegramRetry": "Не удалось завершить вход через Telegram. Повторите попытку после восстановления связи.",
+  "shell.telegramRetry":
+    "Не удалось завершить вход через Telegram. Повторите попытку после восстановления связи.",
   "shell.telegramCancelled": "Вход через Telegram отменён. Гостевой прогресс сохранён.",
   "shell.operationFailed": "Не удалось выполнить запрос. Попробуйте ещё раз.",
-  "shell.archiveExplore": {"one": "задача для решения", "few": "задачи для решения", "many": "задач для решения", "other": "задачи для решения"},
-  "shell.discoveryDays": {"one": "день открытий", "few": "дня открытий", "many": "дней открытий", "other": "дня открытий"},
-  "shell.consecutiveDays": {"one": "день подряд", "few": "дня подряд", "many": "дней подряд", "other": "дня подряд"},
-  "shell.mysteriesClear": {"one": "загадка раскрыта", "few": "загадки раскрыты", "many": "загадок раскрыто", "other": "загадки раскрыты"},
+  "shell.archiveExplore": {
+    one: "задача для решения",
+    few: "задачи для решения",
+    many: "задач для решения",
+    other: "задачи для решения",
+  },
+  "shell.discoveryDays": {
+    one: "день открытий",
+    few: "дня открытий",
+    many: "дней открытий",
+    other: "дня открытий",
+  },
+  "shell.consecutiveDays": {
+    one: "день подряд",
+    few: "дня подряд",
+    many: "дней подряд",
+    other: "дня подряд",
+  },
+  "shell.mysteriesClear": {
+    one: "загадка раскрыта",
+    few: "загадки раскрыты",
+    many: "загадок раскрыто",
+    other: "загадки раскрыты",
+  },
 } satisfies Record<keyof typeof en, Translation>;
 
 const zh = {
@@ -314,7 +352,7 @@ const zh = {
   "shell.backTodayCase": "返回今日谜题",
   "shell.comeTomorrow": "明天再来探索下一道谜题。",
   "shell.invalidPuzzleOrder": "谜题顺序无效。",
-  "shell.dailyCase": "今日谜题",
+  "shell.dailyCase": "每日谜题",
   "shell.act": "第 {current} 幕，共 {total} 幕",
   "shell.tagline": "棋已落定，谜题等你解开。",
   "shell.dailyOffline": "你似乎已离线。棋盘尚未提交。",
@@ -347,24 +385,26 @@ const zh = {
   "shell.deleted": "Telegram 个人资料已删除。你现在以访客身份游玩。",
   "shell.deleteProfile": "删除 Telegram 个人资料",
   "shell.deleteProfileQuestion": "删除 Telegram 个人资料？",
-  "shell.deleteWarning": "这将永久删除你的 A MOVE AGO Telegram 个人资料，以及所有设备上保存的尝试、提示和统计数据。你的 Telegram 账号不会被删除。此操作无法撤销。",
+  "shell.deleteWarning":
+    "这将永久删除你的 A MOVE AGO Telegram 个人资料，以及所有设备上保存的尝试、提示和统计数据。你的 Telegram 账号不会被删除。此操作无法撤销。",
   "shell.deletingProfile": "正在删除 Telegram 个人资料…",
   "shell.reloadSignIn": "重新加载并再次登录",
   "shell.cancel": "取消",
   "shell.deleting": "正在删除…",
   "shell.deletePermanently": "永久删除",
   "shell.deleteUnconfirmed": "无法确认 Telegram 个人资料是否已删除。请重试以检查当前状态。",
-  "shell.inactiveSession": "应用会话已失效，无法确认个人资料是否已删除。请重新加载，然后选择“通过 Telegram 保存进度”以验证个人资料。",
+  "shell.inactiveSession":
+    "应用会话已失效，无法确认个人资料是否已删除。请重新加载，然后选择“通过 Telegram 保存进度”以验证个人资料。",
   "shell.telegramExpired": "Telegram 返回链接已过期或已使用。请重新开始保存进度。",
   "shell.guestStartupFailed": "无法启动访客会话。",
   "shell.telegramIncomplete": "Telegram 登录未完成。",
   "shell.telegramRetry": "无法完成 Telegram 登录交换。连接恢复后请重试。",
   "shell.telegramCancelled": "Telegram 登录已取消。访客进度仍然可用。",
   "shell.operationFailed": "无法完成请求。请重试。",
-  "shell.archiveExplore": {"other": "道谜题等你探索"},
-  "shell.discoveryDays": {"other": "天的探索"},
-  "shell.consecutiveDays": {"other": "天连续记录"},
-  "shell.mysteriesClear": {"other": "道谜题已解开"},
+  "shell.archiveExplore": { other: "道谜题等你探索" },
+  "shell.discoveryDays": { other: "天的探索" },
+  "shell.consecutiveDays": { other: "天连续记录" },
+  "shell.mysteriesClear": { other: "道谜题已解开" },
 } satisfies Record<keyof typeof en, Translation>;
 
 export const shellMessages = { en, ru, zh };

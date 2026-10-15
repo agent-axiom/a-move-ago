@@ -52,9 +52,7 @@ export function StatsPanel(props: { title?: string; refreshKey?: string }) {
         <div className="stat-tile">
           <dt>{t("shell.solvedPuzzles")}</dt>
           <dd>{state.stats.solvedPuzzles}</dd>
-          <span>
-            {t("shell.mysteriesClear", { count: state.stats.solvedPuzzles })}
-          </span>
+          <span>{t("shell.mysteriesClear", { count: state.stats.solvedPuzzles })}</span>
         </div>
         <div className="stat-tile">
           <dt>{t("shell.hintsUsed")}</dt>

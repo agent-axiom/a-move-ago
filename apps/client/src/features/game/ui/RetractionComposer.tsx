@@ -72,11 +72,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           board={showingPreview && preview.ok ? preview.previous.board : props.post.board}
           disabled={props.disabled || showingPreview}
           destinationSquare={previousSquare}
-          label={
-            showingPreview
-              ? t("game.board.preview")
-              : t("game.board.interactive")
-          }
+          label={showingPreview ? t("game.board.preview") : t("game.board.interactive")}
           onSelect={(square) => dispatch({ type: "select-square", square })}
           orientation={props.retractingColor === "w" ? "white" : "black"}
           selectedSquare={selectedSquare}

@@ -50,17 +50,27 @@ export interface ApiObservations {
 
 const contentText = {
   ru: {
-    caseTitle: "Пропавшая пешка", firstCaseTitle: "Тихое начало", recentCaseTitle: "Потерянный темп",
-    puzzleTitle: "Исчезнувшая пешка", prompt: "Что произошло ход назад?",
-    provenance: "Учебный пример A MOVE AGO", license: "CC BY 4.0",
-    contradiction: "Этот ход не объясняет исчезновение пешки.", hint: "Пешка сменила вертикаль.",
+    caseTitle: "Пропавшая пешка",
+    firstCaseTitle: "Тихое начало",
+    recentCaseTitle: "Потерянный темп",
+    puzzleTitle: "Исчезнувшая пешка",
+    prompt: "Что произошло ход назад?",
+    provenance: "Учебный пример A MOVE AGO",
+    license: "CC BY 4.0",
+    contradiction: "Этот ход не объясняет исчезновение пешки.",
+    hint: "Пешка сменила вертикаль.",
     explanation: "Белая пешка с вертикали e взяла чёрную пешку на d5.",
   },
   zh: {
-    caseTitle: "消失的兵", firstCaseTitle: "安静的开始", recentCaseTitle: "丢失的一步",
-    puzzleTitle: "一枚兵消失了", prompt: "上一步发生了什么？",
-    provenance: "A MOVE AGO 教学示例", license: "CC BY 4.0",
-    contradiction: "这一步无法解释兵为何消失。", hint: "一枚兵换了纵线。",
+    caseTitle: "消失的兵",
+    firstCaseTitle: "安静的开始",
+    recentCaseTitle: "丢失的一步",
+    puzzleTitle: "一枚兵消失了",
+    prompt: "上一步发生了什么？",
+    provenance: "A MOVE AGO 教学示例",
+    license: "CC BY 4.0",
+    contradiction: "这一步无法解释兵为何消失。",
+    hint: "一枚兵换了纵线。",
     explanation: "白方 e 线的兵吃掉了 d5 格的黑兵。",
   },
 };
@@ -71,28 +81,44 @@ function withLocalizations(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(withLocalizations);
   if (value === null || typeof value !== "object") return value;
   const object = value as Record<string, unknown>;
-  const result = Object.fromEntries(Object.entries(object)
-    .map(([key, child]) => [key, withLocalizations(child)]));
-  const localizations = Object.fromEntries(Object.entries(contentText).map(([locale, text]) => {
-    if (typeof object.postFen === "string") return [locale, {
-      title: text.puzzleTitle, prompt: text.prompt, provenance: text.provenance, license: text.license,
-    }];
-    if (typeof object.title === "string" && (Array.isArray(object.puzzles) || "slug" in object)) {
-      const title = object.title === "A quiet beginning" ? text.firstCaseTitle
-        : object.title === "The missing tempo" ? text.recentCaseTitle
-        : object.title === "The missing pawn" ? text.caseTitle
-        : locale === "ru" ? `Учебная задача ${String(object.date)}` : `教学谜题 ${String(object.date)}`;
-      return [locale, { title }];
-    }
-    if (typeof object.previousFen === "string" && typeof object.explanation === "string") {
-      return [locale, { explanation: text.explanation }];
-    }
-    if (typeof object.level === "number" && typeof object.text === "string") {
-      return [locale, { text: text.hint }];
-    }
-    if (object.code === "NOT_THE_LAST_MOVE") return [locale, { message: text.contradiction }];
-    return [locale, null];
-  }));
+  const result = Object.fromEntries(
+    Object.entries(object).map(([key, child]) => [key, withLocalizations(child)]),
+  );
+  const localizations = Object.fromEntries(
+    Object.entries(contentText).map(([locale, text]) => {
+      if (typeof object.postFen === "string")
+        return [
+          locale,
+          {
+            title: text.puzzleTitle,
+            prompt: text.prompt,
+            provenance: text.provenance,
+            license: text.license,
+          },
+        ];
+      if (typeof object.title === "string" && (Array.isArray(object.puzzles) || "slug" in object)) {
+        const title =
+          object.title === "A quiet beginning"
+            ? text.firstCaseTitle
+            : object.title === "The missing tempo"
+              ? text.recentCaseTitle
+              : object.title === "The missing pawn"
+                ? text.caseTitle
+                : locale === "ru"
+                  ? `Учебная задача ${String(object.date)}`
+                  : `教学谜题 ${String(object.date)}`;
+        return [locale, { title }];
+      }
+      if (typeof object.previousFen === "string" && typeof object.explanation === "string") {
+        return [locale, { explanation: text.explanation }];
+      }
+      if (typeof object.level === "number" && typeof object.text === "string") {
+        return [locale, { text: text.hint }];
+      }
+      if (object.code === "NOT_THE_LAST_MOVE") return [locale, { message: text.contradiction }];
+      return [locale, null];
+    }),
+  );
   return localizations.ru === null ? result : { ...result, localizations };
 }
 
@@ -104,8 +130,9 @@ async function json(route: Route, status: number, value: unknown) {
       "access-control-allow-origin": "*",
       "cache-control": "no-store",
     },
-    body: JSON.stringify(route.request().headers()["x-content-locales"] === "1"
-      ? withLocalizations(value) : value),
+    body: JSON.stringify(
+      route.request().headers()["x-content-locales"] === "1" ? withLocalizations(value) : value,
+    ),
   });
 }
 

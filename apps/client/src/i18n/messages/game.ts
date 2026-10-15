@@ -58,7 +58,8 @@ const en = {
   "game.preview.NO_PIECE_ON_CURRENT_SQUARE": "The selected piece is no longer on that square.",
   "game.preview.WRONG_COLOR": "Choose a piece belonging to the side that moved last.",
   "game.preview.PREVIOUS_SQUARE_OCCUPIED": "The square the piece came from must be empty.",
-  "game.preview.RESTORE_SQUARE_OCCUPIED": "The captured piece cannot be restored on an occupied square.",
+  "game.preview.RESTORE_SQUARE_OCCUPIED":
+    "The captured piece cannot be restored on an occupied square.",
   "game.preview.INVALID_SPECIAL_MOVE": "That special move does not match the selected squares.",
   "game.retry.offline": "Connection interrupted. Try again to check the same move.",
   "game.retry.auth": "Your session has expired. Restart to continue.",

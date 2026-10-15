@@ -10,8 +10,8 @@ import { SaveProgressButton } from "./features/session/SaveProgressButton";
 import { SessionProvider, useSession } from "./features/session/SessionProvider";
 import type { Me } from "./features/session/session-state";
 import { StatsPanel } from "./features/stats/StatsPanel";
-import { BrandMark } from "./shared/BrandMark";
 import { I18nProvider, LanguageSwitcher, localizedSystemMessage, useI18n } from "./i18n";
+import { BrandMark } from "./shared/BrandMark";
 import "./i18n/language.css";
 import "./features/archive/archive.css";
 
@@ -117,7 +117,8 @@ function AppContent() {
         {caseDate ? (
           <section className="archive-case-context" aria-label={t("shell.selectedArchive")}>
             <p>
-              {t("shell.fromArchive")} · <time dateTime={caseDate}>{archiveDateLabel(caseDate, intlLocale)}</time>
+              {t("shell.fromArchive")} ·{" "}
+              <time dateTime={caseDate}>{archiveDateLabel(caseDate, intlLocale)}</time>
             </p>
             <div>
               <button
@@ -164,7 +165,9 @@ function AppContent() {
               type="button"
               onClick={() => dispatch({ type: "back" })}
             >
-              {navigation.stack.at(-2)?.name === "archive" ? t("shell.backArchive") : t("shell.backCase")}
+              {navigation.stack.at(-2)?.name === "archive"
+                ? t("shell.backArchive")
+                : t("shell.backCase")}
             </button>
           ) : (
             <button
@@ -211,9 +214,7 @@ function AppContent() {
                   <strong>{t("shell.helpComplete")}</strong> {t("shell.helpCompleteText")}
                 </li>
               </ol>
-              <p className="help-note">
-                {t("shell.helpNote")}
-              </p>
+              <p className="help-note">{t("shell.helpNote")}</p>
             </div>
           </details>
         </nav>

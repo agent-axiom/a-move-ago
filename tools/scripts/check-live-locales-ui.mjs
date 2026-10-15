@@ -7,7 +7,10 @@ let browser;
 try {
   browser = await chromium.launch();
   // Navigator preference intentionally differs from the required English default.
-  const context = await browser.newContext({ locale: "zh-CN", viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({
+    locale: "zh-CN",
+    viewport: { width: 390, height: 844 },
+  });
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   let attempts = 0;
@@ -18,20 +21,29 @@ try {
     if (request.method() === "GET" && path === "/v1/daily") dailyRequests += 1;
   });
   function language() {
-    return page.locator("select").filter({ has: page.getByRole("option", { name: "English", exact: true }) });
+    return page
+      .locator("select")
+      .filter({ has: page.getByRole("option", { name: "English", exact: true }) });
   }
   async function layout() {
     for (const width of [320, 390, 1440]) {
       await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
-      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+      assert.ok(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      );
       const tooSmall = await page.locator("button, select, a[href]").evaluateAll((elements) =>
         elements.some((element) => {
           if (element.closest(".chessboard")) return false;
           const rect = element.getBoundingClientRect();
           const style = window.getComputedStyle(element);
-          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" &&
-            (rect.width < 44 || rect.height < 44);
-        }));
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.visibility !== "hidden" &&
+            (rect.width < 44 || rect.height < 44)
+          );
+        }),
+      );
       assert.equal(tooSmall, false);
     }
   }
@@ -40,7 +52,11 @@ try {
   await page.getByRole("grid").waitFor();
   assert.equal(await page.locator("html").getAttribute("lang"), "en");
   assert.equal(await language().inputValue(), "en");
-  assert.deepEqual(await language().locator("option").allTextContents(), ["English", "Русский", "中文"]);
+  assert.deepEqual(await language().locator("option").allTextContents(), [
+    "English",
+    "Русский",
+    "中文",
+  ]);
   await page.getByRole("button", { name: "Check move", exact: true }).waitFor();
   const originalTitle = await page.locator("h1").innerText();
   const originalDailyRequests = dailyRequests;
@@ -91,18 +107,29 @@ try {
   stage = "ENGLISH_RESTORED";
   await language().selectOption("en");
   await page.getByRole("heading", { name: "The archive", exact: true }).waitFor();
-  await page.locator(".archive-cases li").filter({
-    has: page.locator('time[datetime="2026-09-10"]'),
-  }).getByRole("button").click();
+  await page
+    .locator(".archive-cases li")
+    .filter({
+      has: page.locator('time[datetime="2026-09-10"]'),
+    })
+    .getByRole("button")
+    .click();
   await page.getByRole("grid").waitFor();
   assert.equal(await page.locator("h1").innerText(), originalTitle);
   assert.equal(attempts, 0);
   // No traces, screenshots, response bodies, puzzle text or storage are exported.
-  console.log(JSON.stringify({
-    ok: true, locales: ["en", "ru", "zh"], englishDefault: true,
-    selectedDatePreserved: true, persistedChoice: true, archiveAndProgress: true,
-    viewports: [320, 390, 1440], submittedAttempts: attempts,
-  }));
+  console.log(
+    JSON.stringify({
+      ok: true,
+      locales: ["en", "ru", "zh"],
+      englishDefault: true,
+      selectedDatePreserved: true,
+      persistedChoice: true,
+      archiveAndProgress: true,
+      viewports: [320, 390, 1440],
+      submittedAttempts: attempts,
+    }),
+  );
 } catch {
   console.error(JSON.stringify({ ok: false, code: `LIVE_LOCALES_UI_${stage}_FAILED` }));
   process.exitCode = 1;

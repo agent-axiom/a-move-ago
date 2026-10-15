@@ -53,12 +53,20 @@ function ArchiveCases(props: {
           <span aria-hidden="true"> · </span>
           <span>{t("shell.archiveCompleted", { count: completed })}</span>
         </p>
-        {props.archive.startsOn ? <p>{t("shell.archiveSince", { date: archiveDateLabel(props.archive.startsOn, intlLocale) })}</p> : null}
+        {props.archive.startsOn ? (
+          <p>
+            {t("shell.archiveSince", {
+              date: archiveDateLabel(props.archive.startsOn, intlLocale),
+            })}
+          </p>
+        ) : null}
       </div>
       <div className="archive-toolbar">
         <div>
           <p className="eyebrow">{t("shell.archiveChoose")}</p>
-          <h2 id="archive-month-heading">{month ? monthLabel(month, intlLocale) : t("shell.archivePublished")}</h2>
+          <h2 id="archive-month-heading">
+            {month ? monthLabel(month, intlLocale) : t("shell.archivePublished")}
+          </h2>
         </div>
         <label>
           <span>{t("shell.browseMonth")}</span>
@@ -116,7 +124,10 @@ function ArchiveCases(props: {
                       {status}
                     </span>{" "}
                     <span>
-                      {t("shell.solvedCount", { solved: item.solvedPuzzles, total: item.puzzleCount })}
+                      {t("shell.solvedCount", {
+                        solved: item.solvedPuzzles,
+                        total: item.puzzleCount,
+                      })}
                     </span>
                   </span>
                 </span>
@@ -153,9 +164,7 @@ export function ArchivePage(props: {
         <div>
           <p className="eyebrow">{t("shell.archiveEyebrow")}</p>
           <h1 id="archive-heading">{t("shell.archiveTitle")}</h1>
-          <p className="page-description">
-            {t("shell.archiveDescription")}
-          </p>
+          <p className="page-description">{t("shell.archiveDescription")}</p>
         </div>
         <button className="button-secondary" type="button" onClick={props.onToday}>
           {t("shell.backToday")}

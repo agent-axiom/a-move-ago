@@ -33,14 +33,16 @@ export function localizationDates(request: LocalizationRequest): string[] {
   );
 }
 
-const sourceCaseSchema = z.object({
-  case_id: z.string().min(1),
-  case_date: z.iso.date(),
-  import_count: z.literal(1),
-  source_shape_valid: z.literal(1),
-  source_digest: z.string().regex(/^[a-f0-9]{64}$/),
-  source_json: z.string(),
-}).strict();
+const sourceCaseSchema = z
+  .object({
+    case_id: z.string().min(1),
+    case_date: z.iso.date(),
+    import_count: z.literal(1),
+    source_shape_valid: z.literal(1),
+    source_digest: z.string().regex(/^[a-f0-9]{64}$/),
+    source_json: z.string(),
+  })
+  .strict();
 
 /** Rebuild the immutable import in memory; no source text is returned in receipts or logs. */
 export function localizationSourceStatement(caseId: string): D1Statement {
@@ -130,13 +132,23 @@ async function verifyRows(rows: LocalizedRow[], query: Query, requireExisting: b
   ensure(results.length === rows.length, "INVALID_D1_RESPONSE");
   for (const result of results) {
     ensure(result.length === 1, "INVALID_D1_RESPONSE");
-    const parsed = z.object({ conflict: z.union([z.literal(0), z.literal(1)]) }).strict().parse(result[0]);
-    ensure(parsed.conflict === 0, requireExisting ? "LOCALIZATION_IMPORT_INCOMPLETE" : "EXISTING_LOCALIZATION_CONFLICT");
+    const parsed = z
+      .object({ conflict: z.union([z.literal(0), z.literal(1)]) })
+      .strict()
+      .parse(result[0]);
+    ensure(
+      parsed.conflict === 0,
+      requireExisting ? "LOCALIZATION_IMPORT_INCOMPLETE" : "EXISTING_LOCALIZATION_CONFLICT",
+    );
   }
 }
 
 /** Validate the entire bundle and all remote conflicts before binding its envelope. */
-export async function prepareLocalizationImport(payload: unknown, request: LocalizationRequest, query: Query) {
+export async function prepareLocalizationImport(
+  payload: unknown,
+  request: LocalizationRequest,
+  query: Query,
+) {
   const bundle = LocalizationBundleSchema.parse(payload);
   const expectedDates = localizationDates(request);
   ensure(bundle.cases.length === expectedDates.length, "LOCALIZATION_RANGE_MISMATCH");
@@ -145,7 +157,9 @@ export async function prepareLocalizationImport(payload: unknown, request: Local
     ensure(!caseIds.has(content.caseId), "DUPLICATE_LOCALIZATION_CASE");
     caseIds.add(content.caseId);
   }
-  const sources = await query(bundle.cases.map((content) => localizationSourceStatement(content.caseId)));
+  const sources = await query(
+    bundle.cases.map((content) => localizationSourceStatement(content.caseId)),
+  );
   ensure(sources.length === bundle.cases.length, "INVALID_D1_RESPONSE");
   const dates = new Set<string>();
   const puzzleIds = new Set<string>();
@@ -155,15 +169,25 @@ export async function prepareLocalizationImport(payload: unknown, request: Local
     const sourceRows = sources[index];
     ensure(sourceRows?.length === 1, "LOCALIZATION_SOURCE_MISSING");
     const source = sourceCaseSchema.parse(sourceRows[0]);
-    ensure(source.case_id === content.caseId && source.source_digest === content.sourceDigest, "LOCALIZATION_SOURCE_MISMATCH");
+    ensure(
+      source.case_id === content.caseId && source.source_digest === content.sourceDigest,
+      "LOCALIZATION_SOURCE_MISMATCH",
+    );
     ensure(!dates.has(source.case_date), "DUPLICATE_LOCALIZATION_DATE");
     dates.add(source.case_date);
     const originalCase = ContentCaseSchema.parse(JSON.parse(source.source_json));
-    ensure(hash(originalCase) === content.sourceDigest && originalCase.case.id === content.caseId && originalCase.case.date === source.case_date, "LOCALIZATION_SOURCE_MISMATCH");
+    ensure(
+      hash(originalCase) === content.sourceDigest &&
+        originalCase.case.id === content.caseId &&
+        originalCase.case.date === source.case_date,
+      "LOCALIZATION_SOURCE_MISMATCH",
+    );
     const sourcePuzzles = originalCase.puzzles.map((puzzle) => ({
       rowId: `${puzzle.public.id}:v${puzzle.public.version}`,
-      id: puzzle.public.id, version: puzzle.public.version,
-      maxHints: puzzle.public.maxHints, hintsCount: puzzle.hints.length,
+      id: puzzle.public.id,
+      version: puzzle.public.version,
+      maxHints: puzzle.public.maxHints,
+      hintsCount: puzzle.hints.length,
       explanationsCount: puzzle.acceptedSolutions.length,
       contradictionKeys: Object.keys(puzzle.contradictionExplanations),
     }));
@@ -177,30 +201,80 @@ export async function prepareLocalizationImport(payload: unknown, request: Local
     for (const locale of request.locales) {
       const translation = content.translations[locale];
       ensure(translation.puzzles.length === sourcePuzzles.length, "LOCALIZATION_PUZZLE_MISMATCH");
-      const caseDigest = hash({ caseId: content.caseId, sourceDigest: content.sourceDigest, locale, title: translation.title });
-      rows.push({ table: "case_localizations", key: content.caseId, locale, values: {
-        title: translation.title, source_digest: content.sourceDigest, content_digest: caseDigest,
-      } });
+      const caseDigest = hash({
+        caseId: content.caseId,
+        sourceDigest: content.sourceDigest,
+        locale,
+        title: translation.title,
+      });
+      rows.push({
+        table: "case_localizations",
+        key: content.caseId,
+        locale,
+        values: {
+          title: translation.title,
+          source_digest: content.sourceDigest,
+          content_digest: caseDigest,
+        },
+      });
       for (const [puzzleIndex, localized] of translation.puzzles.entries()) {
         const original = sourcePuzzles[puzzleIndex];
-        ensure(original && localized.id === original.id && localized.version === original.version, "LOCALIZATION_PUZZLE_MISMATCH");
+        ensure(
+          original && localized.id === original.id && localized.version === original.version,
+          "LOCALIZATION_PUZZLE_MISMATCH",
+        );
         ensure(localized.hints.length === original.hintsCount, "LOCALIZATION_HINT_MISMATCH");
-        ensure(localized.explanations.length === original.explanationsCount, "LOCALIZATION_EXPLANATION_MISMATCH");
-        ensure(canonicalJson(Object.keys(localized.contradictionExplanations).sort()) === canonicalJson([...original.contradictionKeys].sort()), "LOCALIZATION_CONTRADICTION_MISMATCH");
-        const publicContent = { title: localized.title, prompt: localized.prompt, provenance: localized.provenance, license: localized.license };
-        const privateContent = { hints: localized.hints, explanations: localized.explanations, contradictionExplanations: localized.contradictionExplanations };
-        const puzzleDigest = hash({ puzzleId: original.rowId, sourceDigest: content.sourceDigest, locale, public: publicContent, private: privateContent });
-        rows.push({ table: "puzzle_localizations", key: original.rowId, locale, values: {
-          public_json: canonicalJson(publicContent), private_json: canonicalJson(privateContent),
-          source_digest: content.sourceDigest, content_digest: puzzleDigest,
-        } });
+        ensure(
+          localized.explanations.length === original.explanationsCount,
+          "LOCALIZATION_EXPLANATION_MISMATCH",
+        );
+        ensure(
+          canonicalJson(Object.keys(localized.contradictionExplanations).sort()) ===
+            canonicalJson([...original.contradictionKeys].sort()),
+          "LOCALIZATION_CONTRADICTION_MISMATCH",
+        );
+        const publicContent = {
+          title: localized.title,
+          prompt: localized.prompt,
+          provenance: localized.provenance,
+          license: localized.license,
+        };
+        const privateContent = {
+          hints: localized.hints,
+          explanations: localized.explanations,
+          contradictionExplanations: localized.contradictionExplanations,
+        };
+        const puzzleDigest = hash({
+          puzzleId: original.rowId,
+          sourceDigest: content.sourceDigest,
+          locale,
+          public: publicContent,
+          private: privateContent,
+        });
+        rows.push({
+          table: "puzzle_localizations",
+          key: original.rowId,
+          locale,
+          values: {
+            public_json: canonicalJson(publicContent),
+            private_json: canonicalJson(privateContent),
+            source_digest: content.sourceDigest,
+            content_digest: puzzleDigest,
+          },
+        });
       }
     }
   }
-  ensure(dates.size === expectedDates.length && expectedDates.every((date) => dates.has(date)), "LOCALIZATION_RANGE_MISMATCH");
+  ensure(
+    dates.size === expectedDates.length && expectedDates.every((date) => dates.has(date)),
+    "LOCALIZATION_RANGE_MISMATCH",
+  );
   await verifyRows(rows, query, false);
   return {
-    cases: bundle.cases.length, puzzles, dates: [...dates].sort(), locales: request.locales,
+    cases: bundle.cases.length,
+    puzzles,
+    dates: [...dates].sort(),
+    locales: request.locales,
     caseRows: bundle.cases.length * request.locales.length,
     puzzleRows: puzzles * request.locales.length,
     async import() {

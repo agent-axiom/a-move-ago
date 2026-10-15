@@ -17,10 +17,23 @@ it("localizes archive titles, dates, progress and months without fetching again"
     today: "2026-10-15",
     startsOn: "2026-09-10",
     cases: [
-      { id: "october", date: "2026-10-14", slug: "october", title: "October clue", puzzleCount: 1, solvedPuzzles: 0, completed: false },
       {
-        id: "september", date: "2026-09-10", slug: "september", title: "The first clue",
-        puzzleCount: 2, solvedPuzzles: 1, completed: false,
+        id: "october",
+        date: "2026-10-14",
+        slug: "october",
+        title: "October clue",
+        puzzleCount: 1,
+        solvedPuzzles: 0,
+        completed: false,
+      },
+      {
+        id: "september",
+        date: "2026-09-10",
+        slug: "september",
+        title: "The first clue",
+        puzzleCount: 2,
+        solvedPuzzles: 1,
+        completed: false,
         localizations: { ru: { title: "Первая зацепка" }, zh: { title: "第一条线索" } },
       },
     ],
@@ -39,7 +52,9 @@ it("localizes archive titles, dates, progress and months without fetching again"
   );
   await user.selectOptions(await screen.findByLabelText("Archive month"), "2026-09");
   await user.selectOptions(screen.getByLabelText("Language"), "ru");
-  const russian = screen.getByRole("button", { name: /Открыть задачу за 10 сентября 2026.*Первая зацепка/ });
+  const russian = screen.getByRole("button", {
+    name: /Открыть задачу за 10 сентября 2026.*Первая зацепка/,
+  });
   expect(russian).toHaveAccessibleDescription("В процессе Решено 1 / 2");
   expect(screen.getByLabelText("Месяц архива")).toHaveValue("2026-09");
   expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("сентябрь");

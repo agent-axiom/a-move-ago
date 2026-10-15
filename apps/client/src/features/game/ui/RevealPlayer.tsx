@@ -98,9 +98,7 @@ export function RevealPlayer(props: {
             board={showingPrevious ? previous.board : post.board}
             disabled
             destinationSquare={props.solution.retraction.previousSquare}
-            label={
-              showingPrevious ? t("game.reveal.boardBefore") : t("game.reveal.boardAfter")
-            }
+            label={showingPrevious ? t("game.reveal.boardBefore") : t("game.reveal.boardAfter")}
             onSelect={() => undefined}
             orientation={props.solution.retraction.movedPiece.color === "w" ? "white" : "black"}
             selectedSquare={props.solution.retraction.currentSquare}
@@ -119,10 +117,10 @@ export function RevealPlayer(props: {
           <h2 id="solution-heading">{t("game.solved")}</h2>
         </div>
         <p className="solution-notation">{props.solution.forwardSan}</p>
-        <p className="solution-explanation">{localizedText(props.solution, "explanation", locale)}</p>
-        <p className="solution-inspect-copy">
-          {t("game.reveal.inspect")}
+        <p className="solution-explanation">
+          {localizedText(props.solution, "explanation", locale)}
         </p>
+        <p className="solution-inspect-copy">{t("game.reveal.inspect")}</p>
         <div className="solution-actions">
           <button
             className="button-secondary"
