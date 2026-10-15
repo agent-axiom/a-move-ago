@@ -1,9 +1,13 @@
 .chessboard {
   display: grid;
   grid-template-rows: repeat(8, 1fr);
-  width: min(100%, 32rem);
+  width: 100%;
   aspect-ratio: 1;
-  border: 0.2rem solid #302d2a;
+  overflow: hidden;
+  border: 1px solid rgb(245 242 234 / 12%);
+  border-radius: 5px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 18%);
+  isolation: isolate;
 }
 
 .board-row {
@@ -17,56 +21,94 @@
   display: grid;
   place-items: center;
   min-width: 0;
+  min-height: 0;
+  min-block-size: 0;
+  padding: 0;
   border: 0;
-  color: #171513;
+  border-radius: 0;
+  color: #252a23;
   cursor: pointer;
+  transition: box-shadow 140ms ease;
+  touch-action: manipulation;
 }
 
 .board-cell.light {
-  background: #eee2c7;
+  background: #e6dfd0;
+}
+.board-cell.dark {
+  background: #83917c;
 }
 
-.board-cell.dark {
-  background: #8a674b;
+.board-cell:not(:disabled):hover {
+  box-shadow: inset 0 0 0 3px rgb(33 26 19 / 18%);
 }
 
 .board-cell[aria-selected="true"] {
-  box-shadow: inset 0 0 0 0.25rem #111;
+  background-image: linear-gradient(rgb(225 176 103 / 46%), rgb(225 176 103 / 46%));
+  box-shadow: inset 0 0 0 3px #a06c33;
+}
+
+.board-cell-destination::after {
+  position: absolute;
+  inset: 12%;
+  border: 3px solid #a06c33;
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
 }
 
 .board-cell:focus-visible {
   z-index: 1;
-  outline: 0.25rem solid #111;
-  outline-offset: -0.25rem;
+  outline: 3px solid #352613;
+  outline-offset: -4px;
 }
 
 .board-cell:disabled {
+  opacity: 1;
   cursor: default;
-  filter: saturate(0.72);
 }
 
-.piece-glyph {
-  font-size: clamp(1.6rem, 8vw, 3.2rem);
-  line-height: 1;
+.chess-piece {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 88%;
+  height: 88%;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 1px rgb(0 0 0 / 10%));
 }
 
-.square-coordinate {
+.square-rank,
+.square-file {
   position: absolute;
-  inset: auto 0.15rem 0.05rem auto;
-  font-size: 0.58rem;
+  z-index: 2;
+  font-family: var(--font-sans, sans-serif);
+  font-size: clamp(0.5rem, 1.1vw, 0.68rem);
   font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
 }
 
-.board-cell.light .square-coordinate {
-  color: #171513;
+.square-rank {
+  top: 5px;
+  left: 5px;
 }
-
-.board-cell.dark .square-coordinate {
-  color: #fff;
+.square-file {
+  right: 5px;
+  bottom: 4px;
+}
+.board-cell.light .square-rank,
+.board-cell.light .square-file {
+  color: #55624d;
+}
+.board-cell.dark .square-rank,
+.board-cell.dark .square-file {
+  color: #1a2117;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .board-cell {
-    scroll-behavior: auto;
+    transition: none;
   }
 }

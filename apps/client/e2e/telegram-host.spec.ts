@@ -41,7 +41,7 @@ test("Telegram ready/layout/back work while identity waits for explicit consent"
     ),
   ).toBe("48px");
   expect(
-    await page.locator("main.app-shell").evaluate((element) => {
+    await page.locator(".app-shell").evaluate((element) => {
       const style = window.getComputedStyle(element);
       return { minHeight: style.minHeight, paddingTop: style.paddingTop };
     }),

@@ -48,7 +48,7 @@ test("guest solves the seeded case through Worker and retains D1 progress after 
     (response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === "/v1/attempts",
   );
-  await page.getByRole("button", { name: "Submit retraction" }).click();
+  await page.getByRole("button", { name: "Check move" }).click();
   const attemptResponse = await attemptResponsePromise;
   expect(attemptResponse.status()).toBe(201);
   expect(await attemptResponse.json()).toMatchObject({

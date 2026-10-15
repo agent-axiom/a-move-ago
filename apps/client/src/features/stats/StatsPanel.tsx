@@ -34,17 +34,31 @@ export function StatsPanel(props: { title?: string; refreshKey?: string }) {
     );
   }
   return (
-    <section aria-labelledby="stats-heading">
+    <section className="stats-panel" aria-labelledby="stats-heading">
       <h2 id="stats-heading">{title}</h2>
-      <dl>
-        <dt>Current streak</dt>
-        <dd>{state.stats.currentStreak}</dd>
-        <dt>Best streak</dt>
-        <dd>{state.stats.bestStreak}</dd>
-        <dt>Solved puzzles</dt>
-        <dd>{state.stats.solvedPuzzles}</dd>
-        <dt>Hints used</dt>
-        <dd>{state.stats.hintsUsed}</dd>
+      <dl className="stats-grid">
+        <div className="stat-tile stat-tile-accent">
+          <dt>Current streak</dt>
+          <dd>{state.stats.currentStreak}</dd>
+          <span>{state.stats.currentStreak === 1 ? "day of discovery" : "days of discovery"}</span>
+        </div>
+        <div className="stat-tile">
+          <dt>Best streak</dt>
+          <dd>{state.stats.bestStreak}</dd>
+          <span>{state.stats.bestStreak === 1 ? "day in a row" : "days in a row"}</span>
+        </div>
+        <div className="stat-tile">
+          <dt>Solved puzzles</dt>
+          <dd>{state.stats.solvedPuzzles}</dd>
+          <span>
+            {state.stats.solvedPuzzles === 1 ? "mystery made clear" : "mysteries made clear"}
+          </span>
+        </div>
+        <div className="stat-tile">
+          <dt>Hints used</dt>
+          <dd>{state.stats.hintsUsed}</dd>
+          <span>A little nudge, when needed</span>
+        </div>
       </dl>
     </section>
   );

@@ -25,12 +25,28 @@ export function DailyCaseGate(props: {
 }) {
   const { state, retry } = useDailyCase(props.enabled, props.caseDate);
   if (state.tag === "idle" || state.tag === "loading") {
-    return <p role="status">Loading today’s case…</p>;
+    return (
+      <section className="loading-case" aria-label="Loading case">
+        <p className="eyebrow">A daily chess mystery</p>
+        <p className="loading-title" role="status">
+          Loading today’s case…
+        </p>
+        <div className="loading-layout" aria-hidden="true">
+          <div className="loading-board" />
+          <div className="loading-lines">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      </section>
+    );
   }
   if (state.tag === "error") {
     const requestId = "requestId" in state.failure ? state.failure.requestId : undefined;
     return (
-      <section aria-labelledby="daily-error-heading">
+      <section className="state-panel" aria-labelledby="daily-error-heading">
+        <p className="eyebrow">Pause for a moment</p>
         <h1 id="daily-error-heading">Case unavailable</h1>
         <p role="alert">{message(state.failure.kind)}</p>
         {requestId ? (

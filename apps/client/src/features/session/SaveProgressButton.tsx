@@ -6,8 +6,9 @@ export function SaveProgressButton() {
   const disabled =
     state.tag === "booting" || state.tag === "authenticating" || state.tag === "fatal";
   return (
-    <div>
+    <div className="save-progress">
       <button
+        className="button-primary"
         type="button"
         disabled={disabled}
         onClick={() => {
