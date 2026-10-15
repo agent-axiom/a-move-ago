@@ -68,42 +68,83 @@ it("localizes archive titles, dates, progress and months without fetching again"
 });
 
 it.each([
-  { locale: "en", label: "Archive month", title: "The first clue", since: /Since 10 September 2026/, completed: "0 completed" },
-  { locale: "ru", label: "Месяц архива", title: "Первая зацепка", since: /С 10 сентября 2026/, completed: "0 решено" },
-  { locale: "zh", label: "档案月份", title: "第一条线索", since: /始于 2026年9月10日/, completed: "已完成 0 道" },
-])("shows the collection from September 10 in $locale, excluding legacy and future cases", async ({ locale, label, title, since, completed }) => {
-  localStorage.setItem(localeStorageKey, locale);
-  const first = {
-    id: "first", date: "2026-09-10", slug: "first", title: "The first clue",
-    puzzleCount: 1, solvedPuzzles: 0, completed: false,
-    localizations: { ru: { title: "Первая зацепка" }, zh: { title: "第一条线索" } },
-  };
-  const archive: ArchiveResponse = {
-    today: "2026-10-15",
-    startsOn: "2026-08-03",
-    cases: [
-      { id: "legacy", date: "2026-08-03", slug: "legacy", title: "Legacy case", puzzleCount: 1, solvedPuzzles: 1, completed: true },
-      { ...first, id: "before-launch", date: "2026-09-09", title: "Before launch", solvedPuzzles: 1, completed: true },
-      first,
-      { ...first, id: "future", date: "2026-11-01", title: "Future case" },
-    ],
-  };
-  const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
-  runtime.api.getArchive = vi.fn().mockResolvedValue(archive);
-  render(
-    <RuntimeProvider runtime={runtime}>
-      <I18nProvider>
-        <ArchivePage enabled month="2026-08" onSelect={vi.fn()} onToday={vi.fn()} />
-      </I18nProvider>
-    </RuntimeProvider>,
-  );
-  expect(await screen.findByLabelText(label)).toHaveValue("2026-09");
-  expect(screen.getByText(title)).toBeInTheDocument();
-  expect(screen.getAllByRole("option")).toHaveLength(1);
-  expect(screen.queryByText("Legacy case")).not.toBeInTheDocument();
-  expect(screen.queryByText("Before launch")).not.toBeInTheDocument();
-  expect(screen.queryByText("Future case")).not.toBeInTheDocument();
-  expect(screen.getByText(since)).toBeInTheDocument();
-  expect(screen.getByText(completed)).toBeInTheDocument();
-  expect(document.querySelector(".archive-summary strong")).toHaveTextContent("1");
-});
+  {
+    locale: "en",
+    label: "Archive month",
+    title: "The first clue",
+    since: /Since 10 September 2026/,
+    completed: "0 completed",
+  },
+  {
+    locale: "ru",
+    label: "Месяц архива",
+    title: "Первая зацепка",
+    since: /С 10 сентября 2026/,
+    completed: "0 решено",
+  },
+  {
+    locale: "zh",
+    label: "档案月份",
+    title: "第一条线索",
+    since: /始于 2026年9月10日/,
+    completed: "已完成 0 道",
+  },
+])(
+  "shows the collection from September 10 in $locale, excluding legacy and future cases",
+  async ({ locale, label, title, since, completed }) => {
+    localStorage.setItem(localeStorageKey, locale);
+    const first = {
+      id: "first",
+      date: "2026-09-10",
+      slug: "first",
+      title: "The first clue",
+      puzzleCount: 1,
+      solvedPuzzles: 0,
+      completed: false,
+      localizations: { ru: { title: "Первая зацепка" }, zh: { title: "第一条线索" } },
+    };
+    const archive: ArchiveResponse = {
+      today: "2026-10-15",
+      startsOn: "2026-08-03",
+      cases: [
+        {
+          id: "legacy",
+          date: "2026-08-03",
+          slug: "legacy",
+          title: "Legacy case",
+          puzzleCount: 1,
+          solvedPuzzles: 1,
+          completed: true,
+        },
+        {
+          ...first,
+          id: "before-launch",
+          date: "2026-09-09",
+          title: "Before launch",
+          solvedPuzzles: 1,
+          completed: true,
+        },
+        first,
+        { ...first, id: "future", date: "2026-11-01", title: "Future case" },
+      ],
+    };
+    const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+    runtime.api.getArchive = vi.fn().mockResolvedValue(archive);
+    render(
+      <RuntimeProvider runtime={runtime}>
+        <I18nProvider>
+          <ArchivePage enabled month="2026-08" onSelect={vi.fn()} onToday={vi.fn()} />
+        </I18nProvider>
+      </RuntimeProvider>,
+    );
+    expect(await screen.findByLabelText(label)).toHaveValue("2026-09");
+    expect(screen.getByText(title)).toBeInTheDocument();
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.queryByText("Legacy case")).not.toBeInTheDocument();
+    expect(screen.queryByText("Before launch")).not.toBeInTheDocument();
+    expect(screen.queryByText("Future case")).not.toBeInTheDocument();
+    expect(screen.getByText(since)).toBeInTheDocument();
+    expect(screen.getByText(completed)).toBeInTheDocument();
+    expect(document.querySelector(".archive-summary strong")).toHaveTextContent("1");
+  },
+);
