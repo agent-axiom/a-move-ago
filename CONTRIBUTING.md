@@ -64,6 +64,11 @@ or another author unless its license permits redistribution and the
 provenance/license record is explicit. Production puzzles and the private
 production corpus are not accepted in this public repository.
 
+The sole production-content transport exception is an authenticated encrypted
+envelope at `ops/content-envelope.json`, handled by the main-only protected
+workflow described in [ops/README.md](ops/README.md). This permits opaque
+ciphertext only; plaintext puzzles, solutions, and private keys remain forbidden.
+
 ## Never commit
 
 - production puzzles or other private puzzle sources;

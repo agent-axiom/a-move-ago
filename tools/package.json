@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json",
     "content:import": "tsx src/content-import.ts",
+    "content:private": "tsx src/private-content.ts",
     "dev:seed": "tsx src/seed-local.ts",
     "render:wrangler": "tsx src/render-wrangler-config.ts",
     "test": "vitest run src",

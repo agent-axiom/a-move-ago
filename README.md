@@ -237,7 +237,9 @@ submit attempts, send Telegram proof, or print tokens or puzzle payloads. Each
 request has a ten-second timeout and redirects are rejected. A successful
 `/v1/healthz` alone does not establish that daily gameplay is available.
 
-The API workflow runs this check after deployment. The **Deployment health**
+The API workflow deploys from `main` through an explicit manual run or a reviewed
+change to `ops/api-release.json`. It uses the protected `production` environment
+and runs this check after deployment. The **Deployment health**
 workflow runs it daily at 00:31 UTC using the repository `API_ORIGIN` variable;
 it can also be run manually. If the web deployment changes origin, update its
 fixed origin in both workflows and `WEB_AUTH_RETURN_URL` in the config template.

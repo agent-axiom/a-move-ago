@@ -2,6 +2,10 @@ name: API
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ops/api-release.json"
 
 permissions:
   contents: read
