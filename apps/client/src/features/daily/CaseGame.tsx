@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
+import { localizedText, useI18n } from "../../i18n";
 import { PuzzleGame } from "../game/ui/PuzzleGame";
 import { StatsPanel } from "../stats/StatsPanel";
 import { nextUnsolvedIndex } from "./case-progress";
 import type { DailyCase } from "./use-daily-case";
 
 export function CaseGame({ daily, onToday }: { daily: DailyCase; onToday?: () => void }) {
+  const { locale, intlLocale, t } = useI18n();
+  const title = localizedText(daily, "title", locale);
   const [solved, setSolved] = useState<ReadonlySet<string>>(() => new Set(daily.solvedPuzzleIds));
   const puzzleIds = useMemo(() => daily.puzzles.map((puzzle) => puzzle.id), [daily.puzzles]);
   const index = nextUnsolvedIndex(puzzleIds, solved);
-  const dateLabel = new Intl.DateTimeFormat("en", {
+  const dateLabel = new Intl.DateTimeFormat(intlLocale, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -21,46 +24,46 @@ export function CaseGame({ daily, onToday }: { daily: DailyCase; onToday?: () =>
           <span className="completion-seal" aria-hidden="true">
             ✓
           </span>
-          <p className="eyebrow">A mystery, made clear</p>
-          <h1 id="case-title">{daily.title}</h1>
-          <p className="page-description">You saw what came before. Nicely reasoned.</p>
+          <p className="eyebrow">{t("shell.completeEyebrow")}</p>
+          <h1 id="case-title">{title}</h1>
+          <p className="page-description">{t("shell.completeDescription")}</p>
         </header>
         <StatsPanel />
         <div className="completion-next">
-          <span>A new mystery every day, at 00:00 UTC.</span>
+          <span>{t("shell.newMystery")}</span>
           {daily.date !== new Date().toISOString().slice(0, 10) ? (
             onToday ? (
               <button className="button-quiet" type="button" onClick={onToday}>
-                Back to today’s case <span aria-hidden="true">↗</span>
+                {t("shell.backTodayCase")} <span aria-hidden="true">↗</span>
               </button>
             ) : (
               <a href={window.location.pathname}>
-                Back to today’s case <span aria-hidden="true">↗</span>
+                {t("shell.backTodayCase")} <span aria-hidden="true">↗</span>
               </a>
             )
           ) : (
-            <span>Come back tomorrow for the next case.</span>
+            <span>{t("shell.comeTomorrow")}</span>
           )}
         </div>
       </section>
     );
   }
   const puzzle = daily.puzzles[index];
-  if (!puzzle) return <p role="alert">Case puzzle order is invalid.</p>;
+  if (!puzzle) return <p role="alert">{t("shell.invalidPuzzleOrder")}</p>;
   return (
     <section className="case-page" aria-labelledby="case-title">
       <header className="case-header">
         <div className="case-meta">
-          <p className="eyebrow">The daily case</p>
+          <p className="eyebrow">{t("shell.dailyCase")}</p>
           <time dateTime={daily.date}>{dateLabel}</time>
         </div>
         <div className="case-title-row">
-          <h1 id="case-title">{daily.title}</h1>
+          <h1 id="case-title">{title}</h1>
           <p className="case-progress">
-            Act {index + 1} of {daily.puzzles.length}
+            {t("shell.act", { current: index + 1, total: daily.puzzles.length })}
           </p>
         </div>
-        <p className="case-tagline">The move is over. The mystery is yours.</p>
+        <p className="case-tagline">{t("shell.tagline")}</p>
       </header>
       <PuzzleGame
         caseId={daily.id}

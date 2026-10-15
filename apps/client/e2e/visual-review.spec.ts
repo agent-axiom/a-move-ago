@@ -126,3 +126,51 @@ test("archive remains readable on desktop and mobile", async ({ page }, info) =>
     await checkLayout(page);
   }
 });
+
+for (const locale of ["ru", "zh"] as const) {
+  const labels = locale === "ru"
+    ? { archiveButton: "Архив", archive: "Архив задач",
+        progress: "Прогресс", statistics: "Статистика" }
+    : { archiveButton: "档案", archive: "谜题档案",
+        progress: "进度", statistics: "统计" };
+  test(`${locale} daily, archive and progress remain readable on desktop and small phones`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await installApiMock(page, { archive: true });
+    await page.goto("./?case=2026-09-10");
+    await page.getByLabel("Language", { exact: true }).selectOption(locale);
+    await expect(page.getByRole("heading", {
+      name: locale === "ru" ? "Тихое начало" : "安静的开始", exact: true,
+    })).toBeVisible();
+    await capture(page, info, `${locale}-desktop-daily`);
+    await checkLayout(page);
+    await expect(page.getByRole("button", { name: "Check move", exact: true })).toHaveCount(0);
+    for (const width of [320, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      await checkLayout(page);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await capture(page, info, `${locale}-mobile-daily`);
+
+    await page.getByRole("button", { name: labels.archiveButton, exact: true }).click();
+    await expect(page.getByRole("heading", { name: labels.archive, exact: true })).toBeVisible();
+    await page.locator("select").filter({ has: page.locator('option[value="2026-09"]') }).selectOption("2026-09");
+    await capture(page, info, `${locale}-mobile-archive`);
+    await checkLayout(page);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await checkLayout(page);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await capture(page, info, `${locale}-desktop-archive`);
+    await checkLayout(page);
+
+    await page.getByRole("button", { name: labels.progress, exact: true }).click();
+    await expect(page.getByRole("heading", { name: labels.statistics, exact: true })).toBeVisible();
+    await capture(page, info, `${locale}-desktop-progress`);
+    await checkLayout(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await capture(page, info, `${locale}-mobile-progress`);
+    await checkLayout(page);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await checkLayout(page);
+  });
+}

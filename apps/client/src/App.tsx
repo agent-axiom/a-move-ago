@@ -11,6 +11,8 @@ import { SessionProvider, useSession } from "./features/session/SessionProvider"
 import type { Me } from "./features/session/session-state";
 import { StatsPanel } from "./features/stats/StatsPanel";
 import { BrandMark } from "./shared/BrandMark";
+import { I18nProvider, LanguageSwitcher, localizedSystemMessage, useI18n } from "./i18n";
+import "./i18n/language.css";
 import "./features/archive/archive.css";
 
 const runtimeIds = new WeakMap<object, number>();
@@ -32,6 +34,7 @@ function sessionIdentity(runtime: object, me: Me | null): string {
 }
 
 function AppContent() {
+  const { locale, intlLocale, t } = useI18n();
   const runtime = useRuntime();
   const { state } = useSession();
   const { navigation, dispatch } = useAppNavigation();
@@ -54,16 +57,16 @@ function AppContent() {
   if (state.tag === "fatal") {
     content = (
       <section className="state-panel" aria-labelledby="startup-error-heading">
-        <p className="eyebrow">A moment before the next move</p>
-        <h1 id="startup-error-heading">Startup unavailable</h1>
-        <p role="alert">{state.message}</p>
+        <p className="eyebrow">{t("shell.startupEyebrow")}</p>
+        <h1 id="startup-error-heading">{t("shell.startupUnavailable")}</h1>
+        <p role="alert">{localizedSystemMessage(state.message, locale, t)}</p>
         {state.requestId ? (
           <p>
-            Request ID: <code>{state.requestId}</code>
+            {t("shell.requestId")} <code>{state.requestId}</code>
           </p>
         ) : null}
         <button type="button" onClick={() => window.location.reload()}>
-          Retry startup
+          {t("shell.retryStartup")}
         </button>
       </section>
     );
@@ -71,11 +74,11 @@ function AppContent() {
     content = (
       <section className="profile-page" aria-labelledby="profile-heading">
         <header className="page-heading">
-          <p className="eyebrow">Your chess journal</p>
-          <h1 id="profile-heading">Progress</h1>
-          <p className="page-description">Good discoveries deserve to be remembered.</p>
+          <p className="eyebrow">{t("shell.journal")}</p>
+          <h1 id="profile-heading">{t("shell.progress")}</h1>
+          <p className="page-description">{t("shell.progressDescription")}</p>
         </header>
-        {sessionReady ? <StatsPanel refreshKey={identity} title="Statistics" /> : null}
+        {sessionReady ? <StatsPanel refreshKey={identity} title={t("shell.statistics")} /> : null}
         <div className="profile-connection">
           <span className="connection-mark" aria-hidden="true">
             {me?.kind === "telegram" ? "✓" : "↗"}
@@ -83,13 +86,13 @@ function AppContent() {
           <div className="profile-connection-copy">
             <h2>
               {me?.kind === "telegram"
-                ? `Connected as ${me.profile.displayName}`
-                : "Playing as a guest"}
+                ? t("shell.connectedAs", { name: me.profile.displayName })
+                : t("shell.guest")}
             </h2>
             <p>
               {me?.kind === "telegram"
-                ? "Your discoveries follow you across devices."
-                : "No account needed. Connect Telegram to keep your progress across devices."}
+                ? t("shell.connectedDescription")
+                : t("shell.guestDescription")}
             </p>
             <SaveProgressButton />
           </div>
@@ -112,9 +115,9 @@ function AppContent() {
     content = (
       <>
         {caseDate ? (
-          <section className="archive-case-context" aria-label="Selected archive case">
+          <section className="archive-case-context" aria-label={t("shell.selectedArchive")}>
             <p>
-              From the archive · <time dateTime={caseDate}>{archiveDateLabel(caseDate)}</time>
+              {t("shell.fromArchive")} · <time dateTime={caseDate}>{archiveDateLabel(caseDate, intlLocale)}</time>
             </p>
             <div>
               <button
@@ -122,10 +125,10 @@ function AppContent() {
                 type="button"
                 onClick={() => dispatch({ type: "push", screen: { name: "archive" } })}
               >
-                Browse archive
+                {t("shell.browseArchive")}
               </button>
               <button className="button-secondary" type="button" onClick={showToday}>
-                Back to today
+                {t("shell.backToday")}
               </button>
             </div>
           </section>
@@ -144,24 +147,24 @@ function AppContent() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
-        Skip to content
+        {t("shell.skip")}
       </a>
       <header className="app-header">
         <div className="brand">
           <BrandMark />
           <div>
             <strong className="brand-wordmark">A MOVE AGO</strong>
-            <span className="brand-caption">A daily chess mystery</span>
+            <span className="brand-caption">{t("shell.caption")}</span>
           </div>
         </div>
-        <nav className="app-nav" aria-label="Main navigation">
+        <nav className="app-nav" aria-label={t("shell.mainNavigation")}>
           {screen.name === "profile" ? (
             <button
               className="button-quiet nav-button"
               type="button"
               onClick={() => dispatch({ type: "back" })}
             >
-              {navigation.stack.at(-2)?.name === "archive" ? "Back to archive" : "Back to case"}
+              {navigation.stack.at(-2)?.name === "archive" ? t("shell.backArchive") : t("shell.backCase")}
             </button>
           ) : (
             <button
@@ -170,7 +173,7 @@ function AppContent() {
               disabled={!sessionReady}
               onClick={() => dispatch({ type: "push", screen: { name: "profile" } })}
             >
-              Progress <span aria-hidden="true">↗</span>
+              {t("shell.progress")} <span aria-hidden="true">↗</span>
             </button>
           )}
           <button
@@ -183,33 +186,33 @@ function AppContent() {
                 dispatch({ type: "push", screen: { name: "archive" } });
             }}
           >
-            Archive
+            {t("shell.archive")}
           </button>
+          <LanguageSwitcher />
           <details className="how-to-play">
-            <summary aria-label="How to play">
+            <summary aria-label={t("shell.howToPlay")}>
               <span className="help-icon" aria-hidden="true">
                 ?
               </span>
-              <span className="help-label">How to play</span>
+              <span className="help-label">{t("shell.howToPlay")}</span>
             </summary>
             <div className="help-panel">
-              <p className="eyebrow">A different way to play</p>
-              <h2>Think one move back.</h2>
-              <p>The last move has already happened. Can you work out what it was?</p>
+              <p className="eyebrow">{t("shell.helpEyebrow")}</p>
+              <h2>{t("shell.helpTitle")}</h2>
+              <p>{t("shell.helpIntro")}</p>
               <ol>
                 <li>
-                  <strong>Choose a piece.</strong> Pick a piece of the side that moved last.
+                  <strong>{t("shell.helpChoose")}</strong> {t("shell.helpChooseText")}
                 </li>
                 <li>
-                  <strong>Move it back.</strong> Choose the empty square it came from.
+                  <strong>{t("shell.helpMove")}</strong> {t("shell.helpMoveText")}
                 </li>
                 <li>
-                  <strong>Complete the story.</strong> Restore a capture or choose a special move,
-                  then check your move.
+                  <strong>{t("shell.helpComplete")}</strong> {t("shell.helpCompleteText")}
                 </li>
               </ol>
               <p className="help-note">
-                Tap or use the arrow keys and Enter. Take your time — there is no clock.
+                {t("shell.helpNote")}
               </p>
             </div>
           </details>
@@ -219,15 +222,15 @@ function AppContent() {
         {content}
       </main>
       <footer className="app-footer">
-        <span>A new perspective, every day.</span>
+        <span>{t("shell.footer")}</span>
         <div>
-          <span>New case at 00:00 UTC</span>
+          <span>{t("shell.newCaseTime")}</span>
           <a
             href="https://github.com/agent-axiom/a-move-ago/blob/main/PRIVACY.md"
             target="_blank"
             rel="noreferrer"
           >
-            Privacy
+            {t("shell.privacy")}
           </a>
         </div>
       </footer>
@@ -238,8 +241,10 @@ function AppContent() {
 export function App() {
   const runtime = useRuntime();
   return (
-    <SessionProvider key={runtimeId(runtime)}>
-      <AppContent />
-    </SessionProvider>
+    <I18nProvider>
+      <SessionProvider key={runtimeId(runtime)}>
+        <AppContent />
+      </SessionProvider>
+    </I18nProvider>
   );
 }

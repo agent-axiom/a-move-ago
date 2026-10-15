@@ -1,9 +1,11 @@
+import { useI18n } from "../../i18n";
 import { useStats } from "./use-stats";
 
 export function StatsPanel(props: { title?: string; refreshKey?: string }) {
-  const { title = "Case complete", refreshKey = "default" } = props;
+  const { t } = useI18n();
+  const { title = t("shell.caseComplete"), refreshKey = "default" } = props;
   const { state, retry } = useStats(true, refreshKey);
-  if (state.tag === "loading") return <p role="status">Updating statistics…</p>;
+  if (state.tag === "loading") return <p role="status">{t("shell.statsLoading")}</p>;
   if (state.tag === "error") {
     const requestId = "requestId" in state.failure ? state.failure.requestId : null;
     const reload = state.failure.kind === "auth" || state.failure.kind === "contract";
@@ -11,23 +13,23 @@ export function StatsPanel(props: { title?: string; refreshKey?: string }) {
       <section>
         <p role="alert">
           {state.failure.kind === "auth"
-            ? "The guest session expired. Restart to continue."
+            ? t("shell.statsAuth")
             : state.failure.kind === "contract"
-              ? "This version could not read the statistics response. Reload to continue."
-              : "Statistics could not be refreshed."}
+              ? t("shell.statsContract")
+              : t("shell.statsFailure")}
         </p>
         {requestId ? (
           <p>
-            Request ID: <code>{requestId}</code>
+            {t("shell.requestId")} <code>{requestId}</code>
           </p>
         ) : null}
         {reload ? (
           <button type="button" onClick={() => window.location.reload()}>
-            {state.failure.kind === "auth" ? "Restart guest session" : "Reload application"}
+            {state.failure.kind === "auth" ? t("shell.restartGuest") : t("shell.reload")}
           </button>
         ) : (
           <button type="button" onClick={retry}>
-            Retry statistics
+            {t("shell.retryStats")}
           </button>
         )}
       </section>
@@ -38,26 +40,26 @@ export function StatsPanel(props: { title?: string; refreshKey?: string }) {
       <h2 id="stats-heading">{title}</h2>
       <dl className="stats-grid">
         <div className="stat-tile stat-tile-accent">
-          <dt>Current streak</dt>
+          <dt>{t("shell.currentStreak")}</dt>
           <dd>{state.stats.currentStreak}</dd>
-          <span>{state.stats.currentStreak === 1 ? "day of discovery" : "days of discovery"}</span>
+          <span>{t("shell.discoveryDays", { count: state.stats.currentStreak })}</span>
         </div>
         <div className="stat-tile">
-          <dt>Best streak</dt>
+          <dt>{t("shell.bestStreak")}</dt>
           <dd>{state.stats.bestStreak}</dd>
-          <span>{state.stats.bestStreak === 1 ? "day in a row" : "days in a row"}</span>
+          <span>{t("shell.consecutiveDays", { count: state.stats.bestStreak })}</span>
         </div>
         <div className="stat-tile">
-          <dt>Solved puzzles</dt>
+          <dt>{t("shell.solvedPuzzles")}</dt>
           <dd>{state.stats.solvedPuzzles}</dd>
           <span>
-            {state.stats.solvedPuzzles === 1 ? "mystery made clear" : "mysteries made clear"}
+            {t("shell.mysteriesClear", { count: state.stats.solvedPuzzles })}
           </span>
         </div>
         <div className="stat-tile">
-          <dt>Hints used</dt>
+          <dt>{t("shell.hintsUsed")}</dt>
           <dd>{state.stats.hintsUsed}</dd>
-          <span>A little nudge, when needed</span>
+          <span>{t("shell.hintNudge")}</span>
         </div>
       </dl>
     </section>

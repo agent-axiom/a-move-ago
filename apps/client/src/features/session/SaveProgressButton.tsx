@@ -1,6 +1,8 @@
+import { localizedSystemMessage, useI18n } from "../../i18n";
 import { useSession } from "./SessionProvider";
 
 export function SaveProgressButton() {
+  const { locale, t } = useI18n();
   const { state, save, retryHandoff } = useSession();
   if (state.tag === "ready" && state.me.kind === "telegram") return null;
   const disabled =
@@ -16,17 +18,17 @@ export function SaveProgressButton() {
         }}
       >
         {state.tag === "authenticating"
-          ? "Connecting…"
+          ? t("shell.connecting")
           : state.tag === "handoff-retry"
-            ? "Retry Telegram return"
-            : "Save progress with Telegram"}
+            ? t("shell.retryTelegram")
+            : t("shell.saveTelegram")}
       </button>
       {state.tag === "auth-error" || state.tag === "handoff-retry" ? (
-        <p role="alert">{state.message}</p>
+        <p role="alert">{localizedSystemMessage(state.message, locale, t)}</p>
       ) : null}
       {state.tag === "auth-error" && state.requestId ? (
         <p>
-          Request ID: <code>{state.requestId}</code>
+          {t("shell.requestId")} <code>{state.requestId}</code>
         </p>
       ) : null}
     </div>

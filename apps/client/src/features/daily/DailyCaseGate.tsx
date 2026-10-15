@@ -1,20 +1,21 @@
 import type { ReactNode } from "react";
+import { type Translate, useI18n } from "../../i18n";
 import { type DailyCase, useDailyCase } from "./use-daily-case";
 
-function message(kind: "offline" | "auth" | "rate-limit" | "content" | "server" | "contract") {
+function message(kind: "offline" | "auth" | "rate-limit" | "content" | "server" | "contract", t: Translate) {
   switch (kind) {
     case "offline":
-      return "You appear to be offline. Your board has not been submitted.";
+      return t("shell.dailyOffline");
     case "auth":
-      return "The guest session expired. Reload to start a new guest session.";
+      return t("shell.dailyAuth");
     case "rate-limit":
-      return "Too many requests. Wait a moment and retry.";
+      return t("shell.dailyRateLimit");
     case "content":
-      return "There is no published case for this date.";
+      return t("shell.dailyContent");
     case "contract":
-      return "The case response was not understood.";
+      return t("shell.dailyContract");
     case "server":
-      return "The case service is temporarily unavailable.";
+      return t("shell.dailyServer");
   }
 }
 
@@ -23,13 +24,14 @@ export function DailyCaseGate(props: {
   caseDate: string | null;
   children(daily: DailyCase): ReactNode;
 }) {
+  const { t } = useI18n();
   const { state, retry } = useDailyCase(props.enabled, props.caseDate);
   if (state.tag === "idle" || state.tag === "loading") {
     return (
-      <section className="loading-case" aria-label="Loading case">
-        <p className="eyebrow">A daily chess mystery</p>
+      <section className="loading-case" aria-label={t("shell.loadingCase")}>
+        <p className="eyebrow">{t("shell.caption")}</p>
         <p className="loading-title" role="status">
-          {props.caseDate ? "Opening the selected case…" : "Loading today’s case…"}
+          {props.caseDate ? t("shell.openingSelected") : t("shell.loadingToday")}
         </p>
         <div className="loading-layout" aria-hidden="true">
           <div className="loading-board" />
@@ -46,25 +48,25 @@ export function DailyCaseGate(props: {
     const requestId = "requestId" in state.failure ? state.failure.requestId : undefined;
     return (
       <section className="state-panel" aria-labelledby="daily-error-heading">
-        <p className="eyebrow">Pause for a moment</p>
-        <h1 id="daily-error-heading">Case unavailable</h1>
-        <p role="alert">{message(state.failure.kind)}</p>
+        <p className="eyebrow">{t("shell.pause")}</p>
+        <h1 id="daily-error-heading">{t("shell.caseUnavailable")}</h1>
+        <p role="alert">{message(state.failure.kind, t)}</p>
         {requestId ? (
           <p>
-            Request ID: <code>{requestId}</code>
+            {t("shell.requestId")} <code>{requestId}</code>
           </p>
         ) : null}
         {state.failure.kind === "auth" ? (
           <button type="button" onClick={() => window.location.reload()}>
-            Restart guest session
+            {t("shell.restartGuest")}
           </button>
         ) : state.failure.kind === "contract" ? (
           <button type="button" onClick={() => window.location.reload()}>
-            Reload application
+            {t("shell.reload")}
           </button>
         ) : (
           <button type="button" onClick={retry}>
-            Retry case
+            {t("shell.retryCase")}
           </button>
         )}
       </section>

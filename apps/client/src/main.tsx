@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { createBrowserRuntime, RuntimeProvider } from "./app/runtime";
+import { intlLocales, readPreferredLocale, translate } from "./i18n";
 import "./styles/base.css";
 
 const loadAndroid =
@@ -28,9 +29,11 @@ async function main() {
   );
 }
 
-void main().catch((error: unknown) => {
+void main().catch(() => {
   const element = document.getElementById("root");
   if (element) {
-    element.textContent = error instanceof Error ? error.message : "App startup failed.";
+    const locale = readPreferredLocale();
+    document.documentElement.lang = intlLocales[locale];
+    element.textContent = translate(locale, "shell.startupUnavailable");
   }
 });

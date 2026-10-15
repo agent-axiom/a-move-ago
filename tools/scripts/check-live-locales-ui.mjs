@@ -1,0 +1,111 @@
+import assert from "node:assert/strict";
+import { chromium } from "@playwright/test";
+
+const pageUrl = `https://agent-axiom.github.io/a-move-ago/?case=2026-09-10&release=${encodeURIComponent(process.env.GITHUB_SHA ?? "current")}`;
+let stage = "START";
+let browser;
+try {
+  browser = await chromium.launch();
+  // Navigator preference intentionally differs from the required English default.
+  const context = await browser.newContext({ locale: "zh-CN", viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  page.setDefaultTimeout(15_000);
+  let attempts = 0;
+  let dailyRequests = 0;
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (request.method() === "POST" && path.startsWith("/v1/attempts")) attempts += 1;
+    if (request.method() === "GET" && path === "/v1/daily") dailyRequests += 1;
+  });
+  function language() {
+    return page.locator("select").filter({ has: page.getByRole("option", { name: "English", exact: true }) });
+  }
+  async function layout() {
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+      const tooSmall = await page.locator("button, select, a[href]").evaluateAll((elements) =>
+        elements.some((element) => {
+          if (element.closest(".chessboard")) return false;
+          const rect = element.getBoundingClientRect();
+          const style = window.getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" &&
+            (rect.width < 44 || rect.height < 44);
+        }));
+      assert.equal(tooSmall, false);
+    }
+  }
+  stage = "ENGLISH_DEFAULT";
+  await page.goto(pageUrl, { waitUntil: "domcontentloaded" });
+  await page.getByRole("grid").waitFor();
+  assert.equal(await page.locator("html").getAttribute("lang"), "en");
+  assert.equal(await language().inputValue(), "en");
+  assert.deepEqual(await language().locator("option").allTextContents(), ["English", "Русский", "中文"]);
+  await page.getByRole("button", { name: "Check move", exact: true }).waitFor();
+  const originalTitle = await page.locator("h1").innerText();
+  const originalDailyRequests = dailyRequests;
+  await layout();
+
+  stage = "RUSSIAN_CASE";
+  await language().selectOption("ru");
+  await page.getByRole("button", { name: "Проверить ход", exact: true }).waitFor();
+  assert.equal(await page.locator("html").getAttribute("lang"), "ru");
+  assert.match(await page.locator("h1").innerText(), /\p{Script=Cyrillic}/u);
+  assert.equal(new URL(page.url()).searchParams.get("case"), "2026-09-10");
+  assert.equal(dailyRequests, originalDailyRequests);
+  await layout();
+  stage = "RUSSIAN_PROGRESS";
+  await page.getByRole("button", { name: "Прогресс", exact: true }).click();
+  await page.getByRole("heading", { name: "Статистика", exact: true }).waitFor();
+  await layout();
+
+  stage = "CHINESE_PROGRESS";
+  await language().selectOption("zh");
+  await page.getByRole("heading", { name: "统计", exact: true }).waitFor();
+  assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN");
+  await layout();
+  await page.getByRole("button", { name: "返回谜题", exact: true }).click();
+  await page.getByRole("button", { name: "检查走法", exact: true }).waitFor();
+  assert.match(await page.locator("h1").innerText(), /\p{Script=Han}/u);
+  assert.equal(new URL(page.url()).searchParams.get("case"), "2026-09-10");
+  await layout();
+  stage = "PERSISTED_CHINESE";
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "检查走法", exact: true }).waitFor();
+  assert.equal(await language().inputValue(), "zh");
+  assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN");
+
+  stage = "CHINESE_ARCHIVE";
+  await page.getByRole("button", { name: "档案", exact: true }).click();
+  await page.getByRole("heading", { name: "谜题档案", exact: true }).waitFor();
+  await page.getByLabel("档案月份", { exact: true }).selectOption("2026-09");
+  await page.locator('.archive-cases time[datetime="2026-09-10"]').waitFor();
+  assert.match(await page.locator(".archive-cases").innerText(), /\p{Script=Han}/u);
+  await layout();
+  stage = "RUSSIAN_ARCHIVE";
+  await language().selectOption("ru");
+  await page.getByRole("heading", { name: "Архив задач", exact: true }).waitFor();
+  assert.equal(await page.getByLabel("Месяц архива", { exact: true }).inputValue(), "2026-09");
+  assert.match(await page.locator(".archive-cases").innerText(), /\p{Script=Cyrillic}/u);
+  await layout();
+  stage = "ENGLISH_RESTORED";
+  await language().selectOption("en");
+  await page.getByRole("heading", { name: "The archive", exact: true }).waitFor();
+  await page.locator(".archive-cases li").filter({
+    has: page.locator('time[datetime="2026-09-10"]'),
+  }).getByRole("button").click();
+  await page.getByRole("grid").waitFor();
+  assert.equal(await page.locator("h1").innerText(), originalTitle);
+  assert.equal(attempts, 0);
+  // No traces, screenshots, response bodies, puzzle text or storage are exported.
+  console.log(JSON.stringify({
+    ok: true, locales: ["en", "ru", "zh"], englishDefault: true,
+    selectedDatePreserved: true, persistedChoice: true, archiveAndProgress: true,
+    viewports: [320, 390, 1440], submittedAttempts: attempts,
+  }));
+} catch {
+  console.error(JSON.stringify({ ok: false, code: `LIVE_LOCALES_UI_${stage}_FAILED` }));
+  process.exitCode = 1;
+} finally {
+  await browser?.close();
+}

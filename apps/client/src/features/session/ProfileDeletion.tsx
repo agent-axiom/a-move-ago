@@ -1,5 +1,6 @@
 import { ApiError } from "@a-move-ago/api-contract";
 import { useEffect, useRef, useState } from "react";
+import { localizedSystemMessage, useI18n } from "../../i18n";
 import { useSession } from "./SessionProvider";
 
 type DeletionView =
@@ -39,6 +40,7 @@ function classifyFailure(error: unknown): Extract<DeletionView, { tag: "error" }
 }
 
 export function ProfileDeletion() {
+  const { locale, t } = useI18n();
   const { state, deleteProfile } = useSession();
   const [view, setView] = useState<DeletionView>({ tag: "closed" });
   const openerRef = useRef<HTMLButtonElement>(null);
@@ -89,7 +91,7 @@ export function ProfileDeletion() {
     return (
       <div className="profile-deletion">
         <p ref={successRef} role="status" tabIndex={-1}>
-          Telegram profile deleted. You are now playing as a guest.
+          {t("shell.deleted")}
         </p>
       </div>
     );
@@ -112,7 +114,7 @@ export function ProfileDeletion() {
           setView(expanded ? { tag: "closed" } : { tag: "confirming" });
         }}
       >
-        Delete Telegram profile
+        {t("shell.deleteProfile")}
       </button>
       {expanded ? (
         <section
@@ -122,28 +124,26 @@ export function ProfileDeletion() {
           aria-describedby={warningId}
         >
           <h2 ref={headingRef} id={headingId} tabIndex={-1}>
-            Delete Telegram profile?
+            {t("shell.deleteProfileQuestion")}
           </h2>
           <p id={warningId}>
-            This permanently deletes your A MOVE AGO Telegram profile and all saved attempts, hints,
-            and statistics on every device. It does not delete your Telegram account. This cannot be
-            undone.
+            {t("shell.deleteWarning")}
           </p>
-          {pending ? <p role="status">Deleting Telegram profile…</p> : null}
+          {pending ? <p role="status">{t("shell.deletingProfile")}</p> : null}
           {visibleView.tag === "error" ? (
             <>
               <p role="alert">
-                {visibleView.message}
+                {localizedSystemMessage(visibleView.message, locale, t)}
                 {visibleView.requestId ? (
                   <>
                     {" "}
-                    Request ID: <code>{visibleView.requestId}</code>
+                    {t("shell.requestId")} <code>{visibleView.requestId}</code>
                   </>
                 ) : null}
               </p>
               {visibleView.reloadToReauthenticate ? (
                 <button type="button" onClick={() => window.location.reload()}>
-                  Reload to sign in again
+                  {t("shell.reloadSignIn")}
                 </button>
               ) : null}
             </>
@@ -157,7 +157,7 @@ export function ProfileDeletion() {
                 setView({ tag: "closed" });
               }}
             >
-              Cancel
+              {t("shell.cancel")}
             </button>
             <button
               type="button"
@@ -165,7 +165,7 @@ export function ProfileDeletion() {
               disabled={pending}
               onClick={() => void confirmDeletion()}
             >
-              {pending ? "Deleting…" : "Delete permanently"}
+              {pending ? t("shell.deleting") : t("shell.deletePermanently")}
             </button>
           </div>
         </section>
