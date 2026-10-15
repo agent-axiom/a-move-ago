@@ -962,7 +962,7 @@ describe("POST /v1/attempts", () => {
     const first = await postAttempt(issued.token, correctRequest());
     expect(first.response.status).toBe(201);
     const collidingId = AttemptResultSchema.parse(first.body).id;
-    vi.spyOn(crypto, "randomUUID").mockReturnValue(collidingId);
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(collidingId as ReturnType<Crypto["randomUUID"]>);
 
     const collision = await postAttempt(issued.token, correctRequest());
 

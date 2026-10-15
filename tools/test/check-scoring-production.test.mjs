@@ -372,7 +372,11 @@ test("scoring checker masks transport, payload, pricing, persistence and idempot
       },
       "API_CORS_FAILED",
     ],
-    ["HTTP", (_r, _p, _s, h) => new Response(secret, { status: 500, headers: h }), "API_HTTP_FAILED"],
+    [
+      "HTTP",
+      (_r, _p, _s, h) => new Response(secret, { status: 500, headers: h }),
+      "API_HTTP_FAILED",
+    ],
     ["JSON", (_r, _p, s, h) => new Response(secret, { status: s, headers: h }), "API_INVALID_JSON"],
     [
       "fresh private fields",
