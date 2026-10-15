@@ -13,16 +13,8 @@ import whiteKnight from "../../../assets/pieces/wN.svg";
 import whitePawn from "../../../assets/pieces/wP.svg";
 import whiteQueen from "../../../assets/pieces/wQ.svg";
 import whiteRook from "../../../assets/pieces/wR.svg";
+import { useI18n } from "../../../i18n";
 import { type BoardOrientation, nextFocus, squareAt } from "./board-order";
-
-const names = {
-  p: "pawn",
-  n: "knight",
-  b: "bishop",
-  r: "rook",
-  q: "queen",
-  k: "king",
-} as const;
 
 const pieces: Record<string, string> = {
   wp: whitePawn,
@@ -39,10 +31,6 @@ const pieces: Record<string, string> = {
   bk: blackKing,
 };
 
-function pieceLabel(piece: Piece | undefined): string {
-  return piece ? `${piece.color === "w" ? "white" : "black"} ${names[piece.type]}` : "empty";
-}
-
 export function Chessboard(props: {
   board: Board;
   orientation: BoardOrientation;
@@ -52,8 +40,13 @@ export function Chessboard(props: {
   label: string;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const [active, setActive] = useState(0);
   const cells = useRef<Array<HTMLButtonElement | null>>([]);
+
+  function pieceLabel(piece: Piece | undefined): string {
+    return piece ? t(`game.piece.${piece.color}${piece.type}`) : t("game.empty");
+  }
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const next = nextFocus(index, event.key);

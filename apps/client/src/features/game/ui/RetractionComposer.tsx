@@ -1,16 +1,11 @@
 import type { Color, Retraction } from "@a-move-ago/api-contract";
 import { type FenState, serializeFen } from "@a-move-ago/game-core";
 import { type ReactNode, useReducer, useState } from "react";
+import { useI18n } from "../../../i18n";
 import { buildPreview, type CapturePieceType, draftReducer, initialDraft } from "../model/draft";
 import { Chessboard } from "./Chessboard";
 
-const captureOptions: ReadonlyArray<{ value: CapturePieceType; label: string }> = [
-  { value: "p", label: "Pawn" },
-  { value: "n", label: "Knight" },
-  { value: "b", label: "Bishop" },
-  { value: "r", label: "Rook" },
-  { value: "q", label: "Queen" },
-];
+const captureOptions: ReadonlyArray<CapturePieceType> = ["p", "n", "b", "r", "q"];
 
 interface RetractionComposerProps {
   post: FenState;
@@ -27,6 +22,7 @@ export function RetractionComposer(props: RetractionComposerProps) {
 }
 
 function RetractionComposerForm(props: RetractionComposerProps) {
+  const { t } = useI18n();
   const [draft, dispatch] = useReducer(
     (
       state: typeof initialDraft | ReturnType<typeof draftReducer>,
@@ -35,17 +31,19 @@ function RetractionComposerForm(props: RetractionComposerProps) {
     initialDraft,
   );
   const [view, setView] = useState<"now" | "before">("now");
-  const preview = buildPreview(props.post, props.retractingColor, draft);
+  const preview = buildPreview(props.post, props.retractingColor, draft, (code) =>
+    t(`game.preview.${code}`),
+  );
   const showingPreview = view === "before" && preview.ok;
   const selectedSquare = draft.tag === "select-current" ? null : draft.currentSquare;
   const previousSquare = draft.tag === "configure" ? draft.previousSquare : null;
   const step = draft.tag === "select-current" ? 1 : draft.tag === "select-previous" ? 2 : 3;
   const instruction =
     step === 1
-      ? "Choose the piece that moved last."
+      ? t("game.instruction.piece")
       : step === 2
-        ? "Choose the square it came from."
-        : "Add any capture or special move, then check your reconstruction.";
+        ? t("game.instruction.square")
+        : t("game.instruction.details");
 
   return (
     <section className="retraction-workspace" aria-labelledby="retraction-heading">
@@ -54,11 +52,11 @@ function RetractionComposerForm(props: RetractionComposerProps) {
         <div className="board-toolbar">
           <span className="last-move-label">
             <span className={`side-marker side-marker-${props.retractingColor}`} />
-            {props.retractingColor === "w" ? "White" : "Black"} moved last
+            {t(`game.lastMove.${props.retractingColor}`)}
           </span>
-          <fieldset className="board-view-switch" aria-label="Board view">
+          <fieldset className="board-view-switch" aria-label={t("game.boardView")}>
             <button type="button" aria-pressed={!showingPreview} onClick={() => setView("now")}>
-              Now
+              {t("game.now")}
             </button>
             <button
               type="button"
@@ -66,7 +64,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
               disabled={!preview.ok}
               onClick={() => setView("before")}
             >
-              Before
+              {t("game.before")}
             </button>
           </fieldset>
         </div>
@@ -74,26 +72,22 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           board={showingPreview && preview.ok ? preview.previous.board : props.post.board}
           disabled={props.disabled || showingPreview}
           destinationSquare={previousSquare}
-          label={
-            showingPreview
-              ? "Your reconstruction, read-only preview"
-              : "Interactive retraction board"
-          }
+          label={showingPreview ? t("game.board.preview") : t("game.board.interactive")}
           onSelect={(square) => dispatch({ type: "select-square", square })}
           orientation={props.retractingColor === "w" ? "white" : "black"}
           selectedSquare={selectedSquare}
         />
         <p className="board-caption" aria-live="polite">
-          {showingPreview ? "Your reconstruction · switch to Now to edit" : instruction}
+          {showingPreview ? t("game.preview.caption") : instruction}
         </p>
       </div>
       <div className="retraction-panel">
         <div className="composer-heading">
-          <p className="game-eyebrow">Your move, in reverse</p>
-          <h2 id="retraction-heading">Reconstruct the move</h2>
+          <p className="game-eyebrow">{t("game.reverseEyebrow")}</p>
+          <h2 id="retraction-heading">{t("game.reconstruct")}</h2>
         </div>
-        <ol className="retraction-steps" aria-label="Reconstruction steps">
-          {["Choose a piece", "Choose its previous square", "Add the details"].map(
+        <ol className="retraction-steps" aria-label={t("game.steps")}>
+          {(["game.step.piece", "game.step.square", "game.step.details"] as const).map(
             (label, index) => (
               <li
                 aria-current={step === index + 1 ? "step" : undefined}
@@ -103,32 +97,32 @@ function RetractionComposerForm(props: RetractionComposerProps) {
                 <span aria-hidden="true" className="step-number">
                   {index + 1}
                 </span>
-                <span>{label}</span>
+                <span>{t(label)}</span>
               </li>
             ),
           )}
         </ol>
         <p className="composer-instruction">{instruction}</p>
         {draft.tag === "configure" ? (
-          <output className="move-summary" aria-label="Selected retraction">
+          <output className="move-summary" aria-label={t("game.selected")}>
             <span>{draft.currentSquare}</span>
             <span aria-hidden="true" className="move-arrow">
               →
             </span>
-            <span className="sr-only">back to</span>
+            <span className="sr-only">{t("game.backTo")}</span>
             <span>{draft.previousSquare}</span>
-            <small>one move ago</small>
+            <small>{t("game.oneMoveAgo")}</small>
           </output>
         ) : null}
         <fieldset
           className="retraction-details"
           disabled={props.disabled || draft.tag !== "configure"}
         >
-          <legend>Move details</legend>
+          <legend>{t("game.details")}</legend>
           <label>
-            Special move
+            {t("game.special")}
             <select
-              aria-label="Special move"
+              aria-label={t("game.special")}
               onChange={(event) =>
                 dispatch({
                   type: "set-special",
@@ -137,17 +131,17 @@ function RetractionComposerForm(props: RetractionComposerProps) {
               }
               value={draft.tag === "configure" ? draft.special : "normal"}
             >
-              <option value="normal">Normal move</option>
-              <option value="castle-kingside">Castle kingside</option>
-              <option value="castle-queenside">Castle queenside</option>
-              <option value="en-passant">En passant</option>
-              <option value="unpromotion">Reverse promotion</option>
+              <option value="normal">{t("game.special.normal")}</option>
+              <option value="castle-kingside">{t("game.special.kingside")}</option>
+              <option value="castle-queenside">{t("game.special.queenside")}</option>
+              <option value="en-passant">{t("game.special.enPassant")}</option>
+              <option value="unpromotion">{t("game.special.unpromotion")}</option>
             </select>
           </label>
           <label>
-            Captured piece
+            {t("game.captured")}
             <select
-              aria-label="Captured piece"
+              aria-label={t("game.captured")}
               disabled={
                 props.disabled ||
                 draft.tag !== "configure" ||
@@ -165,18 +159,19 @@ function RetractionComposerForm(props: RetractionComposerProps) {
               }
               value={draft.tag === "configure" ? (draft.captureType ?? "") : ""}
             >
-              <option value="">None</option>
+              <option value="">{t("game.none")}</option>
               {captureOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+                <option key={option} value={option}>
+                  {t(`game.capture.${option}`)}
                 </option>
               ))}
             </select>
           </label>
         </fieldset>
         <p className="move-details-help">
-          Undoing a promotion? Choose <strong>Reverse promotion</strong> to turn the piece back into
-          a pawn.
+          {t("game.promotionHelp.before")}
+          <strong>{t("game.special.unpromotion")}</strong>
+          {t("game.promotionHelp.after")}
         </p>
         {!preview.ok && draft.tag === "configure" ? (
           <p className="composer-error" role="alert">
@@ -192,7 +187,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
               if (preview.ok) props.onSubmit(preview.retraction);
             }}
           >
-            Check move
+            {t("game.check")}
           </button>
           <button
             className="button-quiet"
@@ -203,7 +198,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
               setView("now");
             }}
           >
-            Reset
+            {t("game.reset")}
           </button>
         </div>
         {props.feedback}

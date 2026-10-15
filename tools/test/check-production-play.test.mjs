@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { runLocalizedCli } from "../scripts/check-localized-production-play.mjs";
 import { checkProductionPlay, runCli } from "../scripts/check-production-play.mjs";
 
 const env = {
@@ -262,4 +263,290 @@ test("upstream errors, daily leakage and replay regressions have safe failures",
         );
     });
   }
+});
+
+function localizationMap(fields) {
+  return Object.fromEntries(
+    ["ru", "zh"].map((locale) => [
+      locale,
+      Object.fromEntries(fields.map((field) => [field, `${locale} ${secret}`])),
+    ]),
+  );
+}
+
+function localizedHarness({ override } = {}) {
+  const requests = [];
+  let attempts = 0;
+  let hints = 0;
+  let solved = false;
+  let correctPosts = 0;
+  let uuidIndex = 0;
+  const deps = {
+    now: () => new Date(`${date}T12:00:00Z`),
+    uuid: () => (uuidIndex++ === 0 ? "11111111-1111-4111-8111-111111111111" : attemptUuid),
+    fetch: async (url, options) => {
+      const path = new URL(url).pathname;
+      const isD1 = new URL(url).hostname === "api.cloudflare.com";
+      const request = { url, path, isD1, ...options };
+      requests.push(request);
+      const localized = options.headers["x-content-locales"] === "1";
+      const headers = { "access-control-allow-origin": "https://agent-axiom.github.io" };
+      let status = 200;
+      let payload;
+      if (isD1)
+        payload = {
+          success: true,
+          result: [
+            {
+              success: true,
+              results: [
+                {
+                  case_id: "synthetic-case",
+                  puzzle_id: "synthetic-puzzle-0",
+                  solution_json: JSON.stringify(solution()),
+                },
+              ],
+            },
+          ],
+        };
+      else if (path === "/v1/sessions/guest") {
+        status = 201;
+        payload = { kind: "guest", token, expiresAt: "2027-01-01T00:00:00Z" };
+      } else if (path === "/v1/me") payload = { kind: "guest", profile: null };
+      else if (path === "/v1/daily") {
+        payload = daily(solved);
+        if (localized) {
+          payload.localizations = localizationMap(["title"]);
+          for (const puzzle of payload.puzzles)
+            puzzle.localizations = localizationMap(["title", "prompt", "provenance", "license"]);
+        }
+      } else if (path === "/v1/me/stats") {
+        payload = { ...expectedStats(solved ? 1 : 0), attempts, hintsUsed: hints };
+      } else if (path.endsWith("/hints")) {
+        hints = 1;
+        payload = {
+          level: 1,
+          text: secret,
+          exhausted: false,
+          localizations: localizationMap(["text"]),
+        };
+      } else if (path === "/v1/attempts") {
+        const body = JSON.parse(options.body);
+        if (body.retraction.movedPiece.color === "b") {
+          attempts += 1;
+          status = 201;
+          payload = {
+            id: "44444444-4444-4444-8444-444444444444",
+            attemptUuid: body.attemptUuid,
+            correct: false,
+            contradiction: {
+              code: "WRONG_COLOR",
+              message: "Wrong color",
+              localizations: localizationMap(["message"]),
+            },
+          };
+        } else {
+          status = correctPosts++ === 0 ? 201 : 200;
+          if (status === 201) attempts += 1;
+          else headers["idempotency-replayed"] = "true";
+          solved = true;
+          payload = {
+            id: "33333333-3333-4333-8333-333333333333",
+            attemptUuid,
+            correct: true,
+            reveal: solution(),
+          };
+          if (localized) payload.reveal.localizations = localizationMap(["explanation"]);
+        }
+      } else throw new Error(secret);
+      return override
+        ? override(request, payload, status, headers)
+        : new Response(JSON.stringify(payload), { status, headers });
+    },
+  };
+  return {
+    requests,
+    deps,
+    run: () => checkProductionPlay({ ...env, CHECK_LOCALIZATIONS: "true" }, deps),
+  };
+}
+
+test("localized production flow earns one hint and replays the same correct attempt with English compatibility", async () => {
+  const check = localizedHarness();
+  const result = await check.run();
+  assert.deepEqual(result, {
+    ok: true,
+    date,
+    puzzlesSolved: 1,
+    attempts: 2,
+    hintsUsed: 1,
+    locales: ["ru", "zh"],
+    englishCompatible: true,
+    idempotencyVerified: true,
+  });
+  assertSafe(result);
+  const posts = check.requests.filter((request) => request.path === "/v1/attempts");
+  assert.equal(posts.length, 4);
+  assert.equal(JSON.parse(posts[0].body).retraction.movedPiece.color, "b");
+  assert.equal(posts[1].body, posts[2].body);
+  assert.equal(posts[2].body, posts[3].body);
+  assert.equal(posts[2].headers["x-content-locales"], undefined);
+  assert.equal(posts[1].headers["x-content-locales"], "1");
+  assert.equal(posts[3].headers["x-content-locales"], "1");
+  assert.equal(check.requests.filter((request) => request.path.endsWith("/hints")).length, 1);
+});
+
+test("localized private flow rejects leaks, missing translations and replay drift without printing payloads", async (t) => {
+  const cases = [
+    [
+      "daily leak",
+      (r, p) => {
+        if (r.path === "/v1/daily") p.localizations.ru.hints = [secret];
+      },
+      "PUBLIC_DAILY_FAILED",
+    ],
+    [
+      "early reveal",
+      (r, p) => {
+        if (r.path === "/v1/attempts" && p.correct === false) p.reveal = solution();
+      },
+      "LOCALIZED_CONTRADICTION_FAILED",
+    ],
+    [
+      "missing hint language",
+      (r, p) => {
+        if (r.path.endsWith("/hints")) delete p.localizations.zh;
+      },
+      "LOCALIZED_HINT_FAILED",
+    ],
+    [
+      "hint secret field",
+      (r, p) => {
+        if (r.path.endsWith("/hints")) p.localizations.ru.explanation = secret;
+      },
+      "LOCALIZED_HINT_FAILED",
+    ],
+    [
+      "missing reveal language",
+      (r, p) => {
+        if (p.correct === true && p.reveal.localizations) delete p.reveal.localizations.zh;
+      },
+      "CORRECT_ATTEMPT_FAILED",
+    ],
+    [
+      "English replay changed",
+      (r, p, status) => {
+        if (r.path === "/v1/attempts" && status === 200 && !r.headers["x-content-locales"])
+          p.reveal.explanation = "changed";
+      },
+      "ENGLISH_REPLAY_FAILED",
+    ],
+    [
+      "localized replay changed",
+      (r, p, status) => {
+        if (r.path === "/v1/attempts" && status === 200 && r.headers["x-content-locales"])
+          p.reveal.localizations.zh.explanation = "changed";
+      },
+      "IDEMPOTENCY_FAILED",
+    ],
+    [
+      "replay duplicate stats",
+      (r, p) => {
+        if (r.path === "/v1/me/stats" && p.attempts === 2) p.attempts = 3;
+      },
+      "GUEST_STATS_FAILED",
+    ],
+  ];
+  for (const [name, mutate, code] of cases)
+    await t.test(name, async () => {
+      const output = [];
+      const check = localizedHarness({
+        override: (request, payload, status, headers) => {
+          mutate(request, payload, status);
+          return new Response(JSON.stringify(payload), { status, headers });
+        },
+      });
+      assert.equal(
+        await runCli(
+          [],
+          { ...env, CHECK_LOCALIZATIONS: "true" },
+          {
+            ...check.deps,
+            log: (value) => output.push(value),
+            errorLog: (value) => output.push(value),
+          },
+        ),
+        1,
+      );
+      assert.deepEqual(JSON.parse(output[0]), { ok: false, code });
+      assertSafe(output);
+    });
+});
+
+test("localized wrapper skips bootstrap and unrelated imports before any credentialed request", async () => {
+  for (const [purpose, envelope] of [
+    ["launch", true],
+    ["archive", true],
+    ["localization", false],
+  ]) {
+    const output = [];
+    let requests = 0;
+    const status = await runLocalizedCli(
+      [],
+      {},
+      {
+        readFile: async () => JSON.stringify({ purpose }),
+        access: async () => {
+          if (!envelope) throw Object.assign(new Error(secret), { code: "ENOENT" });
+        },
+        fetch: async () => {
+          requests += 1;
+          throw new Error(secret);
+        },
+        log: (value) => output.push(value),
+        errorLog: (value) => output.push(value),
+      },
+    );
+    assert.equal(status, 0);
+    assert.equal(requests, 0);
+    assert.deepEqual(JSON.parse(output[0]), {
+      skipped: true,
+      reason: "NO_LOCALIZATION_PUBLICATION",
+    });
+    assertSafe(output);
+  }
+});
+
+test("localized wrapper explicitly enables the private flow after a localization publication", async () => {
+  const check = localizedHarness();
+  const output = [];
+  const status = await runLocalizedCli([], env, {
+    ...check.deps,
+    readFile: async () => JSON.stringify({ purpose: "localization" }),
+    access: async () => {},
+    log: (value) => output.push(value),
+    errorLog: (value) => output.push(value),
+  });
+  assert.equal(status, 0);
+  assert.equal(JSON.parse(output[0]).hintsUsed, 1);
+  assert.deepEqual(JSON.parse(output[0]).locales, ["ru", "zh"]);
+  assertSafe(output);
+});
+
+test("localized wrapper masks private configuration parse failures before any requests", async () => {
+  const output = [];
+  let requests = 0;
+  const status = await runLocalizedCli([], env, {
+    readFile: async () => secret,
+    fetch: async () => {
+      requests += 1;
+      throw new Error(secret);
+    },
+    log: (value) => output.push(value),
+    errorLog: (value) => output.push(value),
+  });
+  assert.equal(status, 1);
+  assert.equal(requests, 0);
+  assert.deepEqual(JSON.parse(output[0]), { ok: false, code: "LOCALIZED_PLAY_CHECK_FAILED" });
+  assertSafe(output);
 });
