@@ -49,6 +49,12 @@ jobs:
           }
           console.log(`UI_FORMAT_END ${count} ${createHash("sha256").update(patch).digest("hex")}`);
           NODE
+      - name: Collect type-check feedback after formatting
+        continue-on-error: true
+        run: npm run typecheck
+      - name: Collect unit-test feedback after formatting
+        continue-on-error: true
+        run: npm test
       - name: Build the client against the synthetic API
         env:
           VITE_API_BASE_URL: https://api.test
