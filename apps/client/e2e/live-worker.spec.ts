@@ -28,9 +28,7 @@ test("guest solves the seeded case through Worker and retains D1 progress after 
   expect(dailyResponse.status()).toBe(200);
   const daily = DailyCaseResponseSchema.parse(await dailyResponse.json());
   expect(daily.id).toBe(`dev-sample-${daily.date}`);
-  expect(daily.puzzles.map((puzzle) => puzzle.id)).toEqual([
-    `p-dev-sample-${daily.date}-1-v1`,
-  ]);
+  expect(daily.puzzles.map((puzzle) => puzzle.id)).toEqual([`p-dev-sample-${daily.date}-1-v1`]);
   expect(daily.solvedPuzzleIds).toEqual([]);
   await expect(
     page.getByRole("heading", {

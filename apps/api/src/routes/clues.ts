@@ -14,7 +14,9 @@ export function createClueRoutes(options: { now?: () => Date } = {}) {
     const actor = context.get("session");
     if (!actor) throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
     await enforceLimit(context.env.HINT_RATE_LIMITER, `clue:${actor.sessionId}`);
-    z.object({}).strict().parse(await requestJson(context));
+    z.object({})
+      .strict()
+      .parse(await requestJson(context));
     return context.json(
       await requestPuzzleClue(
         context.env,

@@ -5,8 +5,8 @@ import {
   PuzzleProgressSchema,
   PuzzlePublicSchema,
 } from "@a-move-ago/api-contract";
-import { findPublishedCluePuzzle } from "../db/content";
 import { isSessionActorActive } from "../db/attempts";
+import { findPublishedCluePuzzle } from "../db/content";
 import { grantPuzzleClue, readGameProgress } from "../db/gameplay";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
@@ -79,7 +79,12 @@ export async function requestPuzzleClue(
   if (!(await isSessionActorActive(env.DB, actor, now))) {
     throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
   }
-  const states = await puzzleProgressStates(env, actor, [first.puzzle_row_id], includeLocalizations);
+  const states = await puzzleProgressStates(
+    env,
+    actor,
+    [first.puzzle_row_id],
+    includeLocalizations,
+  );
   const progress = states.get(first.puzzle_row_id);
   if (!progress?.clueUnlocked && progress?.earnedPoints === null) {
     throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");

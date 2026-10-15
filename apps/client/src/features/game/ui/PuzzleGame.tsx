@@ -10,10 +10,14 @@ import { RevealPlayer } from "./RevealPlayer";
 
 function retryKey(kind: ClientFailure["kind"]): TranslationKey {
   switch (kind) {
-    case "offline": return "game.retry.offline";
-    case "auth": return "game.retry.auth";
-    case "contract": return "game.retry.contract";
-    default: return "game.retry.generic";
+    case "offline":
+      return "game.retry.offline";
+    case "auth":
+      return "game.retry.auth";
+    case "contract":
+      return "game.retry.contract";
+    default:
+      return "game.retry.generic";
   }
 }
 
@@ -38,7 +42,7 @@ export function PuzzleGame(props: {
   caseId: string;
   caseTitle?: string;
   puzzle: PuzzlePublic;
-  progress?: PuzzleProgress;
+  progress?: PuzzleProgress | undefined;
   onSolved(): void;
 }) {
   const runtime = useRuntime();
@@ -76,8 +80,14 @@ export function PuzzleGame(props: {
           {needsReload(controller.attempt.failure) ? (
             <ReloadButton failure={controller.attempt.failure} />
           ) : (
-            <button className="button-secondary" type="button" disabled={controller.busy}
-              onClick={() => { void controller.retryAttempt(); }}>
+            <button
+              className="button-secondary"
+              type="button"
+              disabled={controller.busy}
+              onClick={() => {
+                void controller.retryAttempt();
+              }}
+            >
               {t("game.retryAttempt")}
             </button>
           )}
@@ -89,21 +99,48 @@ export function PuzzleGame(props: {
           <p role="alert">
             {localizedText(controller.attempt.result.contradiction, "message", locale)}
           </p>
-          {!exhausted && hintItems.length < props.puzzle.maxHints && controller.hints.tag !== "retry" ? (
-            <button className="button-secondary hint-request" type="button" disabled={controller.blocked}
-              onClick={() => { void controller.requestHint(); }}>
-              {controller.hints.tag === "loading" ? t("game.hint.loading") : progress
-                ? t("game.hint.cost", { before: progress.nextAttemptPoints, after: afterAssistance(progress.nextAttemptPoints) })
-                : t("game.hint.get")}
+          {!exhausted &&
+          hintItems.length < props.puzzle.maxHints &&
+          controller.hints.tag !== "retry" ? (
+            <button
+              className="button-secondary hint-request"
+              type="button"
+              disabled={controller.blocked}
+              onClick={() => {
+                void controller.requestHint();
+              }}
+            >
+              {controller.hints.tag === "loading"
+                ? t("game.hint.loading")
+                : progress
+                  ? t("game.hint.cost", {
+                      before: progress.nextAttemptPoints,
+                      after: afterAssistance(progress.nextAttemptPoints),
+                      count: afterAssistance(progress.nextAttemptPoints),
+                    })
+                  : t("game.hint.get")}
             </button>
           ) : null}
           {controller.hints.tag === "retry" ? (
             <div>
-              <p role="alert">{t(needsReload(controller.hints.failure)
-                ? retryKey(controller.hints.failure.kind) : "game.hint.error")}</p>
-              {needsReload(controller.hints.failure) ? <ReloadButton failure={controller.hints.failure} /> : (
-                <button className="button-secondary" type="button" disabled={controller.busy}
-                  onClick={() => { void controller.retryHint(); }}>
+              <p role="alert">
+                {t(
+                  needsReload(controller.hints.failure)
+                    ? retryKey(controller.hints.failure.kind)
+                    : "game.hint.error",
+                )}
+              </p>
+              {needsReload(controller.hints.failure) ? (
+                <ReloadButton failure={controller.hints.failure} />
+              ) : (
+                <button
+                  className="button-secondary"
+                  type="button"
+                  disabled={controller.busy}
+                  onClick={() => {
+                    void controller.retryHint();
+                  }}
+                >
                   {t("game.hint.retry")}
                 </button>
               )}
@@ -113,7 +150,9 @@ export function PuzzleGame(props: {
       ) : null}
       {hintItems.length ? (
         <ol className="hint-list" aria-label={t("game.hints")}>
-          {hintItems.map((hint) => <li key={hint.level}>{localizedText(hint, "text", locale)}</li>)}
+          {hintItems.map((hint) => (
+            <li key={hint.level}>{localizedText(hint, "text", locale)}</li>
+          ))}
         </ol>
       ) : null}
     </section>
@@ -122,9 +161,15 @@ export function PuzzleGame(props: {
   const clueContent = controller.clue.content ?? props.puzzle;
   return (
     <article className="game-layout">
-      <RetractionComposer disabled={controller.blocked} feedback={feedback}
-        onSubmit={(retraction) => { void controller.submit(retraction); }}
-        post={post} retractingColor={props.puzzle.retractingColor}>
+      <RetractionComposer
+        disabled={controller.blocked}
+        feedback={feedback}
+        onSubmit={(retraction) => {
+          void controller.submit(retraction);
+        }}
+        post={post}
+        retractingColor={props.puzzle.retractingColor}
+      >
         <div className="game-copy">
           <p className="game-eyebrow">{t(progress ? "game.conditions" : "game.evidence")}</p>
           {!progress && props.puzzle.title !== props.caseTitle ? (
@@ -134,9 +179,18 @@ export function PuzzleGame(props: {
           {progress ? (
             <>
               <div className="puzzle-score" aria-label={t("game.score.label")} aria-live="polite">
-                <span className="score-attempt">{t("game.score.attempt", { number: progress.attemptCount + 1 })}</span>
-                <strong className="score-potential">{t("game.score.available", { points: progress.nextAttemptPoints })}</strong>
-                {controller.busy ? <small className="score-updating">{t("game.score.sync")}</small> : null}
+                <span className="score-attempt">
+                  {t("game.score.attempt", { number: progress.attemptCount + 1 })}
+                </span>
+                <strong className="score-potential">
+                  {t("game.score.available", {
+                    points: progress.nextAttemptPoints,
+                    count: progress.nextAttemptPoints,
+                  })}
+                </strong>
+                {controller.busy ? (
+                  <small className="score-updating">{t("game.score.sync")}</small>
+                ) : null}
               </div>
               <details className="score-rules">
                 <summary>{t("game.score.rules")}</summary>
@@ -146,25 +200,50 @@ export function PuzzleGame(props: {
                 {progress.clueUnlocked ? (
                   <>
                     <p className="game-eyebrow">{t("game.clue.unlocked")}</p>
-                    <h2 className="clue-title unlocked-clue">{localizedText(clueContent, "title", locale)}</h2>
+                    <h2 className="clue-title unlocked-clue">
+                      {localizedText(clueContent, "title", locale)}
+                    </h2>
                   </>
                 ) : (
                   <>
                     <p>{t("game.clue.hidden")}</p>
                     {controller.clue.tag !== "retry" ? (
-                      <button className="button-secondary clue-request" type="button" disabled={controller.blocked}
-                        onClick={() => { void controller.requestClue(); }}>
-                        {controller.clue.tag === "loading" ? t("game.clue.loading") : t("game.clue.reveal", {
-                          before: progress.nextAttemptPoints, after: afterAssistance(progress.nextAttemptPoints),
-                        })}
+                      <button
+                        className="button-secondary clue-request"
+                        type="button"
+                        disabled={controller.blocked}
+                        onClick={() => {
+                          void controller.requestClue();
+                        }}
+                      >
+                        {controller.clue.tag === "loading"
+                          ? t("game.clue.loading")
+                          : t("game.clue.reveal", {
+                              before: progress.nextAttemptPoints,
+                              after: afterAssistance(progress.nextAttemptPoints),
+                              count: afterAssistance(progress.nextAttemptPoints),
+                            })}
                       </button>
                     ) : (
                       <div>
-                        <p role="alert">{t(needsReload(controller.clue.failure)
-                          ? retryKey(controller.clue.failure.kind) : "game.clue.error")}</p>
-                        {needsReload(controller.clue.failure) ? <ReloadButton failure={controller.clue.failure} /> : (
-                          <button className="button-secondary" type="button" disabled={controller.busy}
-                            onClick={() => { void controller.retryClue(); }}>
+                        <p role="alert">
+                          {t(
+                            needsReload(controller.clue.failure)
+                              ? retryKey(controller.clue.failure.kind)
+                              : "game.clue.error",
+                          )}
+                        </p>
+                        {needsReload(controller.clue.failure) ? (
+                          <ReloadButton failure={controller.clue.failure} />
+                        ) : (
+                          <button
+                            className="button-secondary"
+                            type="button"
+                            disabled={controller.busy}
+                            onClick={() => {
+                              void controller.retryClue();
+                            }}
+                          >
                             {t("game.clue.retry")}
                           </button>
                         )}
@@ -178,7 +257,8 @@ export function PuzzleGame(props: {
         </div>
       </RetractionComposer>
       <footer className="game-provenance">
-        {localizedText(props.puzzle, "provenance", locale)} · {localizedText(props.puzzle, "license", locale)}
+        {localizedText(props.puzzle, "provenance", locale)} ·{" "}
+        {localizedText(props.puzzle, "license", locale)}
       </footer>
     </article>
   );

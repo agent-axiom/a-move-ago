@@ -4,8 +4,8 @@ import {
   StatsResponseSchema,
 } from "@a-move-ago/api-contract";
 import { Hono } from "hono";
-import { findPlayer, toTelegramProfile } from "../db/players";
 import { readTotalPoints } from "../db/gameplay";
+import { findPlayer, toTelegramProfile } from "../db/players";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/api-error";
 import { requireAllowedMutationOrigin } from "../middleware/origin";
@@ -23,10 +23,13 @@ me.get("/stats", requireSession, async (context) => {
   }
   const today = new Date(Date.now()).toISOString().slice(0, 10);
   const stats = await statsForActor(context.env.DB, session, today);
-  const points = context.req.header("x-game-progress") === "1"
-    ? await readTotalPoints(context.env.DB, session)
-    : undefined;
-  return context.json(StatsResponseSchema.parse({ ...stats, ...(points === undefined ? {} : { points }) }));
+  const points =
+    context.req.header("x-game-progress") === "1"
+      ? await readTotalPoints(context.env.DB, session)
+      : undefined;
+  return context.json(
+    StatsResponseSchema.parse({ ...stats, ...(points === undefined ? {} : { points }) }),
+  );
 });
 
 me.get("/", requireSession, async (context) => {

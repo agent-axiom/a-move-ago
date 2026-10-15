@@ -83,9 +83,16 @@ export async function requestHint(
   async function result(hint: HintResponse) {
     const localized = includeLocalizations ? await localizeHint(env.DB, puzzleRowId, hint) : hint;
     const progress = includeGameProgress
-      ? (await puzzleProgressStates(env, actor, [puzzleRowId], includeLocalizations)).get(puzzleRowId)
+      ? (await puzzleProgressStates(env, actor, [puzzleRowId], includeLocalizations)).get(
+          puzzleRowId,
+        )
       : undefined;
     return progress === undefined ? localized : { ...localized, progress };
+  }
+
+  const replay = await findHintForActor(env.DB, actor, attemptId, requestedLevel, now);
+  if (replay) {
+    return await result(parseStoredHint(replay.hint_json, requestedLevel, "hint event"));
   }
 
   const progress = (await readGameProgress(env.DB, actor, [puzzleRowId])).get(puzzleRowId);

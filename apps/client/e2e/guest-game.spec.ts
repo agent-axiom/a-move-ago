@@ -31,7 +31,7 @@ test("guest survives a lost success response and retries the exact UUID", async 
   expect(observed.attemptBodies[1]?.attemptUuid).toBe(observed.attemptBodies[0]?.attemptUuid);
   expect(observed.attemptBodies[1]).toEqual(observed.attemptBodies[0]);
   await expect(page.getByRole("heading", { name: "Solved" })).toBeVisible();
-  await expect(page.locator(".solution-reward")).toHaveText("+100 points earned");
+  await expect(page.locator(".solution-reward strong")).toHaveText("+100 points earned");
   expect(observed.statsRequests).toBe(0);
   await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
   expect(observed.statsRequests).toBe(0);

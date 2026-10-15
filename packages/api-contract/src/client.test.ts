@@ -58,15 +58,37 @@ function responseWithJsonFailure(error: unknown, status = 200) {
 describe("ApiClient", () => {
   it("opts into game progress and requests an explicit clue through the authenticated route", async () => {
     const progress = {
-      attemptCount: 0, assistanceCount: 1, clueUnlocked: true, highestHintLevel: 0,
-      earnedPoints: null, nextAttemptPoints: 50, legacySolved: false, awardAttemptId: null, earnedHints: [],
+      attemptCount: 0,
+      assistanceCount: 1,
+      clueUnlocked: true,
+      highestHintLevel: 0,
+      earnedPoints: null,
+      nextAttemptPoints: 50,
+      legacySolved: false,
+      awardAttemptId: null,
+      earnedHints: [],
     };
-    const fetch = vi.fn().mockResolvedValue(Response.json({ title: "Clue", prompt: "Conditions", progress }));
-    const api = createApiClient({ baseUrl: "https://api.test", fetch, getToken: () => "token", includeGameProgress: true });
-    await expect(api.requestClue("case/one", "puzzle/one")).resolves.toMatchObject({ title: "Clue", progress });
-    expect(fetch).toHaveBeenCalledWith("https://api.test/v1/cases/case%2Fone/puzzles/puzzle%2Fone/clue", expect.objectContaining({
-      method: "POST", body: "{}", headers: expect.objectContaining({ authorization: "Bearer token", "x-game-progress": "1" }),
-    }));
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(Response.json({ title: "Clue", prompt: "Conditions", progress }));
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch,
+      getToken: () => "token",
+      includeGameProgress: true,
+    });
+    await expect(api.requestClue("case/one", "puzzle/one")).resolves.toMatchObject({
+      title: "Clue",
+      progress,
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.test/v1/cases/case%2Fone/puzzles/puzzle%2Fone/clue",
+      expect.objectContaining({
+        method: "POST",
+        body: "{}",
+        headers: expect.objectContaining({ authorization: "Bearer token", "x-game-progress": "1" }),
+      }),
+    );
   });
 
   it("requests localization maps only when explicitly enabled", async () => {

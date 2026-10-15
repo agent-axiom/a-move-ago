@@ -8,23 +8,37 @@ async function chooseMove(page: Page, previous: "c4" | "e4") {
   await page.getByRole("button", { name: "Check move", exact: true }).click();
 }
 function language(page: Page) {
-  return page.locator("select").filter({ has: page.getByRole("option", { name: "English", exact: true }) });
+  return page
+    .locator("select")
+    .filter({ has: page.getByRole("option", { name: "English", exact: true }) });
 }
 async function postAttempt(page: Page, body: Record<string, unknown>) {
   return page.evaluate(async (input) => {
     const response = await fetch("https://api.test/v1/attempts", {
-      method: "POST", headers: {
+      method: "POST",
+      headers: {
         authorization: `Bearer ${localStorage.getItem("amoveago.session.v1")}`,
-        "content-type": "application/json", "x-game-progress": "1", "x-content-locales": "1",
-      }, body: JSON.stringify(input),
+        "content-type": "application/json",
+        "x-game-progress": "1",
+        "x-content-locales": "1",
+      },
+      body: JSON.stringify(input),
     });
-    return { status: response.status, replayed: response.headers.get("idempotency-replayed"), body: await response.json() };
+    return {
+      status: response.status,
+      replayed: response.headers.get("idempotency-replayed"),
+      body: await response.json(),
+    };
   }, body);
 }
 
-test("a fresh unassisted solve awards 100 once across UUID replay, another UUID and reload", async ({ page }) => {
+test("a fresh unassisted solve awards 100 once across UUID replay, another UUID and reload", async ({
+  page,
+}) => {
   const observed = await installApiMock(page);
-  const daily = page.waitForResponse((response) => new URL(response.url()).pathname === "/v1/daily");
+  const daily = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/v1/daily",
+  );
   await page.goto("./?case=2026-08-03");
   const publicBody = await (await daily).json();
   expect(publicBody.puzzles[0].id).toBe("p-case-2026-08-03-1-v1");
@@ -35,9 +49,11 @@ test("a fresh unassisted solve awards 100 once across UUID replay, another UUID 
   await expect(page.locator(".unlocked-clue")).toHaveCount(0);
   await expect(page.locator(".score-attempt")).toHaveText("Attempt 1");
   await expect(page.locator(".score-potential")).toHaveText("Available: 100 points");
-  await expect(page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true }),
+  ).toBeVisible();
   await chooseMove(page, "e4");
-  await expect(page.locator(".solution-reward")).toHaveText("+100 points earned");
+  await expect(page.locator(".solution-reward strong")).toHaveText("+100 points earned");
   expect(observed.clueRequests).toEqual([]);
   const original = observed.attemptBodies[0];
   expect(original).toBeDefined();
@@ -46,7 +62,10 @@ test("a fresh unassisted solve awards 100 once across UUID replay, another UUID 
   expect(replay.status).toBe(200);
   expect(replay.replayed).toBe("true");
   expect(replay.body.progress.earnedPoints).toBe(100);
-  const another = await postAttempt(page, { ...original, attemptUuid: "99999999-9999-4999-8999-999999999999" });
+  const another = await postAttempt(page, {
+    ...original,
+    attemptUuid: "99999999-9999-4999-8999-999999999999",
+  });
   expect(another.status).toBe(201);
   expect(another.body.progress.earnedPoints).toBe(100);
   expect(another.body.progress.awardAttemptId).toBe(replay.body.progress.awardAttemptId);
@@ -58,7 +77,9 @@ test("a fresh unassisted solve awards 100 once across UUID replay, another UUID 
   await expect(page.getByRole("heading", { name: "Case complete", exact: true })).toBeVisible();
 });
 
-test("wrong move and a retried clue grant yield 35, retaining assistance across locales, dates and reload", async ({ page }) => {
+test("wrong move and a retried clue grant yield 35, retaining assistance across locales, dates and reload", async ({
+  page,
+}) => {
   const observed = await installApiMock(page, { archive: true, loseFirstClue: true });
   await page.goto("./?case=2026-09-10");
   await chooseMove(page, "c4");
@@ -91,7 +112,7 @@ test("wrong move and a retried clue grant yield 35, retaining assistance across 
   await page.getByRole("gridcell", { name: "e4, 空格", exact: true }).click();
   await page.getByLabel("被吃的棋子", { exact: true }).selectOption("p");
   await page.getByRole("button", { name: "检查走法", exact: true }).click();
-  await expect(page.locator(".solution-reward")).toHaveText("已获得 +35 分");
+  await expect(page.locator(".solution-reward strong")).toHaveText("已获得 +35 分");
   await page.getByRole("button", { name: "继续", exact: true }).click();
   await expect(page.locator(".personal-rating-total strong")).toHaveText("35");
 });
@@ -108,10 +129,12 @@ test("distinct failed attempts reduce the reward to 70, 40 and 20", async ({ pag
   expect(new Set(observed.attemptBodies.map((body) => body.attemptUuid)).size).toBe(3);
   await page.getByRole("button", { name: "Reset", exact: true }).click();
   await chooseMove(page, "e4");
-  await expect(page.locator(".solution-reward")).toHaveText("+20 points earned");
+  await expect(page.locator(".solution-reward strong")).toHaveText("+20 points earned");
 });
 
-test("guest points survive linking a Telegram identity and clear with profile deletion", async ({ page }) => {
+test("guest points survive linking a Telegram identity and clear with profile deletion", async ({
+  page,
+}) => {
   await installApiMock(page);
   await page.goto("./?case=2026-08-03");
   await chooseMove(page, "e4");
@@ -119,10 +142,12 @@ test("guest points survive linking a Telegram identity and clear with profile de
   await expect(page.locator(".personal-rating-total strong")).toHaveText("100");
   await page.evaluate(async () => {
     const response = await fetch("https://api.test/v1/auth/telegram/mini-app", {
-      method: "POST", headers: {
+      method: "POST",
+      headers: {
         authorization: `Bearer ${localStorage.getItem("amoveago.session.v1")}`,
         "content-type": "application/json",
-      }, body: JSON.stringify({ initData: "synthetic-consented-proof" }),
+      },
+      body: JSON.stringify({ initData: "synthetic-consented-proof" }),
     });
     if (!response.ok) throw new Error("Synthetic identity exchange failed");
     const session = await response.json();
@@ -131,7 +156,9 @@ test("guest points survive linking a Telegram identity and clear with profile de
   await page.reload();
   await expect(page.locator(".personal-rating-total strong")).toHaveText("100");
   await page.getByRole("button", { name: "Progress", exact: true }).click();
-  await expect(page.getByText("Connected as profile-deletion-e2e-marker", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Connected as profile-deletion-e2e-marker", { exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".personal-rating-total strong")).toHaveText("100");
   await page.getByRole("button", { name: "Delete Telegram profile", exact: true }).click();
   await page.getByRole("button", { name: "Delete permanently", exact: true }).click();

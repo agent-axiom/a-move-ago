@@ -135,7 +135,8 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
         attemptAbort.current ||
         hintAbort.current ||
         clueAbort.current
-      ) return;
+      )
+        return;
       const request = Object.freeze({
         attemptUuid: runtime.attemptUuid(),
         caseId,
@@ -168,9 +169,11 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
           activeLifecycle.current.runtime !== runtime ||
           activeLifecycle.current.caseId !== caseId ||
           activeLifecycle.current.puzzleId !== puzzleId
-        ) return;
+        )
+          return;
         if (hint.progress) setProgress(hint.progress);
-        const next = hint.progress?.earnedHints ??
+        const next =
+          hint.progress?.earnedHints ??
           (items.some((item) => item.level === hint.level) ? items : [...items, hint]);
         setHints({ tag: "idle", items: next });
       } catch (error) {
@@ -206,7 +209,8 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
         activeLifecycle.current.runtime !== runtime ||
         activeLifecycle.current.caseId !== caseId ||
         activeLifecycle.current.puzzleId !== puzzleId
-      ) return;
+      )
+        return;
       setProgress(result.progress);
       setHints({ tag: "idle", items: result.progress.earnedHints });
       setClue({ tag: "idle", content: result });
@@ -228,7 +232,8 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
       attempt.tag === "submitting" ||
       attempt.tag === "retry" ||
       attempt.tag === "solved"
-    ) return;
+    )
+      return;
     await sendClue();
   }, [attempt.tag, clue, hints.tag, progress?.clueUnlocked, sendClue]);
 
@@ -239,7 +244,17 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
   const busy = attempt.tag === "submitting" || hints.tag === "loading" || clue.tag === "loading";
   const blocked = busy || attempt.tag === "retry" || hints.tag === "retry" || clue.tag === "retry";
   return {
-    attempt, hints, clue, progress, busy, blocked,
-    submit, retryAttempt, requestHint, retryHint, requestClue, retryClue,
+    attempt,
+    hints,
+    clue,
+    progress,
+    busy,
+    blocked,
+    submit,
+    retryAttempt,
+    requestHint,
+    retryHint,
+    requestClue,
+    retryClue,
   };
 }

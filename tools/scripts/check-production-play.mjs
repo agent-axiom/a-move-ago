@@ -160,12 +160,16 @@ function stablePublicPuzzle(puzzle) {
   const { title: _title, localizations, ...base } = puzzle;
   return {
     ...base,
-    ...(localizations ? {
-      localizations: Object.fromEntries(Object.entries(localizations).map(([locale, value]) => {
-        const { title: _localizedTitle, ...text } = value;
-        return [locale, text];
-      })),
-    } : {}),
+    ...(localizations
+      ? {
+          localizations: Object.fromEntries(
+            Object.entries(localizations).map(([locale, value]) => {
+              const { title: _localizedTitle, ...text } = value;
+              return [locale, text];
+            }),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -400,7 +404,10 @@ export async function checkProductionPlay(
   ensure(
     validDaily(reloaded, date, localized) &&
       reloaded.id === daily.id &&
-      isDeepStrictEqual(reloaded.puzzles.map(stablePublicPuzzle), daily.puzzles.map(stablePublicPuzzle)) &&
+      isDeepStrictEqual(
+        reloaded.puzzles.map(stablePublicPuzzle),
+        daily.puzzles.map(stablePublicPuzzle),
+      ) &&
       isDeepStrictEqual(reloaded.solvedPuzzleIds, [attempt.puzzleId]),
     "RELOADED_DAILY_FAILED",
   );

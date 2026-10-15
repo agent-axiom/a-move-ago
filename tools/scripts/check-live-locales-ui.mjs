@@ -44,19 +44,21 @@ try {
       assert.ok(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
       );
-      const tooSmall = await page.locator("button, select, a[href], summary").evaluateAll((elements) =>
-        elements.some((element) => {
-          if (element.closest(".chessboard")) return false;
-          const rect = element.getBoundingClientRect();
-          const style = window.getComputedStyle(element);
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.visibility !== "hidden" &&
-            (rect.width < 44 || rect.height < 44)
-          );
-        }),
-      );
+      const tooSmall = await page
+        .locator("button, select, a[href], summary")
+        .evaluateAll((elements) =>
+          elements.some((element) => {
+            if (element.closest(".chessboard")) return false;
+            const rect = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.visibility !== "hidden" &&
+              (rect.width < 44 || rect.height < 44)
+            );
+          }),
+        );
       assert.equal(tooSmall, false);
     }
   }

@@ -42,7 +42,12 @@ export async function createBrowserRuntime(
   });
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   if (!baseUrl) throw new Error("VITE_API_BASE_URL is required.");
-  const api = createApiClient({ baseUrl, getToken: token.get, includeLocalizations: true, includeGameProgress: true });
+  const api = createApiClient({
+    baseUrl,
+    getToken: token.get,
+    includeLocalizations: true,
+    includeGameProgress: true,
+  });
   return {
     api,
     platform,

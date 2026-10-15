@@ -1,9 +1,15 @@
 import type { SessionActor } from "../env";
 import { puzzleAliasSql } from "./puzzle-identity";
 
-export async function findPublishedCluePuzzle(db: D1Database, caseId: string, puzzleId: string, today: string) {
-  return await db.prepare(
-    `SELECT p.id AS puzzle_row_id, p.content_key, p.version, p.public_json
+export async function findPublishedCluePuzzle(
+  db: D1Database,
+  caseId: string,
+  puzzleId: string,
+  today: string,
+) {
+  return await db
+    .prepare(
+      `SELECT p.id AS puzzle_row_id, p.content_key, p.version, p.public_json
        FROM daily_cases dc
        JOIN daily_case_puzzles dcp ON dcp.case_id = dc.id
        JOIN puzzles p ON p.id = dcp.puzzle_id
@@ -11,8 +17,10 @@ export async function findPublishedCluePuzzle(db: D1Database, caseId: string, pu
         AND dc.case_date <= ? AND dc.status = 'published' AND p.status = 'published'
         AND NOT EXISTS (SELECT 1 FROM daily_case_puzzles sibling
           JOIN puzzles required ON required.id = sibling.puzzle_id
-          WHERE sibling.case_id = dc.id AND required.status <> 'published')`
-  ).bind(caseId, puzzleId, puzzleId, today).first<{puzzle_row_id:string;content_key:string;version:number;public_json:string}>();
+          WHERE sibling.case_id = dc.id AND required.status <> 'published')`,
+    )
+    .bind(caseId, puzzleId, puzzleId, today)
+    .first<{ puzzle_row_id: string; content_key: string; version: number; public_json: string }>();
 }
 
 export interface PublishedDailyRow {

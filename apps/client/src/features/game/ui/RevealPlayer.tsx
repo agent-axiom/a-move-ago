@@ -13,7 +13,7 @@ interface RevealTimeline {
 export function RevealPlayer(props: {
   postFen: string;
   solution: AcceptedSolution;
-  progress?: PuzzleProgress;
+  progress?: PuzzleProgress | undefined;
   attemptId?: string;
   onComplete(): void;
 }) {
@@ -31,8 +31,8 @@ export function RevealPlayer(props: {
     [props.solution.previousFen],
   );
   const post = useMemo(() => parseFen(props.postFen), [props.postFen]);
-  const awardedHere = props.progress?.awardAttemptId != null &&
-    props.progress.awardAttemptId === props.attemptId;
+  const awardedHere =
+    props.progress?.awardAttemptId != null && props.progress.awardAttemptId === props.attemptId;
 
   const startReplay = useCallback(() => {
     for (const timer of timers.current) clearTimeout(timer);
@@ -122,16 +122,21 @@ export function RevealPlayer(props: {
         </div>
         {props.progress && props.progress.earnedPoints !== null ? (
           <aside className="solution-reward" aria-live="polite">
-            <strong>{props.progress.legacySolved
-              ? t("game.score.legacy")
-              : t(awardedHere ? "game.score.awarded" : "game.score.already", {
-                points: props.progress.earnedPoints,
-              })}</strong>
-            <p>{props.progress.legacySolved
-              ? t("game.score.legacyCopy")
-              : awardedHere
-                ? t("game.score.awardAttempt", { number: props.progress.attemptCount })
-                : t("game.score.alreadyCopy")}</p>
+            <strong>
+              {props.progress.legacySolved
+                ? t("game.score.legacy")
+                : t(awardedHere ? "game.score.awarded" : "game.score.already", {
+                    points: props.progress.earnedPoints,
+                    count: props.progress.earnedPoints,
+                  })}
+            </strong>
+            <p>
+              {props.progress.legacySolved
+                ? t("game.score.legacyCopy")
+                : awardedHere
+                  ? t("game.score.awardAttempt", { number: props.progress.attemptCount })
+                  : t("game.score.alreadyCopy")}
+            </p>
           </aside>
         ) : null}
         <p className="solution-notation">{props.solution.forwardSan}</p>

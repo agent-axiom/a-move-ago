@@ -37,23 +37,25 @@ async function checkLayout(page: Page) {
   expect(widths.document, "Page must fit without horizontal scrolling").toBeLessThanOrEqual(
     widths.viewport + 1,
   );
-  const smallTargets = await page.locator("button, select, a[href], summary").evaluateAll((elements) =>
-    elements.flatMap((element) => {
-      if (element.closest(".chessboard")) return [];
-      const rect = element.getBoundingClientRect();
-      const style = window.getComputedStyle(element);
-      if (rect.width === 0 || rect.height === 0 || style.visibility === "hidden") return [];
-      return rect.width >= 44 && rect.height >= 44
-        ? []
-        : [
-            {
-              label: element.getAttribute("aria-label") ?? element.textContent?.trim(),
-              width: rect.width,
-              height: rect.height,
-            },
-          ];
-    }),
-  );
+  const smallTargets = await page
+    .locator("button, select, a[href], summary")
+    .evaluateAll((elements) =>
+      elements.flatMap((element) => {
+        if (element.closest(".chessboard")) return [];
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        if (rect.width === 0 || rect.height === 0 || style.visibility === "hidden") return [];
+        return rect.width >= 44 && rect.height >= 44
+          ? []
+          : [
+              {
+                label: element.getAttribute("aria-label") ?? element.textContent?.trim(),
+                width: rect.width,
+                height: rect.height,
+              },
+            ];
+      }),
+    );
   expect(smallTargets, "Non-board controls need 44px touch targets").toEqual([]);
 }
 
@@ -82,7 +84,7 @@ test("desktop daily, configured move and solution reveal", async ({ page }, info
   await checkLayout(page);
   await page.getByRole("button", { name: "Check move", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Solved", exact: true })).toBeVisible();
-  await expect(page.locator(".solution-reward")).toHaveText("+50 points earned");
+  await expect(page.locator(".solution-reward strong")).toHaveText("+50 points earned");
   await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
   await capture(page, info, "desktop-reveal");
   await checkLayout(page);
@@ -171,10 +173,15 @@ for (const locale of ["ru", "zh"] as const) {
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await capture(page, info, `${locale}-mobile-daily`);
-    await page.getByRole("button", {
-      name: locale === "ru" ? "Открыть улику · 100 → 50 очков" : "揭示线索 · 100 → 50 分", exact: true,
-    }).click();
-    await expect(page.locator(".unlocked-clue")).toHaveText(locale === "ru" ? "Исчезнувшая пешка" : "一枚兵消失了");
+    await page
+      .getByRole("button", {
+        name: locale === "ru" ? "Открыть улику · 100 → 50 очков" : "揭示线索 · 100 → 50 分",
+        exact: true,
+      })
+      .click();
+    await expect(page.locator(".unlocked-clue")).toHaveText(
+      locale === "ru" ? "Исчезнувшая пешка" : "一枚兵消失了",
+    );
     await capture(page, info, `${locale}-mobile-clue`);
     await checkLayout(page);
     await page.setViewportSize({ width: 320, height: 844 });

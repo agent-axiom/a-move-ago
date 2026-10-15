@@ -4,9 +4,7 @@ import { installApiMock } from "./api-mock";
 test("archive dates retain progress, deep links and browser navigation", async ({ page }) => {
   const observed = await installApiMock(page, { archive: true });
   await page.goto("./");
-  await expect(
-    page.getByRole("heading", { name: "Daily case", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Archive", exact: true }).click();
   await expect(page.getByRole("heading", { name: "The archive", exact: true })).toBeVisible();
@@ -48,9 +46,7 @@ test("archive dates retain progress, deep links and browser navigation", async (
   await page.getByRole("button", { name: "Back to case", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to today", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Daily case", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await expect.poll(() => new URL(page.url()).searchParams.has("case")).toBe(false);
   expect(observed.guestChannels).toEqual(["web"]);
   expect(observed.archiveRequests).toBeGreaterThan(0);

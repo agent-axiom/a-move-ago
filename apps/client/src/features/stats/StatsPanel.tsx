@@ -52,10 +52,22 @@ export function StatsPanel(props: { title?: string; refreshKey?: string }) {
           <div className="personal-rating-rules">
             <h4>{t("shell.ratingRules")}</h4>
             <dl className="personal-rating-scale">
-              <div><dt>{t("shell.ratingTry1")}</dt><dd>100</dd></div>
-              <div><dt>{t("shell.ratingTry2")}</dt><dd>70</dd></div>
-              <div><dt>{t("shell.ratingTry3")}</dt><dd>40</dd></div>
-              <div><dt>{t("shell.ratingTry4")}</dt><dd>20</dd></div>
+              <div>
+                <dt>{t("shell.ratingTry1")}</dt>
+                <dd>100</dd>
+              </div>
+              <div>
+                <dt>{t("shell.ratingTry2")}</dt>
+                <dd>70</dd>
+              </div>
+              <div>
+                <dt>{t("shell.ratingTry3")}</dt>
+                <dd>40</dd>
+              </div>
+              <div>
+                <dt>{t("shell.ratingTry4")}</dt>
+                <dd>20</dd>
+              </div>
             </dl>
             <p>{t("shell.ratingHints")}</p>
           </div>

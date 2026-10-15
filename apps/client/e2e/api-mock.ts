@@ -103,19 +103,25 @@ function withLocalizations(value: unknown): unknown {
       if (typeof object.title === "string" && (Array.isArray(object.puzzles) || "slug" in object)) {
         const title =
           object.title === "Daily case"
-            ? locale === "ru" ? "Задача дня" : "每日棋题"
+            ? locale === "ru"
+              ? "Задача дня"
+              : "每日棋题"
             : object.title === "A quiet beginning"
-            ? text.firstCaseTitle
-            : object.title === "The missing tempo"
-              ? text.recentCaseTitle
-              : object.title === "The missing pawn"
-                ? text.caseTitle
-                : locale === "ru"
-                  ? `Учебная задача ${String(object.date)}`
-                  : `教学谜题 ${String(object.date)}`;
+              ? text.firstCaseTitle
+              : object.title === "The missing tempo"
+                ? text.recentCaseTitle
+                : object.title === "The missing pawn"
+                  ? text.caseTitle
+                  : locale === "ru"
+                    ? `Учебная задача ${String(object.date)}`
+                    : `教学谜题 ${String(object.date)}`;
         return [locale, { title }];
       }
-      if (typeof object.title === "string" && typeof object.prompt === "string" && "progress" in object) {
+      if (
+        typeof object.title === "string" &&
+        typeof object.prompt === "string" &&
+        "progress" in object
+      ) {
         return [locale, { title: text.puzzleTitle, prompt: text.prompt }];
       }
       if (typeof object.previousFen === "string" && typeof object.explanation === "string") {
@@ -131,12 +137,18 @@ function withLocalizations(value: unknown): unknown {
   return localizations.ru === null ? result : { ...result, localizations };
 }
 
-async function json(route: Route, status: number, value: unknown, extraHeaders: Record<string, string> = {}) {
+async function json(
+  route: Route,
+  status: number,
+  value: unknown,
+  extraHeaders: Record<string, string> = {},
+) {
   await route.fulfill({
     status,
     contentType: "application/json",
     headers: {
       "access-control-allow-origin": "*",
+      "access-control-expose-headers": "idempotency-replayed",
       "cache-control": "no-store",
       ...extraHeaders,
     },
@@ -160,7 +172,13 @@ interface MockActor {
   newSolves: Set<string>;
 }
 function actor(): MockActor {
-  return { states: new Map(), attempts: new Map(), attemptsCount: 0, hintsUsed: 0, newSolves: new Set() };
+  return {
+    states: new Map(),
+    attempts: new Map(),
+    attemptsCount: 0,
+    hintsUsed: 0,
+    newSolves: new Set(),
+  };
 }
 function potential(progress: PuzzleProgress) {
   if (progress.earnedPoints !== null) return 0;
@@ -183,9 +201,17 @@ export async function installApiMock(
   } = {},
 ): Promise<ApiObservations> {
   const observed: ApiObservations = {
-    attemptBodies: [], guestChannels: [], hintRequests: [], clueRequests: [], miniAppProofs: [],
-    dailyIdentities: [], dailyDates: [], archiveRequests: 0, statsIdentities: [],
-    profileDeleteRequests: [], statsRequests: 0,
+    attemptBodies: [],
+    guestChannels: [],
+    hintRequests: [],
+    clueRequests: [],
+    miniAppProofs: [],
+    dailyIdentities: [],
+    dailyDates: [],
+    archiveRequests: 0,
+    statsIdentities: [],
+    profileDeleteRequests: [],
+    statsRequests: 0,
   };
   let attemptLost = false;
   let hintLost = false;
@@ -196,23 +222,38 @@ export async function installApiMock(
   const telegram = actor();
   let wrongIds = 0;
   let correctIds = 0;
-  const active = () => identity === "guest" ? guest : telegram;
+  const active = () => (identity === "guest" ? guest : telegram);
   const defaultCase = {
-    id: "case-2026-08-03", date: "2026-08-03", slug: "case-2026-08-03", title: "The missing pawn",
-    puzzleCount: 1, solvedPuzzles: 0, completed: false,
+    id: "case-2026-08-03",
+    date: "2026-08-03",
+    slug: "case-2026-08-03",
+    title: "The missing pawn",
+    puzzleCount: 1,
+    solvedPuzzles: 0,
+    completed: false,
   };
-  const cases = options.archive ? archiveCases.filter((item) => item.date <= archiveToday) : [defaultCase];
+  const cases = options.archive
+    ? archiveCases.filter((item) => item.date <= archiveToday)
+    : [defaultCase];
   function stateFor(item: typeof defaultCase, index: number): MockState {
     const puzzleId = `p-${item.id}-${index + 1}-v1`;
     const existing = active().states.get(puzzleId);
     if (existing) return existing;
     const legacySolved = index < item.solvedPuzzles;
     const state: MockState = {
-      caseId: item.id, date: item.date, puzzleId,
+      caseId: item.id,
+      date: item.date,
+      puzzleId,
       progress: {
-        attemptCount: legacySolved ? 1 : 0, assistanceCount: 0, clueUnlocked: legacySolved,
-        highestHintLevel: 0, earnedPoints: legacySolved ? 0 : null,
-        nextAttemptPoints: legacySolved ? 0 : 100, legacySolved, awardAttemptId: null, earnedHints: [],
+        attemptCount: legacySolved ? 1 : 0,
+        assistanceCount: 0,
+        clueUnlocked: legacySolved,
+        highestHintLevel: 0,
+        earnedPoints: legacySolved ? 0 : null,
+        nextAttemptPoints: legacySolved ? 0 : 100,
+        legacySolved,
+        awardAttemptId: null,
+        earnedHints: [],
       },
     };
     active().states.set(puzzleId, state);
@@ -230,55 +271,99 @@ export async function installApiMock(
   function findState(caseId: unknown, puzzleId: unknown) {
     const item = cases.find((candidate) => candidate.id === caseId);
     if (!item) return undefined;
-    return statesFor(item).find((state) => state.puzzleId === puzzleId ||
-      (item.id === defaultCase.id && puzzleId === "opening-exd5"));
+    return statesFor(item).find(
+      (state) =>
+        state.puzzleId === puzzleId || (item.id === defaultCase.id && puzzleId === "opening-exd5"),
+    );
   }
   function stats() {
     const current = active();
-    const solved = [...current.newSolves].map((id) => current.states.get(id)).filter((state) => state !== undefined);
-    const completed = cases.filter((item) => statesFor(item).every((state) =>
-      state.progress.earnedPoints !== null) && solved.some((state) => state.caseId === item.id));
-    const baseline = identity === "telegram"
-      ? { attempts: 2, hintsUsed: 1, solvedPuzzles: 7, completedCases: 5, currentStreak: 4,
-          bestStreak: 9, lastCompletedDate: "2026-08-03" }
-      : { attempts: 0, hintsUsed: 0, solvedPuzzles: 0, completedCases: 0, currentStreak: 0,
-          bestStreak: 0, lastCompletedDate: null };
+    const solved = [...current.newSolves]
+      .map((id) => current.states.get(id))
+      .filter((state) => state !== undefined);
+    const completed = cases.filter(
+      (item) =>
+        statesFor(item).every((state) => state.progress.earnedPoints !== null) &&
+        solved.some((state) => state.caseId === item.id),
+    );
+    const baseline =
+      identity === "telegram"
+        ? {
+            attempts: 2,
+            hintsUsed: 1,
+            solvedPuzzles: 7,
+            completedCases: 5,
+            currentStreak: 4,
+            bestStreak: 9,
+            lastCompletedDate: "2026-08-03",
+          }
+        : {
+            attempts: 0,
+            hintsUsed: 0,
+            solvedPuzzles: 0,
+            completedCases: 0,
+            currentStreak: 0,
+            bestStreak: 0,
+            lastCompletedDate: null,
+          };
     return {
-      ...baseline, attempts: baseline.attempts + current.attemptsCount,
+      ...baseline,
+      attempts: baseline.attempts + current.attemptsCount,
       hintsUsed: baseline.hintsUsed + current.hintsUsed,
       solvedPuzzles: baseline.solvedPuzzles + solved.length,
       completedCases: baseline.completedCases + completed.length,
       bestStreak: Math.max(baseline.bestStreak, completed.length ? 1 : 0),
-      lastCompletedDate: completed.map((item) => item.date).sort().at(-1) ?? baseline.lastCompletedDate,
+      lastCompletedDate:
+        completed
+          .map((item) => item.date)
+          .sort()
+          .at(-1) ?? baseline.lastCompletedDate,
     };
   }
 
   await page.route("https://telegram.org/js/telegram-web-app.js?63", async (route) => {
-    await route.fulfill({ contentType: "application/javascript", body: "window.Telegram={WebApp:{platform:'unknown'}};" });
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: "window.Telegram={WebApp:{platform:'unknown'}};",
+    });
   });
   await page.route("https://api.test/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const includeProgress = request.headers()["x-game-progress"] === "1";
     if (request.method() === "OPTIONS") {
-      await route.fulfill({ status: 204, headers: {
-        "access-control-allow-origin": "*",
-        "access-control-allow-headers": "authorization,content-type,x-content-locales,x-game-progress",
-        "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
-      } });
+      await route.fulfill({
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-headers":
+            "authorization,content-type,x-content-locales,x-game-progress",
+          "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+        },
+      });
       return;
     }
     if (url.pathname === "/v1/sessions/guest" && request.method() === "POST") {
       observed.guestChannels.push((request.postDataJSON() as { channel: string }).channel);
-      await json(route, 201, { token: "g".repeat(43), expiresAt: "2026-11-01T00:00:00.000Z", kind: "guest" });
+      await json(route, 201, {
+        token: "g".repeat(43),
+        expiresAt: "2026-11-01T00:00:00.000Z",
+        kind: "guest",
+      });
       return;
     }
     if (url.pathname === "/v1/me" && request.method() === "DELETE") {
-      observed.profileDeleteRequests.push({ authorization: request.headers().authorization ?? null, body: request.postData() });
+      observed.profileDeleteRequests.push({
+        authorization: request.headers().authorization ?? null,
+        body: request.postData(),
+      });
       identity = "guest";
       guest = actor();
-      telegram.states.clear(); telegram.attempts.clear(); telegram.newSolves.clear();
-      telegram.attemptsCount = 0; telegram.hintsUsed = 0;
+      telegram.states.clear();
+      telegram.attempts.clear();
+      telegram.newSolves.clear();
+      telegram.attemptsCount = 0;
+      telegram.hintsUsed = 0;
       if (options.loseFirstProfileDeletionResponse && !profileDeletionResponseLost) {
         profileDeletionResponseLost = true;
         await route.abort("internetdisconnected");
@@ -288,19 +373,34 @@ export async function installApiMock(
       return;
     }
     if (url.pathname === "/v1/me" && request.method() === "GET") {
-      await json(route, 200, identity === "guest" ? { kind: "guest", profile: null } : { kind: "telegram", profile });
+      await json(
+        route,
+        200,
+        identity === "guest" ? { kind: "guest", profile: null } : { kind: "telegram", profile },
+      );
       return;
     }
     if (url.pathname === "/v1/archive" && request.method() === "GET") {
       observed.archiveRequests += 1;
       await json(route, 200, {
-        today: archiveToday, startsOn: "2026-09-10",
-        cases: archiveCases.filter((item) => item.date <= archiveToday).toReversed().map((item) => {
-          const states = statesFor(item);
-          const solvedPuzzles = states.filter((state) => state.progress.earnedPoints !== null).length;
-          return { ...item, slug: `case-${item.date}`, title: publicTitle(item), solvedPuzzles,
-            completed: solvedPuzzles === item.puzzleCount };
-        }),
+        today: archiveToday,
+        startsOn: "2026-09-10",
+        cases: archiveCases
+          .filter((item) => item.date <= archiveToday)
+          .toReversed()
+          .map((item) => {
+            const states = statesFor(item);
+            const solvedPuzzles = states.filter(
+              (state) => state.progress.earnedPoints !== null,
+            ).length;
+            return {
+              ...item,
+              slug: `case-${item.date}`,
+              title: publicTitle(item),
+              solvedPuzzles,
+              completed: solvedPuzzles === item.puzzleCount,
+            };
+          }),
       });
       return;
     }
@@ -308,23 +408,46 @@ export async function installApiMock(
       observed.dailyIdentities.push(identity);
       observed.dailyDates.push(url.searchParams.get("date"));
       const item = options.archive
-        ? cases.find((candidate) => candidate.date === (url.searchParams.get("date") ?? archiveToday))
+        ? cases.find(
+            (candidate) => candidate.date === (url.searchParams.get("date") ?? archiveToday),
+          )
         : defaultCase;
       if (!item) {
-        await json(route, 404, { error: { code: "DAILY_NOT_FOUND", message: "There is no published case for this date.", requestId: "synthetic-archive-request" } });
+        await json(route, 404, {
+          error: {
+            code: "DAILY_NOT_FOUND",
+            message: "There is no published case for this date.",
+            requestId: "synthetic-archive-request",
+          },
+        });
         return;
       }
       const states = statesFor(item);
       await json(route, 200, {
-        id: item.id, date: item.date, title: publicTitle(item),
+        id: item.id,
+        date: item.date,
+        title: publicTitle(item),
         puzzles: states.map((state, index) => ({
-          id: state.puzzleId, version: 1, title: entitled(state) ? "A pawn vanished" : `Puzzle ${index + 1}`,
+          id: state.puzzleId,
+          version: 1,
+          title: entitled(state) ? "A pawn vanished" : `Puzzle ${index + 1}`,
           prompt: "What happened one move ago?",
           postFen: "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
-          retractingColor: "w", maxHints: 2, provenance: "A MOVE AGO sample", license: "CC BY 4.0",
+          retractingColor: "w",
+          maxHints: 2,
+          provenance: "A MOVE AGO sample",
+          license: "CC BY 4.0",
         })),
-        solvedPuzzleIds: states.filter((state) => state.progress.earnedPoints !== null).map((state) => state.puzzleId),
-        ...(includeProgress ? { progressStates: Object.fromEntries(states.map((state) => [state.puzzleId, snapshot(state.progress)])) } : {}),
+        solvedPuzzleIds: states
+          .filter((state) => state.progress.earnedPoints !== null)
+          .map((state) => state.puzzleId),
+        ...(includeProgress
+          ? {
+              progressStates: Object.fromEntries(
+                states.map((state) => [state.puzzleId, snapshot(state.progress)]),
+              ),
+            }
+          : {}),
       });
       return;
     }
@@ -344,7 +467,11 @@ export async function installApiMock(
         await route.abort("internetdisconnected");
         return;
       }
-      await json(route, 200, { title: "A pawn vanished", prompt: "What happened one move ago?", progress: snapshot(state.progress) });
+      await json(route, 200, {
+        title: "A pawn vanished",
+        prompt: "What happened one move ago?",
+        progress: snapshot(state.progress),
+      });
       return;
     }
     if (url.pathname === "/v1/attempts" && request.method() === "POST") {
@@ -354,18 +481,30 @@ export async function installApiMock(
       const key = String(body.attemptUuid);
       const replay = current.attempts.get(key);
       if (replay) {
-        if (replay.input !== JSON.stringify(body)) throw new Error("Synthetic idempotency conflict");
+        if (replay.input !== JSON.stringify(body))
+          throw new Error("Synthetic idempotency conflict");
         const { progress, ...base } = replay.response;
-        await json(route, 200, includeProgress ? { ...base, progress } : base, { "idempotency-replayed": "true" });
+        await json(route, 200, includeProgress ? { ...base, progress } : base, {
+          "idempotency-replayed": "true",
+        });
         return;
       }
       const state = findState(body.caseId, body.puzzleId);
       if (!state) throw new Error("Unexpected synthetic attempt identity");
-      const move = body.retraction as { currentSquare: string; previousSquare: string; restoredPiece: unknown };
-      const correct = move.currentSquare === "d5" && move.previousSquare === "e4" && move.restoredPiece !== null;
+      const move = body.retraction as {
+        currentSquare: string;
+        previousSquare: string;
+        restoredPiece: unknown;
+      };
+      const correct =
+        move.currentSquare === "d5" && move.previousSquare === "e4" && move.restoredPiece !== null;
       const id = correct
-        ? correctIds++ === 0 ? "11111111-1111-4111-8111-111111111111" : `22222222-2222-4222-8222-${String(correctIds).padStart(12, "0")}`
-        : wrongIds++ === 0 ? "33333333-3333-4333-8333-333333333333" : `44444444-4444-4444-8444-${String(wrongIds).padStart(12, "0")}`;
+        ? correctIds++ === 0
+          ? "11111111-1111-4111-8111-111111111111"
+          : `22222222-2222-4222-8222-${String(correctIds).padStart(12, "0")}`
+        : wrongIds++ === 0
+          ? "33333333-3333-4333-8333-333333333333"
+          : `44444444-4444-4444-8444-${String(wrongIds).padStart(12, "0")}`;
       const available = potential(state.progress);
       current.attemptsCount += 1;
       if (state.progress.earnedPoints === null) {
@@ -377,16 +516,34 @@ export async function installApiMock(
         }
       }
       const response: Record<string, unknown> = {
-        id, attemptUuid: body.attemptUuid, correct,
-        ...(correct ? { reveal: {
-          retraction: body.retraction,
-          previousFen: "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
-          forwardSan: "exd5", explanation: "The white e-pawn captured the black pawn on d5.",
-          historyConstraints: [{ kind: "previous-castling", value: "KQkq" }, { kind: "previous-en-passant", value: "d6" }],
-        } } : { contradiction: { code: "NOT_THE_LAST_MOVE", message: "That does not explain the missing pawn." } }),
+        id,
+        attemptUuid: body.attemptUuid,
+        correct,
+        ...(correct
+          ? {
+              reveal: {
+                retraction: body.retraction,
+                previousFen: "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+                forwardSan: "exd5",
+                explanation: "The white e-pawn captured the black pawn on d5.",
+                historyConstraints: [
+                  { kind: "previous-castling", value: "KQkq" },
+                  { kind: "previous-en-passant", value: "d6" },
+                ],
+              },
+            }
+          : {
+              contradiction: {
+                code: "NOT_THE_LAST_MOVE",
+                message: "That does not explain the missing pawn.",
+              },
+            }),
         progress: snapshot(state.progress),
       };
-      current.attempts.set(key, { input: JSON.stringify(body), response: structuredClone(response) });
+      current.attempts.set(key, {
+        input: JSON.stringify(body),
+        response: structuredClone(response),
+      });
       if (options.loseFirstAttempt && !attemptLost) {
         attemptLost = true;
         await route.abort("internetdisconnected");
@@ -401,14 +558,20 @@ export async function installApiMock(
       const attemptId = decodeURIComponent(hint[1] ?? "");
       const body = request.postDataJSON() as { level: number };
       observed.hintRequests.push({ attemptId, level: body.level });
-      const attempt = [...active().attempts.values()].find((entry) => entry.response.id === attemptId);
+      const attempt = [...active().attempts.values()].find(
+        (entry) => entry.response.id === attemptId,
+      );
       if (!attempt) throw new Error("Unexpected synthetic hint attempt");
       const input = JSON.parse(attempt.input) as { caseId: string; puzzleId: string };
       const state = findState(input.caseId, input.puzzleId);
       if (!state) throw new Error("Missing synthetic hint state");
       let earned = state.progress.earnedHints.find((item) => item.level === body.level);
       if (!earned) {
-        earned = { level: body.level, text: "A pawn changed files.", exhausted: body.level >= 2 } satisfies EarnedHint;
+        earned = {
+          level: body.level,
+          text: "A pawn changed files.",
+          exhausted: body.level >= 2,
+        } satisfies EarnedHint;
         state.progress.earnedHints.push(earned);
         state.progress.highestHintLevel = body.level;
         state.progress.assistanceCount += 1;
@@ -419,13 +582,19 @@ export async function installApiMock(
         await route.abort("internetdisconnected");
         return;
       }
-      await json(route, 200, { ...earned, ...(includeProgress ? { progress: snapshot(state.progress) } : {}) });
+      await json(route, 200, {
+        ...earned,
+        ...(includeProgress ? { progress: snapshot(state.progress) } : {}),
+      });
       return;
     }
     if (url.pathname === "/v1/me/stats" && request.method() === "GET") {
       observed.statsRequests += 1;
       observed.statsIdentities.push(identity);
-      const points = [...active().states.values()].reduce((sum, state) => sum + (state.progress.earnedPoints ?? 0), 0);
+      const points = [...active().states.values()].reduce(
+        (sum, state) => sum + (state.progress.earnedPoints ?? 0),
+        0,
+      );
       await json(route, 200, { ...stats(), ...(includeProgress ? { points } : {}) });
       return;
     }
@@ -436,13 +605,21 @@ export async function installApiMock(
       }
       for (const [key, attempt] of guest.attempts) telegram.attempts.set(key, attempt);
       for (const id of guest.newSolves) telegram.newSolves.add(id);
-      telegram.attemptsCount += guest.attemptsCount; telegram.hintsUsed += guest.hintsUsed;
+      telegram.attemptsCount += guest.attemptsCount;
+      telegram.hintsUsed += guest.hintsUsed;
       guest = actor();
       identity = "telegram";
-      await json(route, 200, { token: "t".repeat(43), expiresAt: "2026-11-01T00:00:00.000Z", kind: "telegram", profile });
+      await json(route, 200, {
+        token: "t".repeat(43),
+        expiresAt: "2026-11-01T00:00:00.000Z",
+        kind: "telegram",
+        profile,
+      });
       return;
     }
-    await json(route, 404, { error: { code: "NOT_FOUND", message: "Mock route not found.", requestId: "e2e-request" } });
+    await json(route, 404, {
+      error: { code: "NOT_FOUND", message: "Mock route not found.", requestId: "e2e-request" },
+    });
   });
   return observed;
 }

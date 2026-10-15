@@ -1,24 +1,45 @@
+type Translation = string | { other: string; one?: string; few?: string; many?: string };
+
 const en = {
   "game.conditions": "Conditions · no point cost",
   "game.score.label": "Puzzle score",
   "game.score.attempt": "Attempt {number}",
-  "game.score.available": "Available: {points} points",
+  "game.score.available": {
+    one: "Available: {points} point",
+    other: "Available: {points} points",
+  },
   "game.score.sync": "Updating score…",
   "game.score.rules": "How points work",
-  "game.score.rulesCopy": "Solve on attempt 1 / 2 / 3 / 4+ for 100 / 70 / 40 / 20 points. Each new clue or hint halves the reward, rounded down to at least 1 point. Retries of the same request never cost extra.",
+  "game.score.rulesCopy":
+    "Solve on attempt 1 / 2 / 3 / 4+ for 100 / 70 / 40 / 20 points. Each new clue or hint halves the reward, rounded down to at least 1 point. Retries of the same request never cost extra.",
   "game.clue.hidden": "An optional title clue is hidden. You can solve using the conditions above.",
-  "game.clue.reveal": "Reveal clue · {before} → {after} points",
+  "game.clue.reveal": {
+    one: "Reveal clue · {before} → {after} point",
+    other: "Reveal clue · {before} → {after} points",
+  },
   "game.clue.loading": "Revealing clue…",
   "game.clue.unlocked": "Clue unlocked",
-  "game.clue.error": "The clue couldn't be loaded. Retry to confirm it without another point deduction.",
+  "game.clue.error":
+    "The clue couldn't be loaded. Retry to confirm it without another point deduction.",
   "game.clue.retry": "Retry clue",
-  "game.hint.cost": "Get hint · {before} → {after} points",
-  "game.score.awarded": "+{points} points earned",
-  "game.score.already": "Already counted · {points} points",
+  "game.hint.cost": {
+    one: "Get hint · {before} → {after} point",
+    other: "Get hint · {before} → {after} points",
+  },
+  "game.score.awarded": {
+    one: "+{points} point earned",
+    other: "+{points} points earned",
+  },
+  "game.score.already": {
+    one: "Already counted · {points} point",
+    other: "Already counted · {points} points",
+  },
   "game.score.legacy": "Previously solved · unrated",
   "game.score.awardAttempt": "Solved on attempt {number}",
-  "game.score.alreadyCopy": "This puzzle has already contributed to your rating. Replaying it adds no points.",
-  "game.score.legacyCopy": "Solved before scoring was introduced. It stays completed and cannot earn points again.",
+  "game.score.alreadyCopy":
+    "This puzzle has already contributed to your rating. Replaying it adds no points.",
+  "game.score.legacyCopy":
+    "Solved before scoring was introduced. It stays completed and cannot earn points again.",
 
   "game.empty": "empty",
   "game.piece.wp": "white pawn",
@@ -118,23 +139,53 @@ const ru = {
   "game.conditions": "Условия · без потери очков",
   "game.score.label": "Очки за задачу",
   "game.score.attempt": "Попытка {number}",
-  "game.score.available": "Доступно: {points} очков",
+  "game.score.available": {
+    one: "Доступно: {points} очко",
+    few: "Доступно: {points} очка",
+    many: "Доступно: {points} очков",
+    other: "Доступно: {points} очков",
+  },
   "game.score.sync": "Обновляем очки…",
   "game.score.rules": "Как начисляются очки",
-  "game.score.rulesCopy": "Решение с 1-й / 2-й / 3-й / 4-й и следующих попыток даёт 100 / 70 / 40 / 20 очков. Каждая новая улика или подсказка уменьшает награду вдвое, с округлением вниз до минимума в 1 очко. Повтор отправки того же запроса ничего не стоит.",
-  "game.clue.hidden": "Дополнительная улика в названии скрыта. Задачу можно решить по условиям выше.",
-  "game.clue.reveal": "Открыть улику · {before} → {after} очков",
+  "game.score.rulesCopy":
+    "Решение с 1-й / 2-й / 3-й / 4-й и следующих попыток даёт 100 / 70 / 40 / 20 очков. Каждая новая улика или подсказка уменьшает награду вдвое, с округлением вниз до минимума в 1 очко. Повтор отправки того же запроса ничего не стоит.",
+  "game.clue.hidden":
+    "Дополнительная улика в названии скрыта. Задачу можно решить по условиям выше.",
+  "game.clue.reveal": {
+    one: "Открыть улику · {before} → {after} очко",
+    few: "Открыть улику · {before} → {after} очка",
+    many: "Открыть улику · {before} → {after} очков",
+    other: "Открыть улику · {before} → {after} очков",
+  },
   "game.clue.loading": "Открываем улику…",
   "game.clue.unlocked": "Улика открыта",
-  "game.clue.error": "Не удалось загрузить улику. Повторите запрос, чтобы получить её без повторного списания очков.",
+  "game.clue.error":
+    "Не удалось загрузить улику. Повторите запрос, чтобы получить её без повторного списания очков.",
   "game.clue.retry": "Повторить запрос улики",
-  "game.hint.cost": "Подсказка · {before} → {after} очков",
-  "game.score.awarded": "Начислено: +{points} очков",
-  "game.score.already": "Уже учтено · {points} очков",
+  "game.hint.cost": {
+    one: "Подсказка · {before} → {after} очко",
+    few: "Подсказка · {before} → {after} очка",
+    many: "Подсказка · {before} → {after} очков",
+    other: "Подсказка · {before} → {after} очков",
+  },
+  "game.score.awarded": {
+    one: "Начислено: +{points} очко",
+    few: "Начислено: +{points} очка",
+    many: "Начислено: +{points} очков",
+    other: "Начислено: +{points} очков",
+  },
+  "game.score.already": {
+    one: "Уже учтено · {points} очко",
+    few: "Уже учтено · {points} очка",
+    many: "Уже учтено · {points} очков",
+    other: "Уже учтено · {points} очков",
+  },
   "game.score.legacy": "Решено ранее · без оценки",
-  "game.score.awardAttempt": "Решено с попытки {number}",
-  "game.score.alreadyCopy": "Эта задача уже учтена в личном рейтинге. Повторное решение не добавляет очков.",
-  "game.score.legacyCopy": "Задача решена до появления очков. Она остаётся пройденной и не начисляет очки повторно.",
+  "game.score.awardAttempt": "Решено с {number}-й попытки",
+  "game.score.alreadyCopy":
+    "Эта задача уже учтена в личном рейтинге. Повторное решение не добавляет очков.",
+  "game.score.legacyCopy":
+    "Задача решена до появления очков. Она остаётся пройденной и не начисляет очки повторно.",
 
   "game.empty": "пусто",
   "game.piece.wp": "белая пешка",
@@ -227,7 +278,7 @@ const ru = {
   "game.reveal.inspect": "Изучите обе позиции или повторите ход в удобном темпе.",
   "game.reveal.replay": "Повторить ход",
   "game.continue": "Продолжить",
-} satisfies Record<keyof typeof en, string>;
+} satisfies Record<keyof typeof en, Translation>;
 
 const zh = {
   "game.conditions": "题目条件 · 不扣分",
@@ -236,7 +287,8 @@ const zh = {
   "game.score.available": "可得：{points} 分",
   "game.score.sync": "正在更新分数…",
   "game.score.rules": "计分规则",
-  "game.score.rulesCopy": "第 1 / 2 / 3 / 4 次及之后的尝试解出，可得 100 / 70 / 40 / 20 分。每条新线索或提示将奖励减半，向下取整，最低 1 分。重试同一请求不会额外扣分。",
+  "game.score.rulesCopy":
+    "第 1 / 2 / 3 / 4 次及之后的尝试解出，可得 100 / 70 / 40 / 20 分。每条新线索或提示将奖励减半，向下取整，最低 1 分。重试同一请求不会额外扣分。",
   "game.clue.hidden": "标题中的额外线索已隐藏。你可以仅根据上方条件解题。",
   "game.clue.reveal": "揭示线索 · {before} → {after} 分",
   "game.clue.loading": "正在揭示线索…",
@@ -342,6 +394,6 @@ const zh = {
   "game.reveal.inspect": "查看前后两个局面，或按自己的节奏回放走法。",
   "game.reveal.replay": "回放走法",
   "game.continue": "继续",
-} satisfies Record<keyof typeof en, string>;
+} satisfies Record<keyof typeof en, Translation>;
 
 export const gameMessages = { en, ru, zh };

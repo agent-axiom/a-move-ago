@@ -468,11 +468,11 @@ describe("POST /v1/auth/telegram/mini-app", () => {
          normalized_answer_json, correct, response_json, hints_used, submitted_at)
        SELECT 'second-guest-attempt', 'second-uuid', ?, NULL, case_id, puzzle_id,
               '{}', 0, '{}', 0, submitted_at
-         FROM attempts WHERE id = 'first-guest-attempt'`,
+         FROM attempts WHERE id = 'first-guest-attempt' RETURNING id`,
     )
       .bind(second.sessionId)
-      .run();
-    expect(secondFixture.meta.changes).toBe(1);
+      .first<{ id: string }>();
+    expect(secondFixture?.id).toBe("second-guest-attempt");
     const body = { initData: await validInitData() };
 
     const [firstLogin, secondLogin] = await Promise.all([

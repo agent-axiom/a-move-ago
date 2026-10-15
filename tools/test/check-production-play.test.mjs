@@ -555,37 +555,46 @@ test("localized wrapper masks private configuration parse failures before any re
 });
 
 test("solve-unlocked public titles may change while neutral puzzle aliases remain stable", async () => {
-  const check = harness({ override: (request, payload, status, headers) => {
-    if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
-      payload.title = "Unlocked case title";
-      payload.puzzles[0].title = "Unlocked composition title";
-    }
-    return new Response(JSON.stringify(payload), { status, headers });
-  } });
+  const check = harness({
+    override: (request, payload, status, headers) => {
+      if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
+        payload.title = "Unlocked case title";
+        payload.puzzles[0].title = "Unlocked composition title";
+      }
+      return new Response(JSON.stringify(payload), { status, headers });
+    },
+  });
   assert.equal((await check.run()).ok, true);
 });
 
 test("title unlocking cannot change the puzzle identity or free mandatory prompt", async (t) => {
-  for (const [field, value] of [["id", "thematic-source-id"], ["prompt", secret]]) {
+  for (const [field, value] of [
+    ["id", "thematic-source-id"],
+    ["prompt", secret],
+  ]) {
     await t.test(field, async () => {
-      const check = harness({ override: (request, payload, status, headers) => {
-        if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
-          payload.puzzles[0][field] = value;
-        }
-        return new Response(JSON.stringify(payload), { status, headers });
-      } });
+      const check = harness({
+        override: (request, payload, status, headers) => {
+          if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
+            payload.puzzles[0][field] = value;
+          }
+          return new Response(JSON.stringify(payload), { status, headers });
+        },
+      });
       await assert.rejects(check.run(), { message: "RELOADED_DAILY_FAILED" });
     });
   }
 });
 
 test("localized title unlocking preserves all other public translations", async () => {
-  const check = localizedHarness({ override: (request, payload, status, headers) => {
-    if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
-      payload.puzzles[0].localizations.ru.title = "Раскрытая композиция";
-      payload.puzzles[0].localizations.zh.title = "已揭晓的棋题";
-    }
-    return new Response(JSON.stringify(payload), { status, headers });
-  } });
+  const check = localizedHarness({
+    override: (request, payload, status, headers) => {
+      if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
+        payload.puzzles[0].localizations.ru.title = "Раскрытая композиция";
+        payload.puzzles[0].localizations.zh.title = "已揭晓的棋题";
+      }
+      return new Response(JSON.stringify(payload), { status, headers });
+    },
+  });
   assert.equal((await check.run()).ok, true);
 });

@@ -90,7 +90,6 @@ it("requires an application reload after a contract failure", async () => {
   expect(screen.queryByRole("button", { name: "Retry statistics" })).not.toBeInTheDocument();
 });
 
-
 it("shows the personal rating returned by the service and the scoring rules", async () => {
   const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
   runtime.api.getStats = vi.fn().mockResolvedValue({ ...stats, points: 140 });
@@ -108,7 +107,9 @@ it("shows the personal rating returned by the service and the scoring rules", as
   for (const award of ["100", "70", "40", "20"]) {
     expect(within(rating).getByText(award)).toBeInTheDocument();
   }
-  expect(rating).toHaveTextContent("Each revealed clue or hint halves the points, rounded down to a minimum of 1.");
+  expect(rating).toHaveTextContent(
+    "Each revealed clue or hint halves the points, rounded down to a minimum of 1.",
+  );
   expect(runtime.api.getStats).toHaveBeenCalledOnce();
 });
 
@@ -123,7 +124,9 @@ it("keeps earlier solves visible while showing their unrated zero honestly", asy
 
   const rating = await screen.findByRole("region", { name: "Personal rating" });
   expect(within(rating).getByText("0")).toBeInTheDocument();
-  expect(rating).toHaveTextContent("New solves earn points. Earlier progress stays in your history.");
+  expect(rating).toHaveTextContent(
+    "New solves earn points. Earlier progress stays in your history.",
+  );
   expect(screen.getByText("Solved puzzles").nextElementSibling).toHaveTextContent("3");
 });
 
@@ -158,8 +161,10 @@ it("switches the personal rating, point plurals and scoring copy without fetchin
   await user.selectOptions(screen.getByLabelText("Language"), "ru");
   const russian = screen.getByRole("region", { name: "Личный рейтинг" });
   expect(within(russian).getByText("21")).toBeInTheDocument();
-  expect(within(russian).getByText("балл")).toBeInTheDocument();
-  expect(russian).toHaveTextContent("Каждая открытая улика или подсказка уменьшает баллы вдвое");
+  expect(within(russian).getByText("очко")).toBeInTheDocument();
+  expect(russian).toHaveTextContent(
+    "Каждая открытая улика или подсказка уменьшает количество очков вдвое",
+  );
   await user.selectOptions(screen.getByLabelText("Язык"), "zh");
   const chinese = screen.getByRole("region", { name: "个人评分" });
   expect(within(chinese).getByText("21")).toBeInTheDocument();

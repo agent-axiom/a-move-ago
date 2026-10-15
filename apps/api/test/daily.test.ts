@@ -343,12 +343,8 @@ describe("GET /v1/daily", () => {
 
     const currentDaily = DailyCaseResponseSchema.parse(current.body);
     const otherDaily = DailyCaseResponseSchema.parse(other.body);
-    expect(currentDaily.solvedPuzzleIds).toEqual([
-      publicPuzzleId(dailyCase.id, 1, 1),
-    ]);
-    expect(otherDaily.solvedPuzzleIds).toEqual([
-      publicPuzzleId(dailyCase.id, 2, 1),
-    ]);
+    expect(currentDaily.solvedPuzzleIds).toEqual([publicPuzzleId(dailyCase.id, 1, 1)]);
+    expect(otherDaily.solvedPuzzleIds).toEqual([publicPuzzleId(dailyCase.id, 2, 1)]);
     expect(currentDaily.title).toBe(dailyCase.title);
     expect(currentDaily.puzzles[0]?.title).toBe(openingPuzzleFixture.public.title);
     expect(otherDaily.title).toBe("Daily case");
