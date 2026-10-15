@@ -3,6 +3,8 @@ import { useState } from "react";
 import { localizedText, useI18n } from "../../i18n";
 import { useArchive } from "./use-archive";
 
+const archiveFirstDate = "2026-09-10";
+
 export function archiveDateLabel(date: string, locale = "en"): string {
   return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {
     day: "numeric",
@@ -28,13 +30,14 @@ function ArchiveCases(props: {
 }) {
   const { locale, intlLocale, t } = useI18n();
   const cases = props.archive.cases
-    .filter((item) => item.date <= props.archive.today)
+    .filter((item) => item.date >= archiveFirstDate && item.date <= props.archive.today)
     .toSorted((left, right) => right.date.localeCompare(left.date));
   const months = [...new Set(cases.map((item) => item.date.slice(0, 7)))];
   const month =
     props.selectedMonth && months.includes(props.selectedMonth) ? props.selectedMonth : months[0];
   const visibleCases = cases.filter((item) => item.date.startsWith(month ?? ""));
   const completed = cases.filter((item) => item.completed).length;
+  const startsOn = cases.at(-1)?.date;
 
   if (cases.length === 0) {
     return (
@@ -53,10 +56,10 @@ function ArchiveCases(props: {
           <span aria-hidden="true"> · </span>
           <span>{t("shell.archiveCompleted", { count: completed })}</span>
         </p>
-        {props.archive.startsOn ? (
+        {startsOn ? (
           <p>
             {t("shell.archiveSince", {
-              date: archiveDateLabel(props.archive.startsOn, intlLocale),
+              date: archiveDateLabel(startsOn, intlLocale),
             })}
           </p>
         ) : null}
