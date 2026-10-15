@@ -111,13 +111,13 @@ it("lets players inspect either position and replay without advancing the case",
   const complete = vi.fn();
   render(<RevealPlayer onComplete={complete} postFen={postFen} solution={solution} />);
 
-  fireEvent.click(screen.getByRole("button", { name: "Before", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Before" }));
   expect(screen.getByRole("grid", { name: "Reconstructed previous position" })).toBeInTheDocument();
   expect(screen.getByRole("gridcell", { name: "e4, white pawn" })).toBeInTheDocument();
   act(() => vi.runAllTimers());
   expect(screen.getByRole("grid", { name: "Reconstructed previous position" })).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole("button", { name: "After", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "After" }));
   expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Replay move" }));
   expect(screen.getByRole("status")).toHaveTextContent("Rewinding the last move");

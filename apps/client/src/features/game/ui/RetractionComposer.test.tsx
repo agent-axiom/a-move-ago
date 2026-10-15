@@ -73,14 +73,14 @@ it("keeps the current board editable and makes the reconstruction an explicit re
 
   expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toBeEnabled();
   expect(screen.getByRole("gridcell", { name: "e4, empty" })).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Before", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Before" }));
   expect(
     screen.getByRole("grid", { name: "Your reconstruction, read-only preview" }),
   ).toBeInTheDocument();
   expect(screen.getByRole("gridcell", { name: "e4, white pawn" })).toBeDisabled();
   expect(screen.getByRole("gridcell", { name: "d5, black pawn" })).toBeDisabled();
 
-  await user.click(screen.getByRole("button", { name: "Now", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Now" }));
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
   expect(
     screen.getByText("Choose the square it came from.", { selector: ".board-caption" }),
@@ -104,7 +104,7 @@ it("makes reverse promotion discoverable and previews a pawn rather than the pro
   await user.click(screen.getByRole("gridcell", { name: "c8, white knight" }));
   await user.click(screen.getByRole("gridcell", { name: "c7, empty" }));
   await user.selectOptions(screen.getByLabelText("Special move"), "unpromotion");
-  await user.click(screen.getByRole("button", { name: "Before", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Before" }));
   expect(screen.getByRole("gridcell", { name: "c7, white pawn" })).toBeInTheDocument();
   expect(screen.getByRole("gridcell", { name: "c8, empty" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Check move" }));
