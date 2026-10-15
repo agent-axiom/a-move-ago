@@ -36,19 +36,19 @@ function firstCase(value: ArchiveResponse) {
 describe("archive contract", () => {
   it("accepts public metadata, actor progress, and an empty published catalog", () => {
     expect(ArchiveResponseSchema.parse(catalog)).toEqual(catalog);
-    expect(
-      ArchiveResponseSchema.parse({ today: "2026-10-15", startsOn: null, cases: [] }),
-    ).toEqual({ today: "2026-10-15", startsOn: null, cases: [] });
+    expect(ArchiveResponseSchema.parse({ today: "2026-10-15", startsOn: null, cases: [] })).toEqual(
+      { today: "2026-10-15", startsOn: null, cases: [] },
+    );
   });
 
   it("rejects private fields at both response and case levels", () => {
-    expect(
-      ArchiveResponseSchema.safeParse({ ...catalog, acceptedSolutions: [] }).success,
-    ).toBe(false);
+    expect(ArchiveResponseSchema.safeParse({ ...catalog, acceptedSolutions: [] }).success).toBe(
+      false,
+    );
     expect(
       ArchiveResponseSchema.safeParse({
         ...catalog,
-        cases: [{ ...firstCase(catalog), public_json: "private-puzzle-data" }],
+        cases: catalog.cases.map((item) => ({ ...item, public_json: "private-puzzle-data" })),
       }).success,
     ).toBe(false);
   });
@@ -69,7 +69,9 @@ describe("archive contract", () => {
     [
       "duplicate cases",
       (value) => {
-        value.cases.push(structuredClone(firstCase(value)));
+        const oldest = value.cases.at(-1);
+        if (!oldest) throw new Error("Expected catalog fixture");
+        oldest.id = firstCase(value).id;
       },
     ],
     [

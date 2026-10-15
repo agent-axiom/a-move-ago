@@ -17,8 +17,7 @@ export async function readArchiveCases(
   if (actor.kind === "telegram" && actor.playerId === null) {
     throw new Error("Telegram archive actor has no player");
   }
-  const scope =
-    actor.kind === "guest" ? "session_id = ? AND player_id IS NULL" : "player_id = ?";
+  const scope = actor.kind === "guest" ? "session_id = ? AND player_id IS NULL" : "player_id = ?";
   const actorId = actor.kind === "guest" ? actor.sessionId : actor.playerId;
   const result = await db
     .prepare(

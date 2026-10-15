@@ -392,9 +392,7 @@ describe("historical archive content transfer", () => {
     ];
     for (const request of changes) {
       h.state.request = request;
-      await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow(
-        "REQUEST_KEY_MISMATCH",
-      );
+      await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("REQUEST_KEY_MISMATCH");
     }
     expect(h.fetchMock).not.toHaveBeenCalled();
     expect(h.importCase).not.toHaveBeenCalled();
