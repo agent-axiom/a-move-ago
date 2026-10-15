@@ -31,7 +31,14 @@ async function seedCase(
   caseStatus: "draft" | "published" | "retired" = "published",
 ) {
   const id = `case-${date}`;
-  await seedDailyCase(testEnv.DB, { id, date, slug: id, title: id, status: caseStatus });
+  const title = `Hidden theme for ${date}`;
+  await seedDailyCase(testEnv.DB, {
+    id,
+    date,
+    slug: `secret-motif-${date}`,
+    title,
+    status: caseStatus,
+  });
   const puzzles = [];
   for (const [index, status] of statuses.entries()) {
     const puzzle = makePuzzleFixture({ contentKey: `${id}-puzzle-${index}` });
@@ -39,7 +46,7 @@ async function seedCase(
     await seedCasePuzzle(testEnv.DB, id, puzzle.rowId, index + 1);
     puzzles.push(puzzle.rowId);
   }
-  return { id, puzzles };
+  return { id, puzzles, title };
 }
 
 async function solve(
@@ -152,7 +159,7 @@ describe("GET /v1/archive", () => {
         id: "case-2026-10-15",
         date: "2026-10-15",
         slug: "case-2026-10-15",
-        title: "case-2026-10-15",
+        title: "Daily case",
         puzzleCount: 1,
         solvedPuzzles: 0,
         completed: false,
@@ -161,7 +168,7 @@ describe("GET /v1/archive", () => {
         id: "case-2026-10-14",
         date: "2026-10-14",
         slug: "case-2026-10-14",
-        title: "case-2026-10-14",
+        title: "Daily case",
         puzzleCount: 1,
         solvedPuzzles: 0,
         completed: false,
@@ -170,7 +177,7 @@ describe("GET /v1/archive", () => {
         id: "case-2026-09-10",
         date: "2026-09-10",
         slug: "case-2026-09-10",
-        title: "case-2026-09-10",
+        title: "Daily case",
         puzzleCount: 2,
         solvedPuzzles: 0,
         completed: false,
@@ -186,6 +193,8 @@ describe("GET /v1/archive", () => {
       "acceptedSolutions",
       "act_json",
       "hints",
+      "Hidden theme",
+      "secret-motif",
     ]) {
       expect(json).not.toContain(hidden);
     }
@@ -201,6 +210,7 @@ describe("GET /v1/archive", () => {
     await solve(stranger.sessionId, dailyCase.id, puzzleAt(dailyCase, 1));
     let result = ArchiveResponseSchema.parse((await archive(guest.token)).body);
     expect(result.cases[0]).toMatchObject({ puzzleCount: 2, solvedPuzzles: 1, completed: false });
+    expect(result.cases[0]?.title).toBe("Daily case");
     const linkedAttempt = await solve(guest.sessionId, dailyCase.id, puzzleAt(dailyCase, 1));
     await seedPlayer("linked-away-player", "1001");
     await testEnv.DB.prepare("UPDATE attempts SET player_id = ? WHERE id = ?")
@@ -211,6 +221,7 @@ describe("GET /v1/archive", () => {
     await solve(guest.sessionId, dailyCase.id, puzzleAt(dailyCase, 1));
     result = ArchiveResponseSchema.parse((await archive(guest.token)).body);
     expect(result.cases[0]).toMatchObject({ solvedPuzzles: 2, completed: true });
+    expect(result.cases[0]?.title).toBe(dailyCase.title);
   });
 
   it("merges Telegram progress across sessions, including detached origins, without another player", async () => {
@@ -255,19 +266,21 @@ describe("GET /v1/archive", () => {
 
   it("rejects impossible aggregate progress before serving it", async () => {
     const db = {
-      prepare: () => ({
+      prepare: (query: string) => ({
         bind: () => ({
           all: async () => ({
-            results: [
-              {
-                id: "invalid-case",
-                case_date: "2026-10-14",
-                slug: "invalid-case",
-                title: "Invalid case",
-                puzzle_count: 1,
-                solved_puzzles: 2,
-              },
-            ],
+            results: query.includes("WITH actor_solved")
+              ? [
+                  {
+                    id: "invalid-case",
+                    case_date: "2026-10-14",
+                    slug: "invalid-case",
+                    title: "Invalid case",
+                    puzzle_count: 1,
+                    solved_puzzles: 2,
+                  },
+                ]
+              : [],
           }),
         }),
       }),

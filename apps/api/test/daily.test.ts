@@ -7,6 +7,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
 import { hashSessionToken } from "../src/crypto/opaque-token";
+import { publicPuzzleId } from "../src/db/puzzle-identity";
 import type { Env } from "../src/env";
 import { withFakeRateLimiters } from "./fake-rate-limiters";
 import {
@@ -137,13 +138,28 @@ describe("GET /v1/daily", () => {
     expect(DailyCaseResponseSchema.parse(result.body)).toEqual({
       id: dailyCase.id,
       date: "2026-08-03",
-      title: dailyCase.title,
-      puzzles: [secondPuzzle.public, openingPuzzleFixture.public],
+      title: "Daily case",
+      puzzles: [
+        { ...secondPuzzle.public, id: publicPuzzleId(dailyCase.id, 1, 1), title: "Puzzle 1" },
+        {
+          ...openingPuzzleFixture.public,
+          id: publicPuzzleId(dailyCase.id, 2, 1),
+          title: "Puzzle 2",
+        },
+      ],
       solvedPuzzleIds: [],
     });
     expect(serialized).not.toContain("acceptedSolutions");
     expect(serialized).not.toContain("previousFen");
     expect(serialized).not.toContain(privateSolutionMarker);
+    for (const hidden of [
+      dailyCase.title,
+      secondPuzzle.public.title,
+      secondPuzzle.contentKey,
+      openingPuzzleFixture.contentKey,
+    ]) {
+      expect(serialized).not.toContain(hidden);
+    }
   });
 
   it("uses the injected UTC date by default and serves a published past archive", async () => {
@@ -325,8 +341,19 @@ describe("GET /v1/daily", () => {
     const current = await authenticatedJson("/v1/daily?date=2026-08-03", currentToken);
     const other = await authenticatedJson("/v1/daily?date=2026-08-03", otherToken);
 
-    expect(DailyCaseResponseSchema.parse(current.body).solvedPuzzleIds).toEqual(["opening-exd5"]);
-    expect(DailyCaseResponseSchema.parse(other.body).solvedPuzzleIds).toEqual(["quiet-a4"]);
+    const currentDaily = DailyCaseResponseSchema.parse(current.body);
+    const otherDaily = DailyCaseResponseSchema.parse(other.body);
+    expect(currentDaily.solvedPuzzleIds).toEqual([
+      publicPuzzleId(dailyCase.id, 1, 1),
+    ]);
+    expect(otherDaily.solvedPuzzleIds).toEqual([
+      publicPuzzleId(dailyCase.id, 2, 1),
+    ]);
+    expect(currentDaily.title).toBe(dailyCase.title);
+    expect(currentDaily.puzzles[0]?.title).toBe(openingPuzzleFixture.public.title);
+    expect(otherDaily.title).toBe("Daily case");
+    expect(otherDaily.puzzles[0]?.title).toBe("Puzzle 1");
+    expect(otherDaily.puzzles[1]?.title).toBe(secondPuzzle.public.title);
   });
 
   it("scopes Telegram solved puzzles to the player across sessions without cross-player leaks", async () => {
@@ -394,9 +421,11 @@ describe("GET /v1/daily", () => {
     const otherPlayer = await authenticatedJson("/v1/daily?date=2026-08-03", otherToken);
 
     expect(DailyCaseResponseSchema.parse(samePlayer.body).solvedPuzzleIds).toEqual([
-      "opening-exd5",
+      publicPuzzleId(dailyCase.id, 1, 1),
     ]);
-    expect(DailyCaseResponseSchema.parse(otherPlayer.body).solvedPuzzleIds).toEqual(["quiet-a4"]);
+    expect(DailyCaseResponseSchema.parse(otherPlayer.body).solvedPuzzleIds).toEqual([
+      publicPuzzleId(dailyCase.id, 2, 1),
+    ]);
   });
 
   it("fails closed for corrupt, private, mismatched, or version-inconsistent public projections", async () => {

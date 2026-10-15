@@ -1,8 +1,11 @@
 import type { SessionActor } from "../env";
+import { puzzleAliasSql } from "./puzzle-identity";
 
 export interface AttemptReplayRow {
   id: string;
   case_id: string;
+  puzzle_row_id: string;
+  puzzle_alias: string;
   puzzle_content_key: string;
   normalized_answer_json: string;
   correct: number;
@@ -56,10 +59,12 @@ export async function findAttemptReplay(
 ): Promise<AttemptReplayRow | null> {
   return await db
     .prepare(
-      `SELECT a.id, a.case_id, p.content_key AS puzzle_content_key,
+      `SELECT a.id, a.case_id, p.id AS puzzle_row_id, p.content_key AS puzzle_content_key,
+              ${puzzleAliasSql("a.case_id", "dcp.position", "p.version")} AS puzzle_alias,
               a.normalized_answer_json, a.correct, a.response_json
          FROM attempts a
          JOIN puzzles p ON p.id = a.puzzle_id
+         JOIN daily_case_puzzles dcp ON dcp.case_id = a.case_id AND dcp.puzzle_id = p.id
         WHERE a.session_id = ? AND a.attempt_uuid = ?`,
     )
     .bind(sessionId, attemptUuid)
@@ -74,10 +79,12 @@ export async function findAttemptReplayForActor(
 ): Promise<AttemptReplayRow | null> {
   return await db
     .prepare(
-      `SELECT a.id, a.case_id, p.content_key AS puzzle_content_key,
+      `SELECT a.id, a.case_id, p.id AS puzzle_row_id, p.content_key AS puzzle_content_key,
+              ${puzzleAliasSql("a.case_id", "dcp.position", "p.version")} AS puzzle_alias,
               a.normalized_answer_json, a.correct, a.response_json
          FROM attempts a
          JOIN puzzles p ON p.id = a.puzzle_id
+         JOIN daily_case_puzzles dcp ON dcp.case_id = a.case_id AND dcp.puzzle_id = p.id
          JOIN sessions s ON s.id = a.session_id
         WHERE a.session_id = ?
           AND a.attempt_uuid = ?
@@ -109,7 +116,7 @@ export async function findAttemptPuzzle(
          JOIN puzzles p ON p.id = dcp.puzzle_id
          LEFT JOIN puzzle_solutions ps ON ps.puzzle_id = p.id
         WHERE dc.id = ?
-          AND p.content_key = ?
+          AND (p.content_key = ? OR ${puzzleAliasSql("dc.id", "dcp.position", "p.version")} = ?)
           AND dc.case_date <= ?
           AND dc.status = 'published'
           AND p.status = 'published'
@@ -122,7 +129,7 @@ export async function findAttemptPuzzle(
           )
         ORDER BY p.id, ps.sort_order`,
     )
-    .bind(caseId, puzzleContentKey, today)
+    .bind(caseId, puzzleContentKey, puzzleContentKey, today)
     .all<AttemptPuzzleRow>();
   return result.results;
 }
@@ -235,7 +242,11 @@ export async function persistHintForActor(
             AND ${actorPredicate()}
             AND ${hintOwnershipPredicate("a")}
             AND ? = COALESCE(
-              (SELECT MAX(he.hint_level) FROM hint_events he WHERE he.attempt_id = a.id),
+              (SELECT MAX(earned.hint_level)
+                 FROM gameplay_events earned
+                 JOIN attempts earned_attempt ON earned_attempt.id = earned.attempt_id
+                WHERE earned.kind = 'hint' AND earned.puzzle_id = a.puzzle_id
+                  AND ${hintOwnershipPredicate("earned_attempt")}),
               0
             ) + 1
          ON CONFLICT(attempt_id, hint_level) DO NOTHING`,
@@ -251,8 +262,9 @@ export async function persistHintForActor(
     db
       .prepare(
         `UPDATE attempts
-            SET hints_used = MAX(hints_used, ?)
+            SET hints_used = hints_used + 1
           WHERE attempts.id = ?
+            AND changes() = 1
             AND attempts.correct = 0
             AND EXISTS (
               SELECT 1
@@ -266,12 +278,7 @@ export async function persistHintForActor(
                WHERE he.attempt_id = attempts.id AND he.hint_level = ?
             )`,
       )
-      .bind(
-        input.hintLevel,
-        input.attemptId,
-        ...sessionActorBindings(actor, input.now),
-        input.hintLevel,
-      ),
+      .bind(input.attemptId, ...sessionActorBindings(actor, input.now), input.hintLevel),
   ]);
 }
 

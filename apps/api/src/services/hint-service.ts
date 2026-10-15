@@ -7,8 +7,10 @@ import {
   isSessionActorActive,
   persistHintForActor,
 } from "../db/attempts";
+import { readGameProgress } from "../db/gameplay";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
+import { puzzleProgressStates } from "./gameplay-service";
 import { localizeHint } from "./localization-service";
 
 type HintResponse = z.infer<typeof HintResponseSchema>;
@@ -68,6 +70,7 @@ export async function requestHint(
   requestedLevel: number,
   now: number,
   includeLocalizations = false,
+  includeGameProgress = false,
 ): Promise<HintResponse> {
   const attempt = await findHintAttemptForActor(env.DB, actor, attemptId, now);
   if (!attempt) return await throwMissingActorOrAttempt(env, actor, now);
@@ -78,18 +81,27 @@ export async function requestHint(
   const puzzleRowId = attempt.puzzle_id;
 
   async function result(hint: HintResponse) {
-    return includeLocalizations ? await localizeHint(env.DB, puzzleRowId, hint) : hint;
+    const localized = includeLocalizations ? await localizeHint(env.DB, puzzleRowId, hint) : hint;
+    const progress = includeGameProgress
+      ? (await puzzleProgressStates(env, actor, [puzzleRowId], includeLocalizations)).get(puzzleRowId)
+      : undefined;
+    return progress === undefined ? localized : { ...localized, progress };
   }
 
-  const replay = await findHintForActor(env.DB, actor, attemptId, requestedLevel, now);
-  if (replay) {
-    return await result(parseStoredHint(replay.hint_json, requestedLevel, "hint event"));
-  }
-
-  if (requestedLevel !== attempt.max_hint_level + 1) throw hintOutOfOrder();
+  const progress = (await readGameProgress(env.DB, actor, [puzzleRowId])).get(puzzleRowId);
+  if (!progress) throw new Error("Puzzle hint progress is missing");
+  if (requestedLevel > progress.highestHintLevel + 1) throw hintOutOfOrder();
   const puzzleHint = await findPuzzleHint(env.DB, attempt.puzzle_id, requestedLevel);
   if (!puzzleHint) throw hintsExhausted();
   const hint = parseStoredHint(puzzleHint.payload_json, requestedLevel, "puzzle hint");
+
+  if (requestedLevel <= progress.highestHintLevel) {
+    // Hint text retention and a new failed attempt must not erase earned access.
+    if (!(await findHintAttemptForActor(env.DB, actor, attemptId, now))) {
+      return await throwMissingActorOrAttempt(env, actor, now);
+    }
+    return await result(hint);
+  }
 
   await persistHintForActor(env.DB, actor, {
     attemptId,
@@ -100,5 +112,12 @@ export async function requestHint(
 
   const stored = await findHintForActor(env.DB, actor, attemptId, requestedLevel, now);
   if (stored) return await result(parseStoredHint(stored.hint_json, requestedLevel, "hint event"));
-  return await throwMissingActorOrAttempt(env, actor, now);
+
+  // Another owned attempt may have committed this level while this request was in flight.
+  if (!(await findHintAttemptForActor(env.DB, actor, attemptId, now))) {
+    return await throwMissingActorOrAttempt(env, actor, now);
+  }
+  const winner = (await readGameProgress(env.DB, actor, [puzzleRowId])).get(puzzleRowId);
+  if (winner && winner.highestHintLevel >= requestedLevel) return await result(hint);
+  throw hintOutOfOrder();
 }

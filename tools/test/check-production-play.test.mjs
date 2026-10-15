@@ -34,7 +34,7 @@ function daily(solved = false, count = 2) {
     date,
     title: "Synthetic",
     puzzles: Array.from({ length: count }, (_, i) => ({
-      id: `synthetic-puzzle-${i}`,
+      id: `p-synthetic-case-${i + 1}-v1`,
       version: 1,
       title: "Synthetic",
       prompt: "Synthetic",
@@ -44,7 +44,7 @@ function daily(solved = false, count = 2) {
       provenance: "Synthetic fixture",
       license: "Test fixture only",
     })),
-    solvedPuzzleIds: solved ? ["synthetic-puzzle-0"] : [],
+    solvedPuzzleIds: solved ? ["p-synthetic-case-1-v1"] : [],
   };
 }
 function expectedStats(attempts = 0, count = 2) {
@@ -83,7 +83,7 @@ function harness({ override, count = 2 } = {}) {
               results: [
                 {
                   case_id: "synthetic-case",
-                  puzzle_id: "synthetic-puzzle-0",
+                  puzzle_id: "p-synthetic-case-1-v1",
                   solution_json: JSON.stringify(solution()),
                 },
               ],
@@ -148,6 +148,8 @@ test("synthetic guest solve and replay preserve progress without private output"
   assert.match(query.sql, /^SELECT /);
   assert.match(query.sql, /cp.position = 1 AND s.sort_order = 1/);
   assert.match(query.sql, /LIMIT 1$/);
+  assert.match(query.sql, /cp.position \|\| '-v' \|\| p.version/);
+  assert.doesNotMatch(query.sql, /p.content_key AS puzzle_id/);
   assert.doesNotMatch(
     query.sql,
     /\b(INSERT|UPDATE|DELETE|REPLACE|DROP|PRAGMA|players|sessions|attempts)\b|;/i,
@@ -157,6 +159,7 @@ test("synthetic guest solve and replay preserve progress without private output"
   assert.equal(posts.length, 2);
   assert.equal(posts[0].body, posts[1].body);
   assert.deepEqual(JSON.parse(posts[0].body).retraction, solution().retraction);
+  assert.equal(JSON.parse(posts[0].body).puzzleId, "p-synthetic-case-1-v1");
   for (const request of check.requests) {
     assert.equal(request.redirect, "error");
     assert.ok(request.signal instanceof AbortSignal);
@@ -302,7 +305,7 @@ function localizedHarness({ override } = {}) {
               results: [
                 {
                   case_id: "synthetic-case",
-                  puzzle_id: "synthetic-puzzle-0",
+                  puzzle_id: "p-synthetic-case-1-v1",
                   solution_json: JSON.stringify(solution()),
                 },
               ],
@@ -549,4 +552,40 @@ test("localized wrapper masks private configuration parse failures before any re
   assert.equal(requests, 0);
   assert.deepEqual(JSON.parse(output[0]), { ok: false, code: "LOCALIZED_PLAY_CHECK_FAILED" });
   assertSafe(output);
+});
+
+test("solve-unlocked public titles may change while neutral puzzle aliases remain stable", async () => {
+  const check = harness({ override: (request, payload, status, headers) => {
+    if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
+      payload.title = "Unlocked case title";
+      payload.puzzles[0].title = "Unlocked composition title";
+    }
+    return new Response(JSON.stringify(payload), { status, headers });
+  } });
+  assert.equal((await check.run()).ok, true);
+});
+
+test("title unlocking cannot change the puzzle identity or free mandatory prompt", async (t) => {
+  for (const [field, value] of [["id", "thematic-source-id"], ["prompt", secret]]) {
+    await t.test(field, async () => {
+      const check = harness({ override: (request, payload, status, headers) => {
+        if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
+          payload.puzzles[0][field] = value;
+        }
+        return new Response(JSON.stringify(payload), { status, headers });
+      } });
+      await assert.rejects(check.run(), { message: "RELOADED_DAILY_FAILED" });
+    });
+  }
+});
+
+test("localized title unlocking preserves all other public translations", async () => {
+  const check = localizedHarness({ override: (request, payload, status, headers) => {
+    if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
+      payload.puzzles[0].localizations.ru.title = "Раскрытая композиция";
+      payload.puzzles[0].localizations.zh.title = "已揭晓的棋题";
+    }
+    return new Response(JSON.stringify(payload), { status, headers });
+  } });
+  assert.equal((await check.run()).ok, true);
 });

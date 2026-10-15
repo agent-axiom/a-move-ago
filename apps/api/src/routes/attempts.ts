@@ -28,6 +28,7 @@ export function createAttemptRoutes(options: AttemptRouteOptions = {}) {
       input,
       timestamp,
       context.req.header("x-content-locales") === "1",
+      context.req.header("x-game-progress") === "1",
     );
     if (result.replayed) context.header("idempotency-replayed", "true");
     return context.json(result.body, result.replayed ? 200 : 201);
@@ -46,6 +47,7 @@ export function createAttemptRoutes(options: AttemptRouteOptions = {}) {
       input.level,
       timestamp,
       context.req.header("x-content-locales") === "1",
+      context.req.header("x-game-progress") === "1",
     );
     return context.json(hint);
   });

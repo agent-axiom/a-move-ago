@@ -96,6 +96,43 @@ export const MeResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("telegram"), profile: TelegramProfileSchema }).strict(),
 ]);
 
+export const EarnedHintSchema = z
+  .object({
+    level: z.int().positive(),
+    text: z.string().min(1),
+    localizations: contentLocalizationsSchema(LocalizedHintSchema).optional(),
+    exhausted: z.boolean(),
+  })
+  .strict();
+
+export const PuzzleProgressSchema = z
+  .object({
+    attemptCount: z.int().nonnegative(),
+    assistanceCount: z.int().nonnegative(),
+    clueUnlocked: z.boolean(),
+    highestHintLevel: z.int().nonnegative(),
+    earnedPoints: z.int().nonnegative().nullable(),
+    nextAttemptPoints: z.int().nonnegative(),
+    legacySolved: z.boolean(),
+    awardAttemptId: z.uuid().nullable(),
+    earnedHints: z.array(EarnedHintSchema),
+  })
+  .strict();
+export type EarnedHint = z.infer<typeof EarnedHintSchema>;
+export type PuzzleProgress = z.infer<typeof PuzzleProgressSchema>;
+
+export const ClueResponseSchema = z
+  .object({
+    title: z.string().min(1),
+    prompt: z.string().min(1),
+    localizations: contentLocalizationsSchema(
+      z.object({ title: z.string().min(1), prompt: z.string().min(1) }).strict(),
+    ).optional(),
+    progress: PuzzleProgressSchema,
+  })
+  .strict();
+export type ClueResponse = z.infer<typeof ClueResponseSchema>;
+
 export const DailyCaseResponseSchema = z
   .object({
     id: z.string().min(1),
@@ -104,6 +141,7 @@ export const DailyCaseResponseSchema = z
     localizations: contentLocalizationsSchema(LocalizedTitleSchema).optional(),
     puzzles: z.array(PuzzlePublicSchema).min(1),
     solvedPuzzleIds: z.array(z.string()),
+    progressStates: z.record(z.string().min(1), PuzzleProgressSchema).optional(),
   })
   .strict();
 
@@ -180,6 +218,7 @@ export const AttemptResultSchema = z.discriminatedUnion("correct", [
       attemptUuid: z.uuid(),
       correct: z.literal(false),
       contradiction: ContradictionSchema,
+      progress: PuzzleProgressSchema.optional(),
     })
     .strict(),
   z
@@ -188,20 +227,16 @@ export const AttemptResultSchema = z.discriminatedUnion("correct", [
       attemptUuid: z.uuid(),
       correct: z.literal(true),
       reveal: AcceptedSolutionSchema,
+      progress: PuzzleProgressSchema.optional(),
     })
     .strict(),
 ]);
 
 export const HintRequestSchema = z.object({ level: z.int().positive() }).strict();
 
-export const HintResponseSchema = z
-  .object({
-    level: z.int().positive(),
-    text: z.string().min(1),
-    localizations: contentLocalizationsSchema(LocalizedHintSchema).optional(),
-    exhausted: z.boolean(),
-  })
-  .strict();
+export const HintResponseSchema = EarnedHintSchema.extend({
+  progress: PuzzleProgressSchema.optional(),
+}).strict();
 
 export const StatsResponseSchema = z
   .object({
@@ -212,5 +247,6 @@ export const StatsResponseSchema = z
     currentStreak: z.int().nonnegative(),
     bestStreak: z.int().nonnegative(),
     lastCompletedDate: z.iso.date().nullable(),
+    points: z.int().nonnegative().optional(),
   })
   .strict();

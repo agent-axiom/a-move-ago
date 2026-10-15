@@ -3,6 +3,7 @@ import {
   ArchiveResponseSchema,
   AttemptRequestSchema,
   AttemptResultSchema,
+  ClueResponseSchema,
   DailyCaseResponseSchema,
   ErrorEnvelopeSchema,
   GuestMeResponseSchema,
@@ -54,6 +55,7 @@ export interface ApiClientOptions {
   fetch?: typeof globalThis.fetch;
   getToken: () => string | null;
   includeLocalizations?: boolean;
+  includeGameProgress?: boolean;
 }
 
 function throwTransportFailure(error: unknown): never {
@@ -75,6 +77,7 @@ export function createApiClient(options: ApiClientOptions) {
   }): Promise<z.infer<TSchema>> {
     const headers: Record<string, string> = { accept: "application/json" };
     if (options.includeLocalizations === true) headers["x-content-locales"] = "1";
+    if (options.includeGameProgress === true) headers["x-game-progress"] = "1";
     if (input.body !== undefined) headers["content-type"] = "application/json";
     if (input.authenticated !== false) {
       const token = options.getToken();
@@ -158,6 +161,15 @@ export function createApiClient(options: ApiClientOptions) {
         method: "GET",
         path: "/v1/archive",
         responseSchema: ArchiveResponseSchema,
+        signal,
+      });
+    },
+    requestClue(caseId: string, puzzleId: string, signal?: AbortSignal) {
+      return request({
+        method: "POST",
+        path: `/v1/cases/${encodeURIComponent(caseId)}/puzzles/${encodeURIComponent(puzzleId)}/clue`,
+        body: {},
+        responseSchema: ClueResponseSchema,
         signal,
       });
     },
