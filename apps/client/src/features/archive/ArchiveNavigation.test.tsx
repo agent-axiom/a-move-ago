@@ -47,7 +47,7 @@ it("opens a published archive case in the running game and returns to today with
   );
   await screen.findByRole("heading", { name: "The missing pawn", level: 1 });
 
-  await user.click(screen.getByRole("button", { name: "Archive", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Archive" }));
   await user.click(
     await screen.findByRole("button", {
       name: "Open case for 10 September 2026: A September mystery",
@@ -61,7 +61,7 @@ it("opens a published archive case in the running game and returns to today with
   expect(window.location.hash).toBe("#tgWebAppData=host-proof");
   expect(runtime.api.createGuest).not.toHaveBeenCalled();
 
-  await user.click(screen.getByRole("button", { name: "Back to today", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Back to today" }));
   await waitFor(() =>
     expect(runtime.api.getDaily).toHaveBeenLastCalledWith(undefined, expect.any(AbortSignal)),
   );
