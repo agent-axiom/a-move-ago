@@ -20,7 +20,7 @@ function digest(value: unknown) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
-async function harness(count = 2) {
+async function harness(count = 2, extraSolution = false) {
   const db = new DatabaseSync(":memory:");
   const migrations = new URL("../../apps/api/migrations/", import.meta.url);
   for (const filename of (await readdir(migrations)).filter((path) => path.endsWith(".sql")).sort()) {
@@ -36,6 +36,11 @@ async function harness(count = 2) {
     for (const [puzzleIndex, puzzle] of original.puzzles.entries()) {
       puzzle.public.id = `original-puzzle-${index}-${puzzleIndex}`;
       puzzle.acceptedSolutions[0]!.explanation = canary;
+      if (extraSolution) {
+        const second = structuredClone(puzzle.acceptedSolutions[0]!);
+        second.explanation = `${canary} second ordered explanation`;
+        puzzle.acceptedSolutions.push(second);
+      }
       puzzle.contradictionExplanations = { NOT_THE_LAST_MOVE: "Original contradiction" };
     }
     const sourceDigest = digest(original);
@@ -166,6 +171,47 @@ describe("private content localizations", () => {
         const error = await runPrivateContentTransfer(h.overrides).catch((failure: unknown) => failure);
         expect(error).toBeInstanceOf(Error);
         expect(String(error)).not.toContain(canary);
+        expect(h.state.contentWrites).toBe(writes);
+        expect(h.db.prepare("SELECT envelope_digest FROM ops_content_transfer_keys").get()?.envelope_digest).toBeNull();
+        expect(h.db.prepare("SELECT COUNT(*) AS count FROM case_localizations").get()).toMatchObject({ count: 0 });
+      } finally { h.db.close(); }
+    },
+  );
+
+  it.each(["physical-row-id", "solution-order-gap", "hint-level-gap", "inconsistent-contradictions"])(
+    "rejects a source with %s even when reconstructed content and digest still match", async (kind) => {
+      const h = await harness(2, kind === "inconsistent-contradictions");
+      try {
+        const final = h.originals.at(-1)!;
+        const puzzle = final.puzzles[0]!;
+        const rowId = `${puzzle.public.id}:v${puzzle.public.version}`;
+        if (kind === "physical-row-id") {
+          const changedId = `${rowId}-unexpected`;
+          h.db.exec("PRAGMA foreign_keys = OFF");
+          h.db.prepare("UPDATE puzzles SET id = ? WHERE id = ?").run(changedId, rowId);
+          for (const table of ["daily_case_puzzles", "puzzle_solutions", "puzzle_hints"]) {
+            h.db.prepare(`UPDATE ${table} SET puzzle_id = ? WHERE puzzle_id = ?`).run(changedId, rowId);
+          }
+          h.db.exec("PRAGMA foreign_keys = ON");
+          expect(h.db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+        }
+        if (kind === "solution-order-gap") {
+          h.db.prepare("UPDATE puzzle_solutions SET sort_order = 2 WHERE puzzle_id = ?").run(rowId);
+        }
+        if (kind === "hint-level-gap") {
+          h.db.prepare("UPDATE puzzle_hints SET level = level + 10 WHERE puzzle_id = ?").run(rowId);
+        }
+        if (kind === "inconsistent-contradictions") {
+          h.db.prepare("UPDATE puzzle_solutions SET contradiction_json = '{}' WHERE puzzle_id = ? AND sort_order = 2").run(rowId);
+        }
+        const sourceStatement = localizationSourceStatement(final.case.id);
+        const source = h.db.prepare(sourceStatement.sql).get(...sourceStatement.params) as { source_json: string; source_shape_valid: number };
+        expect(JSON.parse(source.source_json)).toEqual(final);
+        expect(digest(JSON.parse(source.source_json))).toBe(h.bundle.cases.at(-1)!.sourceDigest);
+        expect(source.source_shape_valid).toBe(0);
+        await h.prepare();
+        const writes = h.state.contentWrites;
+        await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("PRIVATE_CONTENT_TRANSFER_FAILED");
         expect(h.state.contentWrites).toBe(writes);
         expect(h.db.prepare("SELECT envelope_digest FROM ops_content_transfer_keys").get()?.envelope_digest).toBeNull();
         expect(h.db.prepare("SELECT COUNT(*) AS count FROM case_localizations").get()).toMatchObject({ count: 0 });
