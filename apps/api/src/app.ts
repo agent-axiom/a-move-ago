@@ -7,6 +7,7 @@ import { exactCors } from "./middleware/cors";
 import { requestId } from "./middleware/request-id";
 import { structuredLog } from "./middleware/structured-log";
 import { androidAssociationRoutes } from "./routes/android-association";
+import { createArchiveRoutes } from "./routes/archive";
 import { createAttemptRoutes } from "./routes/attempts";
 import { createDailyRoutes } from "./routes/daily";
 import { me } from "./routes/me";
@@ -37,6 +38,7 @@ export function createApp(options: AppOptions = {}) {
     createTelegramOidcRoutes(options.oidcProvider ?? telegramOidcProvider),
   );
   app.route("/v1/daily", createDailyRoutes(options.now ? { now: options.now } : {}));
+  app.route("/v1/archive", createArchiveRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/attempts", createAttemptRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/me", me);
 

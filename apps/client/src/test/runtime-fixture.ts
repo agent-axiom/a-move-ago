@@ -48,6 +48,11 @@ export function runtimeFixture(options: {
       ],
       solvedPuzzleIds: [],
     })),
+    getArchive: vi.fn(async () => ({
+      today: "2026-10-15",
+      startsOn: null,
+      cases: [],
+    })),
     submitAttempt: vi.fn(),
     requestHint: vi.fn(),
     getStats: vi.fn(),

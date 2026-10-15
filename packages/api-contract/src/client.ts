@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import {
+  ArchiveResponseSchema,
   AttemptRequestSchema,
   AttemptResultSchema,
   DailyCaseResponseSchema,
@@ -147,6 +148,14 @@ export function createApiClient(options: ApiClientOptions) {
         method: "GET",
         path: `/v1/daily${query}`,
         responseSchema: DailyCaseResponseSchema,
+        signal,
+      });
+    },
+    getArchive(signal?: AbortSignal) {
+      return request({
+        method: "GET",
+        path: "/v1/archive",
+        responseSchema: ArchiveResponseSchema,
         signal,
       });
     },

@@ -16,8 +16,14 @@ const row = {
   puzzle_count: 3,
   published_puzzle_count: 2,
 };
+const archivedRow = {
+  date: "2026-09-10",
+  status: "published",
+  puzzle_count: 2,
+  published_puzzle_count: 2,
+};
 
-function harness({ d1Rows = [row], override } = {}) {
+function harness({ d1Rows = [row, archivedRow], override } = {}) {
   const requests = [];
   return {
     requests,
@@ -69,20 +75,34 @@ test("both services confirm access and return only dates, statuses and aggregate
     puzzleCount: 0,
     publishedPuzzleCount: 0,
   });
+  assert.equal(result.d1.archiveCoverage.length, 35);
+  assert.deepEqual(result.d1.archiveCoverage[0], {
+    date: "2026-09-10",
+    status: "published",
+    puzzleCount: 2,
+    publishedPuzzleCount: 2,
+  });
+  assert.deepEqual(result.d1.archiveCoverage[34], {
+    date: "2026-10-14",
+    status: "missing",
+    puzzleCount: 0,
+    publishedPuzzleCount: 0,
+  });
   assertSafe(result);
   assert.equal(check.requests.length, 2);
   const [d1, telegram] = check.requests;
   assert.equal(d1.method, "POST");
   assert.equal(d1.headers.authorization, `Bearer ${env.CLOUDFLARE_API_TOKEN}`);
   const { sql, params } = JSON.parse(d1.body);
-  assert.deepEqual(params, ["2026-10-31", "2026-11-14"]);
+  assert.deepEqual(params, ["2026-10-31", "2026-11-14", "2026-09-10", "2026-10-14"]);
   assert.match(sql, /^SELECT /);
   assert.doesNotMatch(sql, /\b(INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER|PRAGMA|ATTACH)\b|;/i);
   assert.doesNotMatch(
     sql,
     /\b(players|sessions|attempts|puzzle_solutions|solution_json|public_json)\b/i,
   );
-  assert.match(sql, /LIMIT 15$/);
+  assert.match(sql, /LIMIT 50$/);
+  assert.match(sql, /WHERE \(c.case_date >= \? AND c.case_date <= \?\)\n\s+OR \(/);
   assert.equal(telegram.method, "GET");
   assert.equal(telegram.url, `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`);
   assert.equal(telegram.body, undefined);
@@ -161,6 +181,8 @@ test("malformed coverage cannot echo sensitive fields or misleading dates and co
   for (const [name, rows] of [
     ["invalid status", [{ ...row, status: sensitive }]],
     ["out of range date", [{ ...row, date: "2026-11-15" }]],
+    ["date before archive", [{ ...row, date: "2026-09-09" }]],
+    ["gap between archive and current coverage", [{ ...row, date: "2026-10-20" }]],
     ["duplicate date", [row, row]],
     ["invalid count", [{ ...row, puzzle_count: sensitive }]],
     ["negative count", [{ ...row, puzzle_count: -1 }]],

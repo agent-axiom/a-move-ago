@@ -100,6 +100,54 @@ export const DailyCaseResponseSchema = z
   })
   .strict();
 
+export const ArchiveCaseSchema = z
+  .object({
+    id: z.string().min(1),
+    date: z.iso.date(),
+    slug: z.string().min(1),
+    title: z.string().min(1),
+    puzzleCount: z.int().positive(),
+    solvedPuzzles: z.int().nonnegative(),
+    completed: z.boolean(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.solvedPuzzles <= value.puzzleCount &&
+      value.completed === (value.solvedPuzzles === value.puzzleCount),
+    { message: "Archive progress must match the puzzle count" },
+  );
+
+export const ArchiveResponseSchema = z
+  .object({
+    today: z.iso.date(),
+    startsOn: z.iso.date().nullable(),
+    cases: z.array(ArchiveCaseSchema),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const oldest = value.cases.at(-1)?.date ?? null;
+    if (value.startsOn !== oldest) {
+      context.addIssue({ code: "custom", message: "Archive start must match its oldest case" });
+    }
+    const ids = new Set<string>();
+    let previousDate: string | undefined;
+    for (const item of value.cases) {
+      if (
+        item.date > value.today ||
+        (previousDate !== undefined && item.date >= previousDate) ||
+        ids.has(item.id)
+      ) {
+        context.addIssue({ code: "custom", message: "Archive cases must be unique past dates" });
+      }
+      ids.add(item.id);
+      previousDate = item.date;
+    }
+  });
+
+export type ArchiveCase = z.infer<typeof ArchiveCaseSchema>;
+export type ArchiveResponse = z.infer<typeof ArchiveResponseSchema>;
+
 export const AttemptRequestSchema = z
   .object({
     attemptUuid: z.uuid(),

@@ -8,10 +8,11 @@ const coverageSql = `SELECT c.case_date AS date, c.status AS status,
 FROM daily_cases c
 LEFT JOIN daily_case_puzzles cp ON cp.case_id = c.id
 LEFT JOIN puzzles p ON p.id = cp.puzzle_id
-WHERE c.case_date >= ? AND c.case_date <= ?
+WHERE (c.case_date >= ? AND c.case_date <= ?)
+   OR (c.case_date >= ? AND c.case_date <= ?)
 GROUP BY c.case_date, c.status
 ORDER BY c.case_date
-LIMIT 15`;
+LIMIT 50`;
 
 class DiagnosticError extends Error {}
 
@@ -56,6 +57,10 @@ export async function checkProductionAccess(
     date.setUTCDate(date.getUTCDate() + offset);
     return date.toISOString().slice(0, 10);
   });
+  const archiveDates = Array.from({ length: 35 }, (_, offset) =>
+    new Date(Date.UTC(2026, 8, 10 + offset)).toISOString().slice(0, 10),
+  );
+  const allowedDates = new Set([...dates, ...archiveDates]);
 
   async function call(service, url, options) {
     let response;
@@ -89,20 +94,26 @@ export async function checkProductionAccess(
           "content-type": "application/json",
           accept: "application/json",
         },
-        body: JSON.stringify({ sql: coverageSql, params: [dates[0], dates[14]] }),
+        body: JSON.stringify({
+          sql: coverageSql,
+          params: [dates[0], dates[14], archiveDates[0], archiveDates[34]],
+        }),
       },
     );
     ensure(data?.success === true, "D1_QUERY_FAILED");
     ensure(Array.isArray(data.result) && data.result.length === 1, "D1_INVALID_RESPONSE");
     const result = data.result[0];
     ensure(result?.success === true, "D1_QUERY_FAILED");
-    ensure(Array.isArray(result.results) && result.results.length <= 15, "D1_INVALID_RESPONSE");
+    ensure(
+      Array.isArray(result.results) && result.results.length <= allowedDates.size,
+      "D1_INVALID_RESPONSE",
+    );
     const rows = new Map();
     for (const row of result.results) {
       ensure(
         row !== null &&
           typeof row === "object" &&
-          dates.includes(row.date) &&
+          allowedDates.has(row.date) &&
           !rows.has(row.date) &&
           ["draft", "published", "retired"].includes(row.status) &&
           Number.isSafeInteger(row.puzzle_count) &&
@@ -119,12 +130,12 @@ export async function checkProductionAccess(
         publishedPuzzleCount: row.published_puzzle_count,
       });
     }
+    const projection = (date) =>
+      rows.get(date) ?? { date, status: "missing", puzzleCount: 0, publishedPuzzleCount: 0 };
     d1 = {
       ok: true,
-      coverage: dates.map(
-        (date) =>
-          rows.get(date) ?? { date, status: "missing", puzzleCount: 0, publishedPuzzleCount: 0 },
-      ),
+      coverage: dates.map(projection),
+      archiveCoverage: archiveDates.map(projection),
     };
   } catch (error) {
     d1 = { ok: false, code: safeCode(error) };

@@ -29,12 +29,16 @@ jobs:
       - run: npm ci
       - name: Prepare formatting feedback for visual review
         run: |
-          npm exec -- biome format --write apps/client/src apps/client/e2e/visual-review.spec.ts biome.json
+          npm exec -- biome check --write \
+            apps/client/src apps/client/e2e apps/api/src apps/api/test \
+            packages/api-contract/src tools biome.json || true
           node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           import { createHash } from "node:crypto";
           import { gzipSync } from "node:zlib";
-          const patch = execFileSync("git", ["diff", "--", "apps/client", "biome.json"]);
+          const patch = execFileSync("git", [
+            "diff", "--", "apps/client", "apps/api", "packages/api-contract", "tools", "biome.json",
+          ]);
           const encoded = gzipSync(patch).toString("base64");
           let count = 0;
           for (let start = 0; start < encoded.length; start += 10000) {

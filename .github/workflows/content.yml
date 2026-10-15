@@ -60,3 +60,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: npm run content:private -w @a-move-ago/tools
+      - name: Verify every published historical day through the public API
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: node tools/scripts/check-archive-production.mjs

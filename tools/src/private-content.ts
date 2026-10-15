@@ -39,6 +39,13 @@ const envelopeSchema = z
   })
   .strict();
 export type ContentEnvelope = z.infer<typeof envelopeSchema>;
+type ArchiveRequest = {
+  keyId: string;
+  purpose: "archive";
+  from: string;
+  through: string;
+};
+type TransferRequest = { keyId: string; purpose: "launch" } | ArchiveRequest;
 type Corpus = { cases: ContentCase[] };
 type PublishedSummary = {
   mode: "published";
@@ -83,6 +90,47 @@ function ensure(condition: unknown, code: string): asserts condition {
 
 function hash(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function parseRequest(text: string): TransferRequest {
+  ensure(Buffer.byteLength(text) <= 1024, "INVALID_KEY_REQUEST");
+  const parsed = z
+    .union([
+      z.object({ keyId: keyIdSchema, purpose: z.literal("launch").optional() }).strict(),
+      z
+        .object({
+          keyId: keyIdSchema,
+          purpose: z.literal("archive"),
+          from: z.iso.date(),
+          through: z.iso.date(),
+        })
+        .strict(),
+    ])
+    .parse(JSON.parse(text));
+  if (parsed.purpose === "archive") {
+    // The key ID is authenticated by the envelope and fixed in D1. Encoding the
+    // exact archive range binds purpose and dates without altering legacy rows.
+    const prefix = `archive-${parsed.from}-${parsed.through}-`;
+    ensure(
+      parsed.keyId.startsWith(prefix) && /^v[1-9]\d*$/.test(parsed.keyId.slice(prefix.length)),
+      "REQUEST_KEY_MISMATCH",
+    );
+    return parsed;
+  }
+  ensure(!parsed.keyId.startsWith("archive-"), "REQUEST_KEY_MISMATCH");
+  return { keyId: parsed.keyId, purpose: "launch" };
+}
+
+function archiveDates(request: ArchiveRequest, now: number): string[] {
+  const today = new Date(now * 1000).toISOString().slice(0, 10);
+  ensure(request.from <= request.through, "INVALID_ARCHIVE_RANGE");
+  ensure(request.through < today, "ARCHIVE_MUST_BE_HISTORICAL");
+  const start = Date.parse(`${request.from}T00:00:00Z`);
+  const count = (Date.parse(`${request.through}T00:00:00Z`) - start) / 86_400_000 + 1;
+  ensure(Number.isInteger(count) && count >= 1 && count <= 60, "INVALID_ARCHIVE_RANGE");
+  return Array.from({ length: count }, (_, index) =>
+    new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+  );
 }
 
 function aad(keyId: string): Buffer {
@@ -177,14 +225,24 @@ function decrypt(envelope: ContentEnvelope, privateKey: string): unknown {
 }
 
 /** Validate every case before the first import can write draft or published rows. */
-function validateCorpus(payload: unknown, now: number, requireCoverage: boolean): Corpus {
+function validateCorpus(
+  payload: unknown,
+  now: number,
+  requireCoverage: boolean,
+  request: TransferRequest,
+): Corpus {
   ensure(
     payload !== null && typeof payload === "object" && !Array.isArray(payload),
     "INVALID_CORPUS",
   );
   const record = payload as Record<string, unknown>;
   ensure(Object.keys(record).length === 1 && Array.isArray(record.cases), "INVALID_CORPUS");
-  ensure(record.cases.length >= 8 && record.cases.length <= 31, "INVALID_CORPUS_SIZE");
+  const expectedDates = request.purpose === "archive" ? archiveDates(request, now) : undefined;
+  ensure(
+    record.cases.length >= (expectedDates ? 1 : 8) &&
+      record.cases.length <= (expectedDates ? 60 : 31),
+    "INVALID_CORPUS_SIZE",
+  );
   const caseIds = new Set<string>();
   const dates = new Set<string>();
   const slugs = new Set<string>();
@@ -216,9 +274,14 @@ function validateCorpus(payload: unknown, now: number, requireCoverage: boolean)
     }
     return content;
   });
-  // Coverage is checked before the initial digest claim. A bound retry may cross
-  // midnight and must finish the identical, already validated publication.
-  if (requireCoverage) {
+  if (expectedDates) {
+    ensure(
+      dates.size === expectedDates.length && expectedDates.every((date) => dates.has(date)),
+      "ARCHIVE_RANGE_MISMATCH",
+    );
+  } else if (requireCoverage) {
+    // Coverage is checked before the initial launch claim. A bound retry may
+    // cross midnight and must finish the identical, validated publication.
     const today = new Date(now * 1000);
     for (let offset = 0; offset <= 7; offset += 1) {
       const date = new Date(today);
@@ -327,8 +390,11 @@ async function runTransfer(
   runtime: Runtime,
 ): Promise<BootstrapSummary | PublishedSummary | CompletedSummary> {
   const requestText = await runtime.readFile(resolve(runtime.cwd, requestPath), "utf8");
-  ensure(Buffer.byteLength(requestText) <= 1024, "INVALID_KEY_REQUEST");
-  const { keyId } = z.object({ keyId: keyIdSchema }).strict().parse(JSON.parse(requestText));
+  const transferRequest = parseRequest(requestText);
+  const { keyId } = transferRequest;
+  const now = Math.floor(runtime.now());
+  ensure(Number.isSafeInteger(now) && now >= 0, "INVALID_TIME");
+  if (transferRequest.purpose === "archive") archiveDates(transferRequest, now);
   let envelopeText: string | undefined;
   try {
     envelopeText = await runtime.readFile(resolve(runtime.cwd, envelopePath), "utf8");
@@ -339,8 +405,6 @@ async function runTransfer(
     );
   }
   const envelope = envelopeText === undefined ? undefined : parseEnvelope(envelopeText, keyId);
-  const now = Math.floor(runtime.now());
-  ensure(Number.isSafeInteger(now) && now >= 0, "INVALID_TIME");
   const {
     CLOUDFLARE_ACCOUNT_ID: accountId,
     D1_DATABASE_ID: databaseId,
@@ -454,6 +518,7 @@ async function runTransfer(
     decrypt(envelope, row.private_key),
     now,
     row.envelope_digest === null,
+    transferRequest,
   );
   const conflicts = await query(corpus.cases.map(conflictCheck));
   for (const rows of conflicts) {
