@@ -1,6 +1,7 @@
 {
-  "keyId": "archive-2026-09-10-2026-10-14-v1",
-  "purpose": "archive",
+  "keyId": "localize-2026-09-10-2026-11-13-ru-zh-v1",
+  "purpose": "localization",
   "from": "2026-09-10",
-  "through": "2026-10-14"
+  "through": "2026-11-13",
+  "locales": ["ru", "zh"]
 }

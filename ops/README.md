@@ -47,8 +47,45 @@ without missing or extra dates. Archive transfers require a fresh key ID of the
 form `archive-FROM-THROUGH-vN`, where `N` is a positive integer without leading
 zeroes. This binds purpose and range to the authenticated envelope key ID;
 changing either requires a new key. Default launch requests cannot use the
-reserved `archive-` prefix. Identical archive retries and completed receipts
+reserved `archive-` and `localize-` prefixes. Identical archive retries and completed receipts
 remain safe across midnight and key expiry, respectively.
+
+Translations use a fresh explicit localization request:
+
+```json
+{
+  "keyId": "localize-2026-09-10-2026-11-13-ru-zh-v1",
+  "purpose": "localization",
+  "from": "2026-09-10",
+  "through": "2026-11-13",
+  "locales": ["ru", "zh"]
+}
+```
+
+The authenticated key ID binds both inclusive dates and the exact ordered
+language pair. Localization ranges contain 1–90 consecutive dates. Unlike an
+archive backfill, a localization transfer can include future dates whose original
+English cases are already published in D1; the public API still enforces its
+usual release date. The encrypted payload follows `LocalizationBundleSchema`
+from the API contract: version 1, one entry per source case, its immutable source
+digest, and complete Russian and Chinese translations. Keep that plaintext
+outside the repository.
+
+Before claiming an envelope or writing any localization, the importer reconstructs
+every original case in memory from D1 and verifies its canonical SHA-256 against
+the original import digest. Case dates, puzzle IDs and versions, hint and solution
+counts, and contradiction keys must match the full approved source. The complete
+range and both languages are mandatory. Every existing localization is checked
+before the first publication write: identical rows are safe to retry, while a
+conflicting row rejects the complete transfer. Originals are never rewritten.
+
+Localized public text and private hints, solution explanations, and contradictions
+are stored separately in the localization tables installed by migration 0003.
+Apply that migration before publishing a localization envelope. D1 requests are
+bounded to 100 statements, including preflight and post-import checks. Partial
+imports retain their bound key and accept only the identical ciphertext; successful
+completion verifies all rows, erases the active private key, and records only
+counts, dates, target languages, and the envelope digest.
 
 Only encrypted transfer envelopes are permitted in this directory. This narrow
 operational allowance does not permit plaintext production content, private keys,

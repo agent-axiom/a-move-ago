@@ -21,6 +21,7 @@ import {
 } from "../db/attempts";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
+import { localizeAttemptResult } from "./localization-service";
 
 export type AttemptInput = ReturnType<typeof AttemptRequestSchema.parse>;
 type AttemptResult = ReturnType<typeof AttemptResultSchema.parse>;
@@ -196,11 +197,20 @@ export async function submitAttempt(
   actor: SessionActor,
   input: AttemptInput,
   now: number,
+  includeLocalizations = false,
 ): Promise<{ replayed: boolean; body: AttemptResult }> {
+  async function result(replayed: boolean, body: AttemptResult) {
+    return {
+      replayed,
+      body: includeLocalizations
+        ? await localizeAttemptResult(env.DB, input.caseId, input.puzzleId, body)
+        : body,
+    };
+  }
   const answerJson = canonicalRetraction(input.retraction);
   const replay = await findAttemptReplayForActor(env.DB, actor, input.attemptUuid, now);
   if (replay) {
-    return { replayed: true, body: parseReplay(replay, input, answerJson) };
+    return await result(true, parseReplay(replay, input, answerJson));
   }
   if (!(await isSessionActorActive(env.DB, actor, now))) throw invalidSession();
 
@@ -226,10 +236,10 @@ export async function submitAttempt(
     submittedAt: now,
   };
 
-  if (await insertAttempt(env.DB, insert)) return { replayed: false, body };
+  if (await insertAttempt(env.DB, insert)) return await result(false, body);
 
   const winner = await findAttemptReplayForActor(env.DB, actor, input.attemptUuid, now);
-  if (winner) return { replayed: true, body: parseReplay(winner, input, answerJson) };
+  if (winner) return await result(true, parseReplay(winner, input, answerJson));
   if (!(await isSessionActorActive(env.DB, actor, now))) throw invalidSession();
   throw new Error("Attempt insertion did not create or recover a row");
 }

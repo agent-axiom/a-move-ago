@@ -18,7 +18,14 @@ export function createArchiveRoutes(options: ArchiveRouteOptions = {}) {
     const actor = context.get("session");
     if (!actor) throw new ApiError(401, "INVALID_SESSION", "The session is invalid or expired.");
     const today = now().toISOString().slice(0, 10);
-    return context.json(await getArchiveCatalog(context.env, actor, today));
+    return context.json(
+      await getArchiveCatalog(
+        context.env,
+        actor,
+        today,
+        context.req.header("x-content-locales") === "1",
+      ),
+    );
   });
   return archive;
 }

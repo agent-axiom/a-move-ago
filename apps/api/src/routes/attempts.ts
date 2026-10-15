@@ -22,7 +22,13 @@ export function createAttemptRoutes(options: AttemptRouteOptions = {}) {
     await enforceLimit(context.env.ATTEMPT_RATE_LIMITER, `attempt:${actor.sessionId}`);
     const input = AttemptRequestSchema.parse(await requestJson(context));
     const timestamp = Math.floor(now().getTime() / 1_000);
-    const result = await submitAttempt(context.env, actor, input, timestamp);
+    const result = await submitAttempt(
+      context.env,
+      actor,
+      input,
+      timestamp,
+      context.req.header("x-content-locales") === "1",
+    );
     if (result.replayed) context.header("idempotency-replayed", "true");
     return context.json(result.body, result.replayed ? 200 : 201);
   });
@@ -39,6 +45,7 @@ export function createAttemptRoutes(options: AttemptRouteOptions = {}) {
       context.req.param("attemptId"),
       input.level,
       timestamp,
+      context.req.header("x-content-locales") === "1",
     );
     return context.json(hint);
   });

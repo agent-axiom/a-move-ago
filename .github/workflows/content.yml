@@ -9,13 +9,16 @@ on:
       - "ops/content-key-request.json"
       - "ops/content-envelope.json"
       - "tools/src/private-content.ts"
+      - "tools/src/localization-import.ts"
   pull_request:
     paths:
       - ".github/workflows/content.yml"
       - "ops/content-key-request.json"
       - "ops/content-envelope.json"
       - "tools/src/private-content.ts"
+      - "tools/src/localization-import.ts"
       - "tools/src/private-content.test.ts"
+      - "tools/src/localization-import.test.ts"
 
 permissions:
   contents: read
@@ -64,3 +67,7 @@ jobs:
         env:
           API_ORIGIN: ${{ vars.API_ORIGIN }}
         run: node tools/scripts/check-archive-production.mjs
+      - name: Verify every available localized day through the public API
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: node tools/scripts/check-localizations-production.mjs

@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { RetractionSchema } from "./chess";
+import {
+  contentLocalizationsSchema,
+  LocalizedContradictionSchema,
+  LocalizedHintSchema,
+  LocalizedTitleSchema,
+} from "./localizations";
 import { AcceptedSolutionSchema, ContradictionCodeSchema, PuzzlePublicSchema } from "./puzzles";
 
 export const ErrorEnvelopeSchema = z
@@ -95,6 +101,7 @@ export const DailyCaseResponseSchema = z
     id: z.string().min(1),
     date: z.iso.date(),
     title: z.string().min(1),
+    localizations: contentLocalizationsSchema(LocalizedTitleSchema).optional(),
     puzzles: z.array(PuzzlePublicSchema).min(1),
     solvedPuzzleIds: z.array(z.string()),
   })
@@ -106,6 +113,7 @@ export const ArchiveCaseSchema = z
     date: z.iso.date(),
     slug: z.string().min(1),
     title: z.string().min(1),
+    localizations: contentLocalizationsSchema(LocalizedTitleSchema).optional(),
     puzzleCount: z.int().positive(),
     solvedPuzzles: z.int().nonnegative(),
     completed: z.boolean(),
@@ -161,6 +169,7 @@ export const ContradictionSchema = z
   .object({
     code: ContradictionCodeSchema,
     message: z.string().min(1),
+    localizations: contentLocalizationsSchema(LocalizedContradictionSchema).optional(),
   })
   .strict();
 
@@ -189,6 +198,7 @@ export const HintResponseSchema = z
   .object({
     level: z.int().positive(),
     text: z.string().min(1),
+    localizations: contentLocalizationsSchema(LocalizedHintSchema).optional(),
     exhausted: z.boolean(),
   })
   .strict();
