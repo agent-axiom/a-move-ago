@@ -219,10 +219,14 @@ configuration and must never contain secrets.
 
 ## Production release gate
 
-The last existing release on August 23, 2026 deployed the Worker and Pages and
+The August 23, 2026 release deployed the Worker and Pages and
 passed CI and the Android debug build. That establishes a deployed MVP, not
 completion of the public-launch checks below. The private production puzzle
 corpus and current remote D1 content must be verified separately.
+
+On October 15, 2026, the protected private-content workflow published 30 original
+English daily cases covering October 15 through November 13. Renew this coverage
+before it expires using the process in [ops/README.md](ops/README.md).
 
 After deploying, check the real guest flow, browser CORS configuration and
 today's published content:
