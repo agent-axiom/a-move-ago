@@ -92,13 +92,10 @@ try {
   const todayBefore = new Date().toISOString().slice(0, 10);
   await page.getByRole("button", { name: "Back to today", exact: true }).click();
   await page.getByRole("grid").waitFor();
-  await page.waitForFunction(
-    (before) => {
-      const date = document.querySelector(".case-meta time")?.getAttribute("datetime");
-      return date === before || date === new Date().toISOString().slice(0, 10);
-    },
-    todayBefore,
-  );
+  await page.waitForFunction((before) => {
+    const date = document.querySelector(".case-meta time")?.getAttribute("datetime");
+    return date === before || date === new Date().toISOString().slice(0, 10);
+  }, todayBefore);
   assert.equal(new URL(page.url()).searchParams.has("case"), false);
   assert.equal(new URL(page.url()).searchParams.has("view"), false);
   assert.equal(attempts, 0);
