@@ -4,6 +4,12 @@ import type { runContentImport } from "./content-import";
 import { encryptContentEnvelope, runPrivateContentTransfer } from "./private-content";
 
 const keyId = "launch-2026-10-15-v1";
+const archiveRequest = {
+  keyId: "archive-2026-09-10-2026-10-14-v1",
+  purpose: "archive",
+  from: "2026-09-10",
+  through: "2026-10-14",
+};
 const now = Date.parse("2026-10-15T12:00:00Z") / 1000;
 const canary = "PRIVATE_SOLUTION_CANARY_NEVER_PRINT";
 const env = {
@@ -12,15 +18,17 @@ const env = {
   CLOUDFLARE_API_TOKEN: "private-cloudflare-token",
 };
 
-async function corpus() {
+async function corpus(from = "2026-10-15", count = 8) {
   // Reuse the explicitly public CC BY fixture only in these synthetic tests.
   const sample = JSON.parse(
     await readFile(new URL("../../content/samples/2026-08-03.json", import.meta.url), "utf8"),
   );
   return {
-    cases: Array.from({ length: 8 }, (_, index) => {
+    cases: Array.from({ length: count }, (_, index) => {
       const content = structuredClone(sample);
-      const date = `2026-10-${15 + index}`;
+      const date = new Date(Date.parse(`${from}T00:00:00Z`) + index * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
       content.case = {
         id: `original-${date}`,
         date,
@@ -41,6 +49,7 @@ type MemoryKey = Record<string, string | number | null>;
 function harness() {
   const state = {
     row: undefined as MemoryKey | undefined,
+    request: { keyId } as Record<string, string>,
     envelope: undefined as unknown,
     now,
     writes: 0,
@@ -123,7 +132,7 @@ function harness() {
     now: () => state.now,
     importCase,
     readFile: async (path: string) => {
-      if (path === "/repo/ops/content-key-request.json") return JSON.stringify({ keyId });
+      if (path === "/repo/ops/content-key-request.json") return JSON.stringify(state.request);
       expect(path).toBe("/repo/ops/content-envelope.json");
       if (state.envelope !== undefined) return JSON.stringify(state.envelope);
       throw Object.assign(new Error("missing"), { code: "ENOENT" });
@@ -295,5 +304,132 @@ describe("private production content transfer", () => {
     await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow(
       "PRIVATE_CONTENT_TRANSFER_FAILED",
     );
+  });
+});
+
+describe("historical archive content transfer", () => {
+  it("publishes the exact 35 historical dates without requiring launch coverage", async () => {
+    const h = harness();
+    h.state.request = { ...archiveRequest };
+    await h.prepare(await corpus("2026-09-10", 35));
+    const result = await runPrivateContentTransfer(h.overrides);
+    expect(result).toMatchObject({ mode: "published", cases: 35, puzzles: 35 });
+    expect(result.mode === "published" && result.dates[0]).toBe("2026-09-10");
+    expect(result.mode === "published" && result.dates.at(-1)).toBe("2026-10-14");
+    expect(h.state.imports).toHaveLength(35);
+    expect(h.state.row?.private_key).toBeNull();
+    expect(JSON.stringify(result)).not.toContain(canary);
+  });
+
+  it("resumes after midnight and recognizes the archive receipt after expiry", async () => {
+    const h = harness();
+    h.state.request = { ...archiveRequest };
+    await h.prepare(await corpus("2026-09-10", 35));
+    h.state.failImportAt = 34;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow(
+      "PRIVATE_CONTENT_TRANSFER_FAILED",
+    );
+    expect(h.state.row?.private_key).toContain("BEGIN PRIVATE KEY");
+    h.state.failImportAt = 0;
+    h.state.now += 24 * 3600;
+    const published = await runPrivateContentTransfer(h.overrides);
+    expect(published).toMatchObject({ mode: "published", cases: 35 });
+    expect(h.state.row?.private_key).toBeNull();
+    h.state.now += 10 * 24 * 3600;
+    h.importCase.mockClear();
+    const writes = h.state.writes;
+    expect(await runPrivateContentTransfer(h.overrides)).toEqual({
+      ...published,
+      alreadyCompleted: true,
+    });
+    expect(h.importCase).not.toHaveBeenCalled();
+    expect(h.state.writes).toBe(writes);
+  });
+
+  it.each(["missing", "outside", "extra"])(
+    "rejects an archive with a %s date before any publication write",
+    async (kind) => {
+      const h = harness();
+      h.state.request = { ...archiveRequest };
+      const payload = await corpus("2026-09-10", kind === "extra" ? 36 : 35);
+      if (kind === "missing") payload.cases.splice(17, 1);
+      if (kind === "outside") payload.cases[0].case.date = "2026-10-15";
+      await h.prepare(payload);
+      const writes = h.state.writes;
+      await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow(
+        "ARCHIVE_RANGE_MISMATCH",
+      );
+      expect(h.importCase).not.toHaveBeenCalled();
+      expect(h.state.writes).toBe(writes);
+      expect(h.state.row?.envelope_digest).toBeNull();
+    },
+  );
+
+  it("checks the final historical remote case before writing", async () => {
+    const h = harness();
+    h.state.request = { ...archiveRequest };
+    await h.prepare(await corpus("2026-09-10", 35));
+    h.state.conflictAt = 34;
+    const writes = h.state.writes;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow(
+      "EXISTING_CONTENT_CONFLICT",
+    );
+    expect(h.importCase).not.toHaveBeenCalled();
+    expect(h.state.writes).toBe(writes);
+    expect(h.state.row?.envelope_digest).toBeNull();
+  });
+
+  it("rejects changing purpose or either date with the same archive key before D1", async () => {
+    const h = harness();
+    h.state.request = { ...archiveRequest };
+    await h.prepare(await corpus("2026-09-10", 35));
+    h.fetchMock.mockClear();
+    const changes: Record<string, string>[] = [
+      { keyId: archiveRequest.keyId },
+      { keyId: archiveRequest.keyId, purpose: "launch" },
+      { ...archiveRequest, from: "2026-09-11" },
+      { ...archiveRequest, through: "2026-10-13" },
+    ];
+    for (const request of changes) {
+      h.state.request = request;
+      await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("REQUEST_KEY_MISMATCH");
+    }
+    expect(h.fetchMock).not.toHaveBeenCalled();
+    expect(h.importCase).not.toHaveBeenCalled();
+  });
+
+  it("rejects converting a launch key into an archive before D1", async () => {
+    const h = harness();
+    h.state.request = { ...archiveRequest, keyId };
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("REQUEST_KEY_MISMATCH");
+    expect(h.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["2026-10-15", "2026-10-15"],
+    ["2026-10-14", "2026-10-16"],
+    ["2026-10-14", "2026-09-10"],
+    ["2026-08-15", "2026-10-14"],
+    ["2026-09-31", "2026-10-14"],
+  ])("rejects an invalid historical range %s through %s before D1", async (from, through) => {
+    const h = harness();
+    h.state.request = {
+      keyId: `archive-${from}-${through}-v1`,
+      purpose: "archive",
+      from,
+      through,
+    };
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow();
+    expect(h.fetchMock).not.toHaveBeenCalled();
+    expect(h.importCase).not.toHaveBeenCalled();
+  });
+
+  it("keeps the default launch limit when no archive purpose is requested", async () => {
+    const h = harness();
+    await h.prepare(await corpus("2026-10-15", 35));
+    const writes = h.state.writes;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("INVALID_CORPUS_SIZE");
+    expect(h.importCase).not.toHaveBeenCalled();
+    expect(h.state.writes).toBe(writes);
   });
 });
