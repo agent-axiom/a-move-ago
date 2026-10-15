@@ -56,11 +56,7 @@ export async function readHintLocalizations(db: D1Database, puzzleRowId: string,
   ).results;
 }
 
-export async function readSolutionLocalizations(
-  db: D1Database,
-  caseId: string,
-  puzzleId: string,
-) {
+export async function readSolutionLocalizations(db: D1Database, caseId: string, puzzleId: string) {
   return (
     await db
       .prepare(

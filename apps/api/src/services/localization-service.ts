@@ -36,10 +36,7 @@ export async function caseTitleLocalizations(db: D1Database, caseId?: string) {
 }
 
 export async function publicPuzzleLocalizations(db: D1Database, caseId: string) {
-  const localized = new Map<
-    string,
-    Localizations<z.infer<typeof LocalizedPuzzlePublicSchema>>
-  >();
+  const localized = new Map<string, Localizations<z.infer<typeof LocalizedPuzzlePublicSchema>>>();
   for (const row of await readPublicPuzzleLocalizations(db, caseId)) {
     const texts = localized.get(row.puzzle_id) ?? {};
     texts[locale(row.locale)] = LocalizedPuzzlePublicSchema.parse(JSON.parse(row.public_json));

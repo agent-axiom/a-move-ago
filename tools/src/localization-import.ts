@@ -37,6 +37,7 @@ const sourceCaseSchema = z.object({
   case_id: z.string().min(1),
   case_date: z.iso.date(),
   import_count: z.literal(1),
+  source_shape_valid: z.literal(1),
   source_digest: z.string().regex(/^[a-f0-9]{64}$/),
   source_json: z.string(),
 }).strict();
@@ -49,6 +50,24 @@ export function localizationSourceStatement(caseId: string): D1Statement {
         WHERE i.case_id = d.id AND i.published_at IS NOT NULL) AS import_count,
       (SELECT i.digest FROM content_imports i
         WHERE i.case_id = d.id AND i.published_at IS NOT NULL LIMIT 1) AS source_digest,
+      CASE WHEN NOT EXISTS (
+        SELECT 1 FROM daily_case_puzzles cp JOIN puzzles p ON p.id = cp.puzzle_id
+        WHERE cp.case_id = d.id AND (
+          p.id != p.content_key || ':v' || p.version
+          OR p.content_key != json_extract(p.public_json, '$.id')
+          OR p.version != json_extract(p.public_json, '$.version')
+          OR (SELECT COALESCE(MAX(s.sort_order), 0) FROM puzzle_solutions s
+            WHERE s.puzzle_id = p.id) != (SELECT COUNT(*) FROM puzzle_solutions s
+            WHERE s.puzzle_id = p.id)
+          OR (SELECT COALESCE(MAX(h.level), 0) FROM puzzle_hints h
+            WHERE h.puzzle_id = p.id) != (SELECT COUNT(*) FROM puzzle_hints h
+            WHERE h.puzzle_id = p.id)
+          OR EXISTS (SELECT 1 FROM puzzle_solutions s WHERE s.puzzle_id = p.id
+            AND s.contradiction_json != (SELECT first.contradiction_json
+              FROM puzzle_solutions first WHERE first.puzzle_id = p.id
+              ORDER BY first.sort_order LIMIT 1))
+        )
+      ) THEN 1 ELSE 0 END AS source_shape_valid,
       json_object('case', json_object('id', d.id, 'date', d.case_date,
         'slug', d.slug, 'title', d.title, 'generatedAt', d.created_at),
         'puzzles', json(COALESCE((SELECT json_group_array(json_object(

@@ -51,10 +51,7 @@ type ArchiveRequest = {
   from: string;
   through: string;
 };
-type TransferRequest =
-  | { keyId: string; purpose: "launch" }
-  | ArchiveRequest
-  | LocalizationRequest;
+type TransferRequest = { keyId: string; purpose: "launch" } | ArchiveRequest | LocalizationRequest;
 type Corpus = { cases: ContentCase[] };
 type ContentPublishedSummary = {
   mode: "published";
@@ -64,12 +61,14 @@ type ContentPublishedSummary = {
   puzzles: number;
   dates: string[];
 };
-type PublishedSummary = ContentPublishedSummary | (ContentPublishedSummary & {
-  purpose: "localization";
-  locales: ["ru", "zh"];
-  caseRows: number;
-  puzzleRows: number;
-});
+type PublishedSummary =
+  | ContentPublishedSummary
+  | (ContentPublishedSummary & {
+      purpose: "localization";
+      locales: ["ru", "zh"];
+      caseRows: number;
+      puzzleRows: number;
+    });
 type BootstrapSummary = {
   mode: "bootstrap";
   keyId: string;
@@ -120,13 +119,15 @@ function parseRequest(text: string): TransferRequest {
           through: z.iso.date(),
         })
         .strict(),
-      z.object({
-        keyId: keyIdSchema,
-        purpose: z.literal("localization"),
-        from: z.iso.date(),
-        through: z.iso.date(),
-        locales: z.tuple([z.literal("ru"), z.literal("zh")]),
-      }).strict(),
+      z
+        .object({
+          keyId: keyIdSchema,
+          purpose: z.literal("localization"),
+          from: z.iso.date(),
+          through: z.iso.date(),
+          locales: z.tuple([z.literal("ru"), z.literal("zh")]),
+        })
+        .strict(),
     ])
     .parse(JSON.parse(text));
   if (parsed.purpose === "localization") {
@@ -461,7 +462,7 @@ async function runTransfer(
     if (statements.length > 100) {
       const rows: unknown[][] = [];
       for (let offset = 0; offset < statements.length; offset += 100) {
-        rows.push(...await query(statements.slice(offset, offset + 100)));
+        rows.push(...(await query(statements.slice(offset, offset + 100))));
       }
       return rows;
     }
@@ -539,14 +540,29 @@ async function runTransfer(
       row.completed_digest === digest && row.completed_summary !== null,
       "COMPLETED_TRANSFER_MISMATCH",
     );
-    const contentSummary = z.object({
-      mode: z.literal("published"), keyId: keyIdSchema, digest: z.string(),
-      cases: z.int().positive(), puzzles: z.int().positive(), dates: z.array(z.iso.date()),
-    }).strict();
-    const summary = z.union([contentSummary, contentSummary.extend({
-      purpose: z.literal("localization"), locales: z.tuple([z.literal("ru"), z.literal("zh")]),
-      caseRows: z.int().positive(), puzzleRows: z.int().positive(),
-    }).strict()]).parse(JSON.parse(row.completed_summary));
+    const contentSummary = z
+      .object({
+        mode: z.literal("published"),
+        keyId: keyIdSchema,
+        digest: z.string(),
+        cases: z.int().positive(),
+        puzzles: z.int().positive(),
+        dates: z.array(z.iso.date()),
+      })
+      .strict();
+    const summary = z
+      .union([
+        contentSummary,
+        contentSummary
+          .extend({
+            purpose: z.literal("localization"),
+            locales: z.tuple([z.literal("ru"), z.literal("zh")]),
+            caseRows: z.int().positive(),
+            puzzleRows: z.int().positive(),
+          })
+          .strict(),
+      ])
+      .parse(JSON.parse(row.completed_summary));
     ensure(summary.keyId === keyId && summary.digest === digest, "INVALID_KEY_RECORD");
     return { ...summary, alreadyCompleted: true };
   }
@@ -565,22 +581,33 @@ async function runTransfer(
     const conflicts = await query(corpus.cases.map(conflictCheck));
     for (const rows of conflicts) {
       ensure(rows.length === 1, "INVALID_D1_RESPONSE");
-      const result = z.object({ conflict: z.union([z.literal(0), z.literal(1)]) })
-        .strict().parse(rows[0]);
+      const result = z
+        .object({ conflict: z.union([z.literal(0), z.literal(1)]) })
+        .strict()
+        .parse(rows[0]);
       ensure(result.conflict === 0, "EXISTING_CONTENT_CONFLICT");
     }
   }
   let summary: PublishedSummary;
   if (localization) {
     summary = {
-      mode: "published", keyId, digest, purpose: "localization",
-      cases: localization.cases, puzzles: localization.puzzles, dates: localization.dates,
-      locales: localization.locales, caseRows: localization.caseRows, puzzleRows: localization.puzzleRows,
+      mode: "published",
+      keyId,
+      digest,
+      purpose: "localization",
+      cases: localization.cases,
+      puzzles: localization.puzzles,
+      dates: localization.dates,
+      locales: localization.locales,
+      caseRows: localization.caseRows,
+      puzzleRows: localization.puzzleRows,
     };
   } else {
     ensure(corpus, "INVALID_CORPUS");
     summary = {
-      mode: "published", keyId, digest,
+      mode: "published",
+      keyId,
+      digest,
       cases: corpus.cases.length,
       puzzles: corpus.cases.reduce((total, content) => total + content.puzzles.length, 0),
       dates: corpus.cases.map((content) => content.case.date).sort(),
@@ -640,7 +667,8 @@ export async function runPrivateContentTransfer(
   } catch (error) {
     throw new TransferError(
       error instanceof TransferError || error instanceof LocalizationImportError
-        ? error.message : "PRIVATE_CONTENT_TRANSFER_FAILED",
+        ? error.message
+        : "PRIVATE_CONTENT_TRANSFER_FAILED",
     );
   }
 }

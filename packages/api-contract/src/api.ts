@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { RetractionSchema } from "./chess";
-import { AcceptedSolutionSchema, ContradictionCodeSchema, PuzzlePublicSchema } from "./puzzles";
 import {
   contentLocalizationsSchema,
   LocalizedContradictionSchema,
   LocalizedHintSchema,
   LocalizedTitleSchema,
 } from "./localizations";
+import { AcceptedSolutionSchema, ContradictionCodeSchema, PuzzlePublicSchema } from "./puzzles";
 
 export const ErrorEnvelopeSchema = z
   .object({

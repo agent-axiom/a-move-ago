@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { ColorSchema, RetractionSchema, SquareSchema } from "./chess";
 import {
-  contentLocalizationsSchema,
   ContradictionCodeSchema,
+  contentLocalizationsSchema,
   LocalizedExplanationSchema,
   LocalizedPuzzlePublicSchema,
 } from "./localizations";
+
 export { ContradictionCodeSchema } from "./localizations";
 
 const CastlingRightsSchema = z.union([

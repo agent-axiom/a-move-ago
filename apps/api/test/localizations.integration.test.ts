@@ -89,7 +89,14 @@ describe("opt-in content localizations", () => {
     expect(parsed.localizations?.ru?.title).toBe("Case ru");
     expect(parsed.puzzles[0]?.localizations?.zh?.prompt).toBe("Prompt zh");
     const publicJson = JSON.stringify(daily.body);
-    for (const secret of [privateHintOne, privateHintTwo, privateExplanation, "previousFen", "explanations", "hints"]) {
+    for (const secret of [
+      privateHintOne,
+      privateHintTwo,
+      privateExplanation,
+      "previousFen",
+      "explanations",
+      "hints",
+    ]) {
       expect(publicJson).not.toContain(secret);
     }
     const archive = await authenticatedJson("/v1/archive", guest.token, {
@@ -159,7 +166,9 @@ describe("opt-in content localizations", () => {
     expect(hint.localizations?.ru?.text).toBe(privateHintOne);
     expect(JSON.stringify(replay.body)).not.toContain(privateHintTwo);
     expect(JSON.stringify(replay.body)).not.toContain(privateExplanation);
-    const stored = await testEnv.DB.prepare("SELECT hint_json FROM hint_events WHERE attempt_id = ?")
+    const stored = await testEnv.DB.prepare(
+      "SELECT hint_json FROM hint_events WHERE attempt_id = ?",
+    )
       .bind(incorrect.id)
       .all<{ hint_json: string }>();
     expect(stored.results).toHaveLength(1);
