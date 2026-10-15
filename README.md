@@ -246,6 +246,12 @@ fixed origin in both workflows and `WEB_AUTH_RETURN_URL` in the config template.
 Production config derives its browser origin from that return URL, retains
 the Capacitor origin, and removes the Vite development origin.
 
+The protected API workflow separately checks one synthetic guest solve, a replay
+of the same attempt UUID, reloaded progress, and unchanged statistics. It reads
+only today's first private solution from D1 in runner memory and prints no
+answers or tokens. Pages delivery checks the published HTML against that build
+and verifies its application bundle is available.
+
 On relevant pull requests from this repository, the health workflow also
 checks the currently deployed version. That check is advisory on pull
 requests, so an existing content outage does not block a fix; the local

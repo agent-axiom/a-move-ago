@@ -44,3 +44,37 @@ jobs:
           path: apps/client/dist/pages
       - id: deployment
         uses: actions/deploy-pages@v5
+      - name: Verify the published page and its application bundle
+        env:
+          DEPLOYED_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const page = "https://agent-axiom.github.io/a-move-ago/";
+          const expected = await readFile("apps/client/dist/pages/index.html", "utf8");
+          let verified = false;
+          for (let attempt = 0; attempt < 5; attempt += 1) {
+            const response = await fetch(`${page}?release=${process.env.DEPLOYED_SHA}`, {
+              redirect: "error", cache: "no-store", signal: AbortSignal.timeout(10_000),
+            });
+            if (response.ok && (await response.text()) === expected) {
+              verified = true;
+              break;
+            }
+            if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+          if (!verified) throw new Error("Published page does not match this release");
+          const source = expected.match(/<script[^>]+src="([^"]+\.js)"/u)?.[1];
+          if (!source) throw new Error("Application script missing from page");
+          const asset = new URL(source, page);
+          if (asset.origin !== new URL(page).origin || !asset.pathname.startsWith("/a-move-ago/assets/")) {
+            throw new Error("Unexpected application script location");
+          }
+          const bundle = await fetch(asset, {
+            redirect: "error", cache: "no-store", signal: AbortSignal.timeout(10_000),
+          });
+          if (!bundle.ok || (await bundle.arrayBuffer()).byteLength === 0) {
+            throw new Error("Published application script is unavailable");
+          }
+          console.log(JSON.stringify({ ok: true, page, release: process.env.DEPLOYED_SHA }));
+          NODE
