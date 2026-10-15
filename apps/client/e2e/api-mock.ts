@@ -7,12 +7,43 @@ const profile = {
   avatarUrl: null,
 };
 
+const archiveToday = "2026-10-15";
+const archiveCases = Array.from({ length: 37 }, (_, index) => {
+  const date = new Date("2026-09-10T12:00:00.000Z");
+  date.setUTCDate(date.getUTCDate() + index);
+  const day = date.toISOString().slice(0, 10);
+  const title =
+    day === "2026-09-10"
+      ? "A quiet beginning"
+      : day === "2026-10-14"
+        ? "The missing tempo"
+        : day === archiveToday
+          ? "Today's synthetic case"
+          : day > archiveToday
+            ? "Future synthetic case"
+            : `Training case ${index + 1}`;
+  const puzzleCount = day === "2026-10-14" ? 2 : 1;
+  const solvedPuzzles =
+    day === "2026-10-14" ? 1 : index % 5 === 1 && day < archiveToday ? 1 : 0;
+  return {
+    id: `case-${day}`,
+    date: day,
+    slug: `synthetic-${day}`,
+    title,
+    puzzleCount,
+    solvedPuzzles,
+    completed: solvedPuzzles === puzzleCount,
+  };
+});
+
 export interface ApiObservations {
   attemptBodies: Array<Record<string, unknown>>;
   guestChannels: string[];
   hintRequests: Array<{ attemptId: string; level: number }>;
   miniAppProofs: string[];
   dailyIdentities: Array<"guest" | "telegram">;
+  dailyDates: Array<string | null>;
+  archiveRequests: number;
   statsIdentities: Array<"guest" | "telegram">;
   profileDeleteRequests: Array<{ authorization: string | null; body: string | null }>;
   statsRequests: number;
@@ -37,6 +68,7 @@ export async function installApiMock(
     loseFirstHint?: boolean;
     initialIdentity?: "guest" | "telegram";
     loseFirstProfileDeletionResponse?: boolean;
+    archive?: boolean;
   } = {},
 ): Promise<ApiObservations> {
   const observed: ApiObservations = {
@@ -45,6 +77,8 @@ export async function installApiMock(
     hintRequests: [],
     miniAppProofs: [],
     dailyIdentities: [],
+    dailyDates: [],
+    archiveRequests: 0,
     statsIdentities: [],
     profileDeleteRequests: [],
     statsRequests: 0,
@@ -86,7 +120,7 @@ export async function installApiMock(
     }
     if (url.pathname === "/v1/me" && request.method() === "DELETE") {
       observed.profileDeleteRequests.push({
-        authorization: request.headers()["authorization"] ?? null,
+        authorization: request.headers().authorization ?? null,
         body: request.postData(),
       });
       identity = "guest";
@@ -106,26 +140,51 @@ export async function installApiMock(
       );
       return;
     }
+    if (url.pathname === "/v1/archive" && request.method() === "GET") {
+      observed.archiveRequests += 1;
+      await json(route, 200, {
+        today: archiveToday,
+        startsOn: "2026-09-10",
+        cases: archiveCases.filter((item) => item.date <= archiveToday).toReversed(),
+      });
+      return;
+    }
     if (url.pathname === "/v1/daily" && request.method() === "GET") {
       observed.dailyIdentities.push(identity);
-      await json(route, 200, {
-        id: "case-2026-08-03",
-        date: "2026-08-03",
-        title: "The missing pawn",
-        puzzles: [
-          {
-            id: "opening-exd5",
-            version: 1,
-            title: "A pawn vanished",
-            prompt: "What happened one move ago?",
-            postFen: "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
-            retractingColor: "w",
-            maxHints: 2,
-            provenance: "A MOVE AGO sample",
-            license: "CC BY 4.0",
+      observed.dailyDates.push(url.searchParams.get("date"));
+      const archived = options.archive
+        ? archiveCases.find((item) => item.date === (url.searchParams.get("date") ?? archiveToday))
+        : null;
+      if (options.archive && (!archived || archived.date > archiveToday)) {
+        await json(route, 404, {
+          error: {
+            code: "DAILY_NOT_FOUND",
+            message: "There is no published case for this date.",
+            requestId: "synthetic-archive-request",
           },
-        ],
-        solvedPuzzleIds: [],
+        });
+        return;
+      }
+      const puzzleId = (index: number) =>
+        archived ? `synthetic-${archived.date}-${index}` : "opening-exd5";
+      await json(route, 200, {
+        id: archived?.id ?? "case-2026-08-03",
+        date: archived?.date ?? "2026-08-03",
+        title: archived?.title ?? "The missing pawn",
+        puzzles: Array.from({ length: archived?.puzzleCount ?? 1 }, (_, index) => ({
+          id: puzzleId(index),
+          version: 1,
+          title: "A pawn vanished",
+          prompt: "What happened one move ago?",
+          postFen: "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+          retractingColor: "w",
+          maxHints: 2,
+          provenance: "A MOVE AGO sample",
+          license: "CC BY 4.0",
+        })),
+        solvedPuzzleIds: Array.from({ length: archived?.solvedPuzzles ?? 0 }, (_, index) =>
+          puzzleId(index),
+        ),
       });
       return;
     }

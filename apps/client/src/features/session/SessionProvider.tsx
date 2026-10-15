@@ -137,7 +137,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         sameDocument &&
         (source.searchParams.has("handoff") || source.searchParams.has("authError"))
       ) {
-        window.history.replaceState(null, "", stripAuthReturn(source));
+        window.history.replaceState(window.history.state, "", stripAuthReturn(source));
       }
       if (hasTelegramIdentityRef.current) return;
       if (pendingKeys.has(key) || handledReturnKeysRef.current.has(key)) return;
@@ -155,7 +155,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             runtime,
             source,
             (url) => {
-              if (sameDocument) window.history.replaceState(null, "", url);
+              if (sameDocument) window.history.replaceState(window.history.state, "", url);
             },
             controller.signal,
           );

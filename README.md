@@ -16,6 +16,10 @@ plans; it does not contain the production puzzle corpus.
 5. Use ordered hints, review the reveal, and update the streak.
 6. Optionally save and synchronize progress through Telegram.
 
+Open **Archive** to browse published cases by month and see your completion
+progress. Historical cases have a shareable `?case=YYYY-MM-DD` URL; **Back to
+today** returns to the current UTC daily case. Future cases remain hidden.
+
 Telegram authentication is optional. Merely opening the app in Telegram does
 not create a profile.
 
