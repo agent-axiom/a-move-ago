@@ -1,0 +1,84 @@
+name: Site domain
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/site-domain.yml"
+
+permissions:
+  contents: read
+  pages: read
+
+concurrency:
+  group: site-domain
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Inspect DNS and Pages access without changing settings
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { resolveCname, resolveNs } from "node:dns/promises";
+          const domain = "chess.kosarevsky.dev";
+          const zoneName = "kosarevsky.dev";
+          const repository = "agent-axiom/a-move-ago";
+          async function get(url, token) {
+            try {
+              const response = await fetch(url, {
+                headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+                redirect: "error", signal: AbortSignal.timeout(15_000),
+              });
+              const data = await response.json().catch(() => null);
+              return { status: response.status, data };
+            } catch { return { status: 0, data: null }; }
+          }
+          const summary = { domain, target: "agent-axiom.github.io" };
+          summary.publicDns = {
+            nameservers: await resolveNs(zoneName).catch(() => []),
+            cnames: await resolveCname(domain).catch(() => []),
+          };
+          const pages = await get(`https://api.github.com/repos/${repository}/pages`, process.env.GH_TOKEN);
+          summary.pages = { status: pages.status };
+          if (pages.status === 200) {
+            summary.pages = {
+              status: pages.status, cname: pages.data?.cname ?? null,
+              url: pages.data?.html_url, buildType: pages.data?.build_type,
+              httpsEnforced: pages.data?.https_enforced,
+              certificate: pages.data?.https_certificate?.state ?? null,
+            };
+          }
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const zones = await get(`https://api.cloudflare.com/client/v4/zones?name=${zoneName}&per_page=5`, token);
+          summary.cloudflare = { zoneListStatus: zones.status, zoneFound: false };
+          const matching = Array.isArray(zones.data?.result)
+            ? zones.data.result.filter(zone => zone.name === zoneName && zone.account?.id === account && zone.status === "active")
+            : [];
+          if (zones.status === 200 && zones.data?.success === true && matching.length === 1) {
+            const zone = matching[0];
+            const records = await get(`https://api.cloudflare.com/client/v4/zones/${zone.id}/dns_records?name=${domain}&per_page=20`, token);
+            summary.cloudflare = {
+              zoneListStatus: zones.status, zoneFound: true, dnsReadStatus: records.status,
+              records: records.data?.success === true && Array.isArray(records.data.result)
+                ? records.data.result.filter(record => record.name === domain).map(record => ({
+                    type: record.type, name: record.name, target: record.content,
+                    proxied: record.proxied, ttl: record.ttl,
+                  })) : [],
+            };
+          }
+          console.log(JSON.stringify(summary));
+          NODE
