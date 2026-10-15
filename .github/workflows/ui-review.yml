@@ -5,6 +5,9 @@ on:
   pull_request:
     paths:
       - "apps/client/**"
+      - "apps/api/**"
+      - "packages/api-contract/**"
+      - "tools/**"
       - ".github/workflows/ui-review.yml"
 
 permissions:

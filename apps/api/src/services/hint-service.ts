@@ -9,6 +9,7 @@ import {
 } from "../db/attempts";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
+import { localizeHint } from "./localization-service";
 
 type HintResponse = z.infer<typeof HintResponseSchema>;
 
@@ -66,6 +67,7 @@ export async function requestHint(
   attemptId: string,
   requestedLevel: number,
   now: number,
+  includeLocalizations = false,
 ): Promise<HintResponse> {
   const attempt = await findHintAttemptForActor(env.DB, actor, attemptId, now);
   if (!attempt) return await throwMissingActorOrAttempt(env, actor, now);
@@ -74,9 +76,13 @@ export async function requestHint(
   }
   if (attempt.correct === 1) throw attemptAlreadyCorrect();
 
+  async function result(hint: HintResponse) {
+    return includeLocalizations ? await localizeHint(env.DB, attempt.puzzle_id, hint) : hint;
+  }
+
   const replay = await findHintForActor(env.DB, actor, attemptId, requestedLevel, now);
   if (replay) {
-    return parseStoredHint(replay.hint_json, requestedLevel, "hint event");
+    return await result(parseStoredHint(replay.hint_json, requestedLevel, "hint event"));
   }
 
   if (requestedLevel !== attempt.max_hint_level + 1) throw hintOutOfOrder();
@@ -92,6 +98,6 @@ export async function requestHint(
   });
 
   const stored = await findHintForActor(env.DB, actor, attemptId, requestedLevel, now);
-  if (stored) return parseStoredHint(stored.hint_json, requestedLevel, "hint event");
+  if (stored) return await result(parseStoredHint(stored.hint_json, requestedLevel, "hint event"));
   return await throwMissingActorOrAttempt(env, actor, now);
 }

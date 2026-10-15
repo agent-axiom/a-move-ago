@@ -53,6 +53,7 @@ export interface ApiClientOptions {
   baseUrl: string;
   fetch?: typeof globalThis.fetch;
   getToken: () => string | null;
+  includeLocalizations?: boolean;
 }
 
 function throwTransportFailure(error: unknown): never {
@@ -73,6 +74,7 @@ export function createApiClient(options: ApiClientOptions) {
     signal?: AbortSignal | undefined;
   }): Promise<z.infer<TSchema>> {
     const headers: Record<string, string> = { accept: "application/json" };
+    if (options.includeLocalizations === true) headers["x-content-locales"] = "1";
     if (input.body !== undefined) headers["content-type"] = "application/json";
     if (input.authenticated !== false) {
       const token = options.getToken();

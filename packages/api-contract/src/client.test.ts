@@ -56,6 +56,21 @@ function responseWithJsonFailure(error: unknown, status = 200) {
 }
 
 describe("ApiClient", () => {
+  it("requests localization maps only when explicitly enabled", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json(session, { status: 201 }));
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch,
+      getToken: () => null,
+      includeLocalizations: true,
+    });
+    await api.createGuest("web");
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.test/v1/sessions/guest",
+      expect.objectContaining({ headers: expect.objectContaining({ "x-content-locales": "1" }) }),
+    );
+  });
+
   it("issues an anonymous guest session with the selected channel", async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json(session, { status: 201 }));
     const getToken = vi.fn(() => null);

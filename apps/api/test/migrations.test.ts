@@ -14,9 +14,15 @@ const gameplayTables = [
   "attempts",
   "hint_events",
   "content_imports",
+  "case_localizations",
+  "puzzle_localizations",
 ];
 const digest = "a".repeat(64);
-const migrationNames = [{ name: "0001_initial.sql" }, { name: "0002_telegram_auth.sql" }];
+const migrationNames = [
+  { name: "0001_initial.sql" },
+  { name: "0002_telegram_auth.sql" },
+  { name: "0003_content_localizations.sql" },
+];
 const testEnv = env as Env & { TEST_MIGRATIONS: D1Migration[] };
 type SqlCase = [sql: string, values?: unknown[]];
 

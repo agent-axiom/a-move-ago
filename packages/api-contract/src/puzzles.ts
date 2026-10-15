@@ -1,15 +1,12 @@
 import { z } from "zod";
 import { ColorSchema, RetractionSchema, SquareSchema } from "./chess";
-
-export const ContradictionCodeSchema = z.enum([
-  "NO_PIECE_ON_CURRENT_SQUARE",
-  "WRONG_COLOR",
-  "PREVIOUS_SQUARE_OCCUPIED",
-  "RESTORE_SQUARE_OCCUPIED",
-  "INVALID_SPECIAL_MOVE",
-  "OPPONENT_KING_IN_CHECK",
-  "NOT_THE_LAST_MOVE",
-]);
+import {
+  contentLocalizationsSchema,
+  ContradictionCodeSchema,
+  LocalizedExplanationSchema,
+  LocalizedPuzzlePublicSchema,
+} from "./localizations";
+export { ContradictionCodeSchema } from "./localizations";
 
 const CastlingRightsSchema = z.union([
   z.literal("-"),
@@ -40,6 +37,7 @@ export const PuzzlePublicSchema = z
     maxHints: z.int().nonnegative(),
     provenance: z.string().min(1),
     license: z.string().min(1),
+    localizations: contentLocalizationsSchema(LocalizedPuzzlePublicSchema).optional(),
   })
   .strict();
 
@@ -50,6 +48,7 @@ export const AcceptedSolutionSchema = z
     forwardSan: z.string().min(1),
     explanation: z.string().min(1),
     historyConstraints: z.array(HistoryConstraintSchema),
+    localizations: contentLocalizationsSchema(LocalizedExplanationSchema).optional(),
   })
   .strict();
 

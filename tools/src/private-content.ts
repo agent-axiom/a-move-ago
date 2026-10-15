@@ -18,6 +18,12 @@ import { canonicalJson } from "./canonical-json";
 import { runContentImport } from "./content-import";
 import { executeD1Batch } from "./d1-http";
 import type { D1Statement } from "./import-plan";
+import {
+  LocalizationImportError,
+  type LocalizationRequest,
+  localizationDates,
+  prepareLocalizationImport,
+} from "./localization-import";
 import { type ContentCase, validateContentDocument } from "./validate-content";
 
 const requestPath = "ops/content-key-request.json";
@@ -45,9 +51,12 @@ type ArchiveRequest = {
   from: string;
   through: string;
 };
-type TransferRequest = { keyId: string; purpose: "launch" } | ArchiveRequest;
+type TransferRequest =
+  | { keyId: string; purpose: "launch" }
+  | ArchiveRequest
+  | LocalizationRequest;
 type Corpus = { cases: ContentCase[] };
-type PublishedSummary = {
+type ContentPublishedSummary = {
   mode: "published";
   keyId: string;
   digest: string;
@@ -55,6 +64,12 @@ type PublishedSummary = {
   puzzles: number;
   dates: string[];
 };
+type PublishedSummary = ContentPublishedSummary | (ContentPublishedSummary & {
+  purpose: "localization";
+  locales: ["ru", "zh"];
+  caseRows: number;
+  puzzleRows: number;
+});
 type BootstrapSummary = {
   mode: "bootstrap";
   keyId: string;
@@ -105,8 +120,24 @@ function parseRequest(text: string): TransferRequest {
           through: z.iso.date(),
         })
         .strict(),
+      z.object({
+        keyId: keyIdSchema,
+        purpose: z.literal("localization"),
+        from: z.iso.date(),
+        through: z.iso.date(),
+        locales: z.tuple([z.literal("ru"), z.literal("zh")]),
+      }).strict(),
     ])
     .parse(JSON.parse(text));
+  if (parsed.purpose === "localization") {
+    // Purpose, range, and both target languages are authenticated through keyId.
+    const prefix = `localize-${parsed.from}-${parsed.through}-${parsed.locales.join("-")}-`;
+    ensure(
+      parsed.keyId.startsWith(prefix) && /^v[1-9]\d*$/.test(parsed.keyId.slice(prefix.length)),
+      "REQUEST_KEY_MISMATCH",
+    );
+    return parsed;
+  }
   if (parsed.purpose === "archive") {
     // The key ID is authenticated by the envelope and fixed in D1. Encoding the
     // exact archive range binds purpose and dates without altering legacy rows.
@@ -117,7 +148,10 @@ function parseRequest(text: string): TransferRequest {
     );
     return parsed;
   }
-  ensure(!parsed.keyId.startsWith("archive-"), "REQUEST_KEY_MISMATCH");
+  ensure(
+    !parsed.keyId.startsWith("archive-") && !parsed.keyId.startsWith("localize-"),
+    "REQUEST_KEY_MISMATCH",
+  );
   return { keyId: parsed.keyId, purpose: "launch" };
 }
 
@@ -229,7 +263,7 @@ function validateCorpus(
   payload: unknown,
   now: number,
   requireCoverage: boolean,
-  request: TransferRequest,
+  request: Exclude<TransferRequest, LocalizationRequest>,
 ): Corpus {
   ensure(
     payload !== null && typeof payload === "object" && !Array.isArray(payload),
@@ -395,6 +429,7 @@ async function runTransfer(
   const now = Math.floor(runtime.now());
   ensure(Number.isSafeInteger(now) && now >= 0, "INVALID_TIME");
   if (transferRequest.purpose === "archive") archiveDates(transferRequest, now);
+  if (transferRequest.purpose === "localization") localizationDates(transferRequest);
   let envelopeText: string | undefined;
   try {
     envelopeText = await runtime.readFile(resolve(runtime.cwd, envelopePath), "utf8");
@@ -422,6 +457,15 @@ async function runTransfer(
       signal: AbortSignal.timeout(15_000),
     });
   async function query(statements: D1Statement[]): Promise<unknown[][]> {
+    // The D1 REST batch limit is 100 statements. Keep both preflight and writes bounded.
+    if (statements.length > 100) {
+      const rows: unknown[][] = [];
+      for (let offset = 0; offset < statements.length; offset += 100) {
+        rows.push(...await query(statements.slice(offset, offset + 100)));
+      }
+      return rows;
+    }
+    if (statements.length === 0) return [];
     const response: unknown = await executeD1Batch({
       ...connection,
       statements,
@@ -495,17 +539,14 @@ async function runTransfer(
       row.completed_digest === digest && row.completed_summary !== null,
       "COMPLETED_TRANSFER_MISMATCH",
     );
-    const summary = z
-      .object({
-        mode: z.literal("published"),
-        keyId: keyIdSchema,
-        digest: z.string(),
-        cases: z.int().positive(),
-        puzzles: z.int().positive(),
-        dates: z.array(z.iso.date()),
-      })
-      .strict()
-      .parse(JSON.parse(row.completed_summary));
+    const contentSummary = z.object({
+      mode: z.literal("published"), keyId: keyIdSchema, digest: z.string(),
+      cases: z.int().positive(), puzzles: z.int().positive(), dates: z.array(z.iso.date()),
+    }).strict();
+    const summary = z.union([contentSummary, contentSummary.extend({
+      purpose: z.literal("localization"), locales: z.tuple([z.literal("ru"), z.literal("zh")]),
+      caseRows: z.int().positive(), puzzleRows: z.int().positive(),
+    }).strict()]).parse(JSON.parse(row.completed_summary));
     ensure(summary.keyId === keyId && summary.digest === digest, "INVALID_KEY_RECORD");
     return { ...summary, alreadyCompleted: true };
   }
@@ -514,29 +555,37 @@ async function runTransfer(
     row.envelope_digest === null || row.envelope_digest === digest,
     "TRANSFER_ENVELOPE_MISMATCH",
   );
-  const corpus = validateCorpus(
-    decrypt(envelope, row.private_key),
-    now,
-    row.envelope_digest === null,
-    transferRequest,
-  );
-  const conflicts = await query(corpus.cases.map(conflictCheck));
-  for (const rows of conflicts) {
-    ensure(rows.length === 1, "INVALID_D1_RESPONSE");
-    const result = z
-      .object({ conflict: z.union([z.literal(0), z.literal(1)]) })
-      .strict()
-      .parse(rows[0]);
-    ensure(result.conflict === 0, "EXISTING_CONTENT_CONFLICT");
+  const payload = decrypt(envelope, row.private_key);
+  let corpus: Corpus | undefined;
+  let localization: Awaited<ReturnType<typeof prepareLocalizationImport>> | undefined;
+  if (transferRequest.purpose === "localization") {
+    localization = await prepareLocalizationImport(payload, transferRequest, query);
+  } else {
+    corpus = validateCorpus(payload, now, row.envelope_digest === null, transferRequest);
+    const conflicts = await query(corpus.cases.map(conflictCheck));
+    for (const rows of conflicts) {
+      ensure(rows.length === 1, "INVALID_D1_RESPONSE");
+      const result = z.object({ conflict: z.union([z.literal(0), z.literal(1)]) })
+        .strict().parse(rows[0]);
+      ensure(result.conflict === 0, "EXISTING_CONTENT_CONFLICT");
+    }
   }
-  const summary: PublishedSummary = {
-    mode: "published",
-    keyId,
-    digest,
-    cases: corpus.cases.length,
-    puzzles: corpus.cases.reduce((total, content) => total + content.puzzles.length, 0),
-    dates: corpus.cases.map((content) => content.case.date).sort(),
-  };
+  let summary: PublishedSummary;
+  if (localization) {
+    summary = {
+      mode: "published", keyId, digest, purpose: "localization",
+      cases: localization.cases, puzzles: localization.puzzles, dates: localization.dates,
+      locales: localization.locales, caseRows: localization.caseRows, puzzleRows: localization.puzzleRows,
+    };
+  } else {
+    ensure(corpus, "INVALID_CORPUS");
+    summary = {
+      mode: "published", keyId, digest,
+      cases: corpus.cases.length,
+      puzzles: corpus.cases.reduce((total, content) => total + content.puzzles.length, 0),
+      dates: corpus.cases.map((content) => content.case.date).sort(),
+    };
+  }
   await query([
     {
       sql: `UPDATE ops_content_transfer_keys SET envelope_digest = ?
@@ -545,14 +594,19 @@ async function runTransfer(
     },
   ]);
   ensure((await loadKey())?.envelope_digest === digest, "TRANSFER_ENVELOPE_MISMATCH");
-  for (const content of corpus.cases) {
-    await runtime.importCase(["--file", "memory.json", "--publish"], {
-      cwd: runtime.cwd,
-      env: runtime.env,
-      fetch: request,
-      readFile: async () => JSON.stringify(content),
-      log: () => {},
-    });
+  if (localization) {
+    await localization.import();
+  } else {
+    ensure(corpus, "INVALID_CORPUS");
+    for (const content of corpus.cases) {
+      await runtime.importCase(["--file", "memory.json", "--publish"], {
+        cwd: runtime.cwd,
+        env: runtime.env,
+        fetch: request,
+        readFile: async () => JSON.stringify(content),
+        log: () => {},
+      });
+    }
   }
   await query([
     {
@@ -585,7 +639,8 @@ export async function runPrivateContentTransfer(
     });
   } catch (error) {
     throw new TransferError(
-      error instanceof TransferError ? error.message : "PRIVATE_CONTENT_TRANSFER_FAILED",
+      error instanceof TransferError || error instanceof LocalizationImportError
+        ? error.message : "PRIVATE_CONTENT_TRANSFER_FAILED",
     );
   }
 }
