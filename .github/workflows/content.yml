@@ -71,3 +71,10 @@ jobs:
         env:
           API_ORIGIN: ${{ vars.API_ORIGIN }}
         run: node tools/scripts/check-localizations-production.mjs
+      - name: Verify localized hints and solutions with an isolated synthetic guest
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+        run: node tools/scripts/check-localized-production-play.mjs

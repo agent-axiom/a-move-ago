@@ -1,6 +1,7 @@
 import type { AcceptedSolution } from "@a-move-ago/api-contract";
 import { parseFen } from "@a-move-ago/game-core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { localizedText, useI18n } from "../../../i18n";
 import { Chessboard } from "./Chessboard";
 
 type RevealStage = "post" | "previous" | "forward" | "done";
@@ -14,6 +15,7 @@ export function RevealPlayer(props: {
   solution: AcceptedSolution;
   onComplete(): void;
 }) {
+  const { locale, t } = useI18n();
   const revealKey = useMemo(
     () => JSON.stringify([props.postFen, props.solution]),
     [props.postFen, props.solution],
@@ -62,32 +64,32 @@ export function RevealPlayer(props: {
   const showingPrevious = inspection ? inspection === "previous" : stage === "previous";
   const announcement =
     inspection === "previous"
-      ? "Previous position reconstructed."
+      ? t("game.reveal.previous")
       : inspection === "post"
-        ? "Position after the move."
+        ? t("game.reveal.post")
         : stage === "post"
-          ? "Rewinding the last move."
+          ? t("game.reveal.rewind")
           : stage === "previous"
-            ? "Previous position reconstructed."
+            ? t("game.reveal.previous")
             : stage === "forward"
-              ? `Playing ${props.solution.forwardSan} forward.`
-              : "Solution replay complete.";
+              ? t("game.reveal.forward", { san: props.solution.forwardSan })
+              : t("game.reveal.done");
 
   return (
     <section className="reveal-layout" aria-labelledby="solution-heading">
       <div className="board-panel">
         <div className="board-toolbar">
-          <span className="last-move-label">The true move</span>
-          <fieldset className="board-view-switch" aria-label="Solution position">
+          <span className="last-move-label">{t("game.reveal.trueMove")}</span>
+          <fieldset className="board-view-switch" aria-label={t("game.reveal.position")}>
             <button
               type="button"
               aria-pressed={showingPrevious}
               onClick={() => inspect("previous")}
             >
-              Before
+              {t("game.before")}
             </button>
             <button type="button" aria-pressed={!showingPrevious} onClick={() => inspect("post")}>
-              After
+              {t("game.after")}
             </button>
           </fieldset>
         </div>
@@ -96,9 +98,7 @@ export function RevealPlayer(props: {
             board={showingPrevious ? previous.board : post.board}
             disabled
             destinationSquare={props.solution.retraction.previousSquare}
-            label={
-              showingPrevious ? "Reconstructed previous position" : "Position after the true move"
-            }
+            label={showingPrevious ? t("game.reveal.boardBefore") : t("game.reveal.boardAfter")}
             onSelect={() => undefined}
             orientation={props.solution.retraction.movedPiece.color === "w" ? "white" : "black"}
             selectedSquare={props.solution.retraction.currentSquare}
@@ -109,18 +109,18 @@ export function RevealPlayer(props: {
         </p>
       </div>
       <div className="solution-panel">
-        <p className="game-eyebrow">The story, uncovered</p>
+        <p className="game-eyebrow">{t("game.reveal.eyebrow")}</p>
         <div className="solved-heading">
           <span className="solved-mark" aria-hidden="true">
             ✓
           </span>
-          <h2 id="solution-heading">Solved</h2>
+          <h2 id="solution-heading">{t("game.solved")}</h2>
         </div>
         <p className="solution-notation">{props.solution.forwardSan}</p>
-        <p className="solution-explanation">{props.solution.explanation}</p>
-        <p className="solution-inspect-copy">
-          Explore both positions, or replay the move at your own pace.
+        <p className="solution-explanation">
+          {localizedText(props.solution, "explanation", locale)}
         </p>
+        <p className="solution-inspect-copy">{t("game.reveal.inspect")}</p>
         <div className="solution-actions">
           <button
             className="button-secondary"
@@ -130,7 +130,7 @@ export function RevealPlayer(props: {
               startReplay();
             }}
           >
-            Replay move
+            {t("game.reveal.replay")}
           </button>
           <button
             className="button-primary"
@@ -142,7 +142,7 @@ export function RevealPlayer(props: {
               props.onComplete();
             }}
           >
-            Continue
+            {t("game.continue")}
           </button>
         </div>
       </div>

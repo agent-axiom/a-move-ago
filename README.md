@@ -20,6 +20,14 @@ Open **Archive** to browse published cases by month and see your completion
 progress. Historical cases have a shareable `?case=YYYY-MM-DD` URL; **Back to
 today** returns to the current UTC daily case. Future cases remain hidden.
 
+The language selector offers English (the first-run default), Russian, and
+Simplified Chinese. It remembers an explicit choice on this device and updates
+the interface, puzzle text, earned hints, and solution explanations without
+resetting the selected date or move. Public API translations are opt-in through
+`x-content-locales: 1`; private translations follow the same access rules as
+their English originals. Production translations use the encrypted import
+described in [ops/README.md](ops/README.md).
+
 Telegram authentication is optional. Merely opening the app in Telegram does
 not create a profile.
 

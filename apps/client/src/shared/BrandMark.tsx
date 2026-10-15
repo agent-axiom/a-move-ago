@@ -1,7 +1,10 @@
+import { useI18n } from "../i18n";
+
 export function BrandMark() {
+  const { t } = useI18n();
   return (
     <svg className="brand-mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-      <title>A MOVE AGO reverse knight</title>
+      <title>{t("shell.brandMark")}</title>
       <path
         fill="var(--color-text)"
         d="M226 164c38 6 70 30 84 64 16 38 10 86-16 118l16 48H158l14-44c6-20 10-42 6-62l-36 28c-18 14-46 4-50-18-2-14 8-26 18-38l56-68-16-42 58 28 18-14Zm-68 242h158l16 24H140l18-24Z"

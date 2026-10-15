@@ -102,17 +102,33 @@ const retractionErrorMessage: Record<RetractionErrorCode, string> = {
   INVALID_SPECIAL_MOVE: "That special move does not match the selected squares.",
 };
 
+export type DraftPreviewErrorCode =
+  | RetractionErrorCode
+  | "SELECT_SQUARES"
+  | "CANNOT_RETRACT"
+  | "INVALID_DETAILS"
+  | "UNAVAILABLE";
+
+const previewErrorMessage: Record<DraftPreviewErrorCode, string> = {
+  ...retractionErrorMessage,
+  SELECT_SQUARES: "Choose current and previous squares.",
+  CANNOT_RETRACT: "The selected piece cannot be retracted.",
+  INVALID_DETAILS: "The retraction details do not match the selected squares.",
+  UNAVAILABLE: "This retraction cannot be previewed.",
+};
+
 export function buildPreview(
   post: FenState,
   retractingColor: Color,
   state: DraftState,
+  formatError: (code: DraftPreviewErrorCode) => string = (code) => previewErrorMessage[code],
 ): DraftPreview {
   if (state.tag !== "configure") {
-    return { ok: false, reason: "Choose current and previous squares." };
+    return { ok: false, reason: formatError("SELECT_SQUARES") };
   }
   const movedPiece = post.board[state.currentSquare];
   if (!movedPiece || movedPiece.color !== retractingColor) {
-    return { ok: false, reason: "The selected piece cannot be retracted." };
+    return { ok: false, reason: formatError("CANNOT_RETRACT") };
   }
   const restoredPiece = state.captureType
     ? { color: opponent(retractingColor), type: state.captureType, square: restoreSquare(state) }
@@ -127,7 +143,7 @@ export function buildPreview(
   if (!parsed.success) {
     return {
       ok: false,
-      reason: "The retraction details do not match the selected squares.",
+      reason: formatError("INVALID_DETAILS"),
     };
   }
   const retraction = parsed.data;
@@ -136,10 +152,7 @@ export function buildPreview(
   } catch (error) {
     return {
       ok: false,
-      reason:
-        error instanceof RetractionError
-          ? retractionErrorMessage[error.code]
-          : "This retraction cannot be previewed.",
+      reason: formatError(error instanceof RetractionError ? error.code : "UNAVAILABLE"),
     };
   }
 }

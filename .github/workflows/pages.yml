@@ -82,3 +82,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Verify the live archive, historical dates and return to today
         run: node tools/scripts/check-live-archive-ui.mjs
+      - name: Verify English default, Russian and Chinese on the live site
+        run: node tools/scripts/check-live-locales-ui.mjs

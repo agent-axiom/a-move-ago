@@ -1,9 +1,10 @@
 import type { ArchiveResponse } from "@a-move-ago/api-contract";
 import { useState } from "react";
+import { localizedText, useI18n } from "../../i18n";
 import { useArchive } from "./use-archive";
 
-export function archiveDateLabel(date: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
+export function archiveDateLabel(date: string, locale = "en"): string {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -11,8 +12,8 @@ export function archiveDateLabel(date: string): string {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
-function monthLabel(month: string): string {
-  return new Intl.DateTimeFormat("en", {
+function monthLabel(month: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -25,6 +26,7 @@ function ArchiveCases(props: {
   onMonthChange(month: string): void;
   onSelect(date: string): void;
 }) {
+  const { locale, intlLocale, t } = useI18n();
   const cases = props.archive.cases
     .filter((item) => item.date <= props.archive.today)
     .toSorted((left, right) => right.date.localeCompare(left.date));
@@ -37,8 +39,8 @@ function ArchiveCases(props: {
   if (cases.length === 0) {
     return (
       <div className="archive-empty">
-        <h2>The collection is just beginning.</h2>
-        <p>Published cases will appear here. Today’s case is a good place to start.</p>
+        <h2>{t("shell.archiveEmptyTitle")}</h2>
+        <p>{t("shell.archiveEmptyDescription")}</p>
       </div>
     );
   }
@@ -47,27 +49,35 @@ function ArchiveCases(props: {
     <>
       <div className="archive-summary">
         <p>
-          <strong>{cases.length}</strong> {cases.length === 1 ? "case" : "cases"} to explore
+          <strong>{cases.length}</strong> {t("shell.archiveExplore", { count: cases.length })}
           <span aria-hidden="true"> · </span>
-          <span>{completed} completed</span>
+          <span>{t("shell.archiveCompleted", { count: completed })}</span>
         </p>
-        {props.archive.startsOn ? <p>Since {archiveDateLabel(props.archive.startsOn)}</p> : null}
+        {props.archive.startsOn ? (
+          <p>
+            {t("shell.archiveSince", {
+              date: archiveDateLabel(props.archive.startsOn, intlLocale),
+            })}
+          </p>
+        ) : null}
       </div>
       <div className="archive-toolbar">
         <div>
-          <p className="eyebrow">Choose your next mystery</p>
-          <h2 id="archive-month-heading">{month ? monthLabel(month) : "Published cases"}</h2>
+          <p className="eyebrow">{t("shell.archiveChoose")}</p>
+          <h2 id="archive-month-heading">
+            {month ? monthLabel(month, intlLocale) : t("shell.archivePublished")}
+          </h2>
         </div>
         <label>
-          <span>Browse month</span>
+          <span>{t("shell.browseMonth")}</span>
           <select
-            aria-label="Archive month"
+            aria-label={t("shell.archiveMonth")}
             value={month}
             onChange={(event) => props.onMonthChange(event.currentTarget.value)}
           >
             {months.map((value) => (
               <option key={value} value={value}>
-                {monthLabel(value)}
+                {monthLabel(value, intlLocale)}
               </option>
             ))}
           </select>
@@ -75,24 +85,25 @@ function ArchiveCases(props: {
       </div>
       <ul className="archive-cases" aria-labelledby="archive-month-heading">
         {visibleCases.map((item) => {
-          const date = archiveDateLabel(item.date);
+          const date = archiveDateLabel(item.date, intlLocale);
+          const title = localizedText(item, "title", locale);
           const status = item.completed
-            ? "Completed"
+            ? t("shell.completed")
             : item.solvedPuzzles > 0
-              ? "In progress"
-              : "Not started";
+              ? t("shell.inProgress")
+              : t("shell.notStarted");
           return (
             <li key={item.id}>
               <button
                 className={`archive-case${item.completed ? " archive-case-completed" : ""}`}
                 type="button"
-                aria-label={`Open case for ${date}: ${item.title}`}
+                aria-label={t("shell.openCase", { date, title })}
                 aria-describedby={`archive-progress-${item.date}`}
                 onClick={() => props.onSelect(item.date)}
               >
                 <span className="archive-date" aria-hidden="true">
                   <span>
-                    {new Date(`${item.date}T00:00:00Z`).toLocaleDateString("en", {
+                    {new Date(`${item.date}T00:00:00Z`).toLocaleDateString(intlLocale, {
                       month: "short",
                       timeZone: "UTC",
                     })}
@@ -103,17 +114,20 @@ function ArchiveCases(props: {
                   <span className="archive-case-meta">
                     <time dateTime={item.date}>{date}</time>
                     {item.date === props.archive.today ? (
-                      <span className="archive-today">Today</span>
+                      <span className="archive-today">{t("shell.today")}</span>
                     ) : null}
                   </span>
-                  <strong className="archive-case-title">{item.title}</strong>
+                  <strong className="archive-case-title">{title}</strong>
                   <span className="archive-case-status" id={`archive-progress-${item.date}`}>
                     <span>
                       {item.completed ? "✓ " : ""}
                       {status}
                     </span>{" "}
                     <span>
-                      {item.solvedPuzzles} / {item.puzzleCount} solved
+                      {t("shell.solvedCount", {
+                        solved: item.solvedPuzzles,
+                        total: item.puzzleCount,
+                      })}
                     </span>
                   </span>
                 </span>
@@ -136,6 +150,7 @@ export function ArchivePage(props: {
   onSelect(date: string): void;
   onToday(): void;
 }) {
+  const { t } = useI18n();
   const { state, retry } = useArchive(props.enabled);
   const [localMonth, setLocalMonth] = useState<string | null>(null);
   const reload =
@@ -147,34 +162,32 @@ export function ArchivePage(props: {
     <section className="archive-page" aria-labelledby="archive-heading">
       <header className="archive-heading page-heading">
         <div>
-          <p className="eyebrow">One move back, any day</p>
-          <h1 id="archive-heading">The archive</h1>
-          <p className="page-description">
-            There’s always another perspective. Revisit a daily mystery, at your own pace.
-          </p>
+          <p className="eyebrow">{t("shell.archiveEyebrow")}</p>
+          <h1 id="archive-heading">{t("shell.archiveTitle")}</h1>
+          <p className="page-description">{t("shell.archiveDescription")}</p>
         </div>
         <button className="button-secondary" type="button" onClick={props.onToday}>
-          Back to today
+          {t("shell.backToday")}
         </button>
       </header>
-      {state.tag === "loading" ? <p role="status">Opening the archive…</p> : null}
+      {state.tag === "loading" ? <p role="status">{t("shell.archiveLoading")}</p> : null}
       {state.tag === "error" ? (
         <div className="archive-empty">
-          <h2>The archive is unavailable.</h2>
+          <h2>{t("shell.archiveUnavailable")}</h2>
           <p role="alert">
             {state.failure.kind === "offline"
-              ? "You appear to be offline. Reconnect to explore past cases."
+              ? t("shell.archiveOffline")
               : state.failure.kind === "auth"
-                ? "Your session expired. Reload to continue."
-                : "We couldn’t load the collection. Please try again."}
+                ? t("shell.sessionExpired")
+                : t("shell.archiveFailure")}
           </p>
           {requestId ? (
             <p>
-              Request ID: <code>{requestId}</code>
+              {t("shell.requestId")} <code>{requestId}</code>
             </p>
           ) : null}
           <button type="button" onClick={reload ? () => window.location.reload() : retry}>
-            {reload ? "Reload application" : "Retry archive"}
+            {reload ? t("shell.reload") : t("shell.retryArchive")}
           </button>
         </div>
       ) : null}
