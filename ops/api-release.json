@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-15",
-  "reason": "Allow the exact chess.kosarevsky.dev and GitHub Pages web origins before the custom domain cutover"
+  "release": "2026-10-15-domain-cutover-v1",
+  "reason": "Finalize chess.kosarevsky.dev as the canonical web authentication return after DNS, Pages, and TLS verification"
 }

@@ -27,7 +27,7 @@ const sentinels = [
   '"database_id": "00000000-0000-0000-0000-000000000000"',
   '"ENVIRONMENT": "development"',
   `"ALLOWED_ORIGINS": "${sourceOrigins}"`,
-  '"WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/"',
+  '"WEB_AUTH_RETURN_URL": "https://chess.kosarevsky.dev/"',
   '"TELEGRAM_OIDC_CLIENT_ID": "123456789"',
   '"TELEGRAM_OIDC_CALLBACK_URL": "https://a-move-ago-api.example.invalid/v1/auth/telegram/oidc/callback"',
   '"API_ORIGIN": "https://a-move-ago-api.example.invalid"',
@@ -67,14 +67,12 @@ describe("renderWranglerConfig", () => {
     expect(rendered).not.toContain("amoveago-debug:");
     expect(rendered).not.toContain("http://localhost:5173");
     expect(rendered).not.toMatch(/90000000[1-4]/);
-    expect(rendered).toContain(
-      '"WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/"',
-    );
+    expect(rendered).toContain('"WEB_AUTH_RETURN_URL": "https://chess.kosarevsky.dev/"');
   });
 
   it("uses the explicit trusted Web origins while retaining Capacitor", async () => {
     const source = (await sourceText())
-      .replace("https://agent-axiom.github.io/a-move-ago/", "https://play.example:8443/a-move-ago/")
+      .replace("https://chess.kosarevsky.dev/", "https://play.example:8443/a-move-ago/")
       .replace(sourceOrigins, "https://play.example:8443,https://localhost");
 
     expect(renderWranglerConfig(source, productionInput)).toContain(
@@ -84,7 +82,7 @@ describe("renderWranglerConfig", () => {
 
   it("requires the auth return origin to appear in the explicit allowlist", async () => {
     const source = (await sourceText()).replace(
-      "https://agent-axiom.github.io/a-move-ago/",
+      "https://chess.kosarevsky.dev/",
       "https://other.example/a-move-ago/",
     );
     expect(() => renderWranglerConfig(source, productionInput)).toThrow(/not explicitly allowed/i);
@@ -107,7 +105,7 @@ describe("renderWranglerConfig", () => {
     "https://agent-axiom.github.io,https://localhost,https://OTHER.example",
     "https://agent-axiom.github.io,https://localhost,https://other.example:443",
     "https://agent-axiom.github.io, https://localhost",
-    "https://agent-axiom.github.io",
+    "https://chess.kosarevsky.dev",
   ])("rejects malformed or incomplete explicit production origins: %s", async (origins) => {
     const source = (await sourceText()).replace(
       JSON.stringify(sourceOrigins),
@@ -135,10 +133,7 @@ describe("renderWranglerConfig", () => {
     "https://play.example",
     "https://play.example,other.example/a-move-ago/",
   ])("rejects an invalid or noncanonical Web auth return URL: %s", async (returnUrl) => {
-    const source = (await sourceText()).replace(
-      "https://agent-axiom.github.io/a-move-ago/",
-      returnUrl,
-    );
+    const source = (await sourceText()).replace("https://chess.kosarevsky.dev/", returnUrl);
 
     expect(() => renderWranglerConfig(source, productionInput)).toThrow(/Web auth return URL/i);
   });

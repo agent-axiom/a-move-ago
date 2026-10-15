@@ -23,6 +23,20 @@ try {
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
   let attempts = 0;
+  const customDomain = pageUrl.origin === "https://chess.kosarevsky.dev";
+  let failedAssets = 0;
+  if (customDomain) {
+    const appAsset = (value) => {
+      const url = new URL(value);
+      return url.origin === pageUrl.origin && url.pathname.startsWith("/assets/");
+    };
+    page.on("response", (response) => {
+      if (appAsset(response.url()) && !response.ok()) failedAssets += 1;
+    });
+    page.on("requestfailed", (outgoing) => {
+      if (appAsset(outgoing.url())) failedAssets += 1;
+    });
+  }
   page.on("request", (outgoing) => {
     if (
       outgoing.method() === "POST" &&
@@ -109,6 +123,37 @@ try {
   }, todayBefore);
   assert.equal(new URL(page.url()).searchParams.has("case"), false);
   assert.equal(new URL(page.url()).searchParams.has("view"), false);
+  if (customDomain) {
+    async function checkLegacyRedirect(parameters, ready) {
+      const legacy = new URL("https://agent-axiom.github.io/a-move-ago/");
+      legacy.search = new URLSearchParams({ ...parameters, keep: "domain-check" }).toString();
+      legacy.hash = "main-content";
+      await page.goto(legacy.href, { waitUntil: "domcontentloaded" });
+      await ready();
+      const redirected = new URL(page.url());
+      assert.equal(redirected.origin, pageUrl.origin);
+      assert.equal(redirected.pathname, "/");
+      assert.equal(redirected.searchParams.get("keep"), "domain-check");
+      assert.equal(redirected.hash, "#main-content");
+      for (const [key, value] of Object.entries(parameters)) {
+        assert.equal(redirected.searchParams.get(key), value);
+      }
+    }
+    stage = "LEGACY_CASE_REDIRECT";
+    await checkLegacyRedirect({ case: request.from }, async () => {
+      await page.getByRole("grid").waitFor();
+      await page.locator(`.case-meta time[datetime="${request.from}"]`).waitFor();
+    });
+    stage = "LEGACY_ARCHIVE_REDIRECT";
+    await checkLegacyRedirect({ view: "archive", month: request.from.slice(0, 7) }, async () => {
+      await page.getByRole("heading", { name: "The archive", exact: true }).waitFor();
+      await select.waitFor();
+    });
+    assert.equal(await select.inputValue(), request.from.slice(0, 7));
+    assert.equal(await select.locator('option[value="2026-08"]').count(), 0);
+    stage = "APPLICATION_ASSETS";
+    assert.equal(failedAssets, 0);
+  }
   assert.equal(attempts, 0);
   // No traces, screenshots, response bodies or browser storage are exported.
   console.log(
@@ -120,6 +165,9 @@ try {
       deepLinkReload: true,
       browserBack: true,
       backToToday: true,
+      ...(customDomain
+        ? { legacyRedirects: true, queryAndFragmentPreserved: true, sameOriginAssets: true }
+        : {}),
       submittedAttempts: attempts,
     }),
   );

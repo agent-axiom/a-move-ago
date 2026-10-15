@@ -44,7 +44,7 @@
     "TELEGRAM_OIDC_CLIENT_ID": "123456789",
     "TELEGRAM_OIDC_CALLBACK_URL": "https://a-move-ago-api.example.invalid/v1/auth/telegram/oidc/callback",
     "API_ORIGIN": "https://a-move-ago-api.example.invalid",
-    "WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/",
+    "WEB_AUTH_RETURN_URL": "https://chess.kosarevsky.dev/",
     "ANDROID_AUTH_RETURN_URL": "amoveago-debug://auth",
     "ANDROID_PACKAGE_NAME": "com.agentaxiom.amoveago",
     "ANDROID_SHA256_CERT_FINGERPRINTS": "",

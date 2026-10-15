@@ -1,4 +1,4 @@
 {
   "domain": "chess.kosarevsky.dev",
-  "phase": "connect"
+  "phase": "check-https"
 }
