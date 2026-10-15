@@ -21,7 +21,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "test": "npm run test --workspaces --if-present && npm run test:deployment",
-    "test:deployment": "node --test tools/test/check-deployment.test.mjs",
+    "test:deployment": "node --test tools/test/*.test.mjs",
     "test:run": "vitest run",
     "content:validate": "npm run validate-content -w @a-move-ago/tools",
     "typecheck": "npm run typecheck --workspaces --if-present"
