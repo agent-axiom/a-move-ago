@@ -78,3 +78,7 @@ jobs:
           }
           console.log(JSON.stringify({ ok: true, page, release: process.env.DEPLOYED_SHA }));
           NODE
+      - name: Install the production browser smoke-check runtime
+        run: npx playwright install --with-deps chromium
+      - name: Verify the live archive, historical dates and return to today
+        run: node tools/scripts/check-live-archive-ui.mjs

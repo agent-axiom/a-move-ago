@@ -1,8 +1,8 @@
-import { type ReactNode, useEffect, useMemo, useReducer } from "react";
-import { parseEntryQuery } from "./app/entry-query";
-import { initialNavigation, navigationReducer } from "./app/navigation";
+import { type ReactNode, useEffect } from "react";
 import { useRuntime } from "./app/runtime";
+import { useAppNavigation } from "./app/use-app-navigation";
 import { useHostBack } from "./app/use-host-back";
+import { ArchivePage, archiveDateLabel } from "./features/archive/ArchivePage";
 import { CaseGame } from "./features/daily/CaseGame";
 import { DailyCaseGate } from "./features/daily/DailyCaseGate";
 import { ProfileDeletion } from "./features/session/ProfileDeletion";
@@ -11,6 +11,7 @@ import { SessionProvider, useSession } from "./features/session/SessionProvider"
 import type { Me } from "./features/session/session-state";
 import { StatsPanel } from "./features/stats/StatsPanel";
 import { BrandMark } from "./shared/BrandMark";
+import "./features/archive/archive.css";
 
 const runtimeIds = new WeakMap<object, number>();
 let nextRuntimeId = 1;
@@ -33,8 +34,7 @@ function sessionIdentity(runtime: object, me: Me | null): string {
 function AppContent() {
   const runtime = useRuntime();
   const { state } = useSession();
-  const entry = useMemo(() => parseEntryQuery(new URL(window.location.href)), []);
-  const [navigation, dispatch] = useReducer(navigationReducer, entry.caseDate, initialNavigation);
+  const { navigation, dispatch } = useAppNavigation();
   useHostBack(navigation, dispatch);
 
   useEffect(() => {
@@ -44,6 +44,8 @@ function AppContent() {
   }, [runtime.platform]);
 
   const screen = navigation.stack.at(-1) ?? { name: "case" as const };
+  const caseDate = screen.name === "case" ? (screen.caseDate ?? null) : null;
+  const showToday = () => dispatch({ type: "reset", screen: { name: "case" } });
   const sessionReady = state.tag !== "booting" && state.tag !== "fatal";
   const me = "me" in state ? state.me : null;
   const identity = sessionIdentity(runtime, me);
@@ -95,11 +97,47 @@ function AppContent() {
         <ProfileDeletion />
       </section>
     );
+  } else if (screen.name === "archive") {
+    content = (
+      <ArchivePage
+        enabled={sessionReady}
+        key={identity}
+        month={screen.month ?? null}
+        onMonthChange={(month) => dispatch({ type: "replace", screen: { name: "archive", month } })}
+        onSelect={(date) => dispatch({ type: "push", screen: { name: "case", caseDate: date } })}
+        onToday={showToday}
+      />
+    );
   } else {
     content = (
-      <DailyCaseGate enabled={sessionReady} caseDate={entry.caseDate} key={identity}>
-        {(daily) => <CaseGame daily={daily} key={daily.id} />}
-      </DailyCaseGate>
+      <>
+        {caseDate ? (
+          <section className="archive-case-context" aria-label="Selected archive case">
+            <p>
+              From the archive · <time dateTime={caseDate}>{archiveDateLabel(caseDate)}</time>
+            </p>
+            <div>
+              <button
+                className="button-quiet"
+                type="button"
+                onClick={() => dispatch({ type: "push", screen: { name: "archive" } })}
+              >
+                Browse archive
+              </button>
+              <button className="button-secondary" type="button" onClick={showToday}>
+                Back to today
+              </button>
+            </div>
+          </section>
+        ) : null}
+        <DailyCaseGate
+          enabled={sessionReady}
+          caseDate={caseDate}
+          key={`${identity}:${caseDate ?? "today"}`}
+        >
+          {(daily) => <CaseGame daily={daily} key={daily.id} onToday={showToday} />}
+        </DailyCaseGate>
+      </>
     );
   }
 
@@ -123,7 +161,7 @@ function AppContent() {
               type="button"
               onClick={() => dispatch({ type: "back" })}
             >
-              Back to case
+              {navigation.stack.at(-2)?.name === "archive" ? "Back to archive" : "Back to case"}
             </button>
           ) : (
             <button
@@ -135,6 +173,18 @@ function AppContent() {
               Progress <span aria-hidden="true">↗</span>
             </button>
           )}
+          <button
+            className="button-quiet nav-button"
+            type="button"
+            disabled={!sessionReady}
+            aria-current={screen.name === "archive" ? "page" : undefined}
+            onClick={() => {
+              if (screen.name !== "archive")
+                dispatch({ type: "push", screen: { name: "archive" } });
+            }}
+          >
+            Archive
+          </button>
           <details className="how-to-play">
             <summary aria-label="How to play">
               <span className="help-icon" aria-hidden="true">
