@@ -61,7 +61,14 @@ async function classifyDeletionOutcome(
          FROM sessions current
         WHERE current.id = ?`,
     )
-      .bind(actor.playerId, actor.playerId, actor.playerId, actor.playerId, actor.playerId, actor.sessionId)
+      .bind(
+        actor.playerId,
+        actor.playerId,
+        actor.playerId,
+        actor.playerId,
+        actor.playerId,
+        actor.sessionId,
+      )
       .first<DeletionState>();
   } catch {
     throw failure;

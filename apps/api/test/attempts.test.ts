@@ -961,8 +961,7 @@ describe("POST /v1/attempts", () => {
     const issued = await issueGuest();
     const first = await postAttempt(issued.token, correctRequest());
     expect(first.response.status).toBe(201);
-    const collidingId = "11111111-1111-4111-8111-111111111111";
-    await testEnv.DB.prepare("UPDATE attempts SET id = ?").bind(collidingId).run();
+    const collidingId = AttemptResultSchema.parse(first.body).id;
     vi.spyOn(crypto, "randomUUID").mockReturnValue(collidingId);
 
     const collision = await postAttempt(issued.token, correctRequest());

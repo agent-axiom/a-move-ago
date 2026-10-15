@@ -4,7 +4,10 @@ import { stripTypeScriptTypes } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-const source = await readFile(new URL("../../apps/api/src/db/gameplay.ts", import.meta.url), "utf8");
+const source = await readFile(
+  new URL("../../apps/api/src/db/gameplay.ts", import.meta.url),
+  "utf8",
+);
 const gameplay = await import(
   `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString("base64")}`
 );
@@ -27,8 +30,13 @@ const attemptQueries = await import(
   `data:text/javascript;base64,${Buffer.from(attemptCode).toString("base64")}`
 );
 const migrations = await Promise.all(
-  ["0001_initial", "0002_telegram_auth", "0003_content_localizations", "0004_gameplay_progress"].map(
-    (name) => readFile(new URL(`../../apps/api/migrations/${name}.sql`, import.meta.url), "utf8"),
+  [
+    "0001_initial",
+    "0002_telegram_auth",
+    "0003_content_localizations",
+    "0004_gameplay_progress",
+  ].map((name) =>
+    readFile(new URL(`../../apps/api/migrations/${name}.sql`, import.meta.url), "utf8"),
   ),
 );
 const guest = (id = "g1") => ({ sessionId: id, playerId: null, kind: "guest", channel: "web" });
@@ -58,35 +66,51 @@ function fixture({ legacy } = {}) {
   `);
   for (let index = 1; index <= 4; index++) {
     const id = `q${index}`;
-    sql.prepare(
-      `INSERT INTO puzzles(id,content_key,version,content_digest,status,public_json,provenance,
+    sql
+      .prepare(
+        `INSERT INTO puzzles(id,content_key,version,content_digest,status,public_json,provenance,
          license,created_at,updated_at) VALUES (?,?,1,?,'published','{}','Synthetic','CC0',1,1)`,
-    ).run(id, id, "a".repeat(64));
-    sql.prepare(
-      "INSERT INTO daily_case_puzzles(case_id,puzzle_id,position,act_json) VALUES ('c1',?,?,'{}')",
-    ).run(id, index);
+      )
+      .run(id, id, "a".repeat(64));
+    sql
+      .prepare(
+        "INSERT INTO daily_case_puzzles(case_id,puzzle_id,position,act_json) VALUES ('c1',?,?,'{}')",
+      )
+      .run(id, index);
     for (let level = 1; level <= 3; level++)
-      sql.prepare("INSERT INTO puzzle_hints(puzzle_id,level,payload_json) VALUES (?,?,'{}')").run(
-        id,
-        level,
-      );
+      sql
+        .prepare("INSERT INTO puzzle_hints(puzzle_id,level,payload_json) VALUES (?,?,'{}')")
+        .run(id, level);
   }
   let sequence = 0;
   function attempt(actor, correct, { puzzle = "q1", id, uuid, at = now, hints = 0 } = {}) {
     const attemptId = id ?? `a${++sequence}`;
-    sql.prepare(
-      `INSERT INTO attempts(id,attempt_uuid,session_id,player_id,case_id,puzzle_id,
+    sql
+      .prepare(
+        `INSERT INTO attempts(id,attempt_uuid,session_id,player_id,case_id,puzzle_id,
          normalized_answer_json,correct,response_json,hints_used,submitted_at)
        VALUES (?,?,?,?,'c1',?,'{}',?,'{}',?,?)
        ON CONFLICT(session_id,attempt_uuid) DO NOTHING`,
-    ).run(attemptId, uuid ?? attemptId, actor.sessionId, actor.playerId, puzzle, +correct, hints, at);
+      )
+      .run(
+        attemptId,
+        uuid ?? attemptId,
+        actor.sessionId,
+        actor.playerId,
+        puzzle,
+        +correct,
+        hints,
+        at,
+      );
     return attemptId;
   }
   function hint(attemptId, level) {
-    sql.prepare(
-      `INSERT INTO hint_events(attempt_id,hint_level,hint_json,created_at) VALUES (?,?,'{}',?)
+    sql
+      .prepare(
+        `INSERT INTO hint_events(attempt_id,hint_level,hint_json,created_at) VALUES (?,?,'{}',?)
        ON CONFLICT(attempt_id,hint_level) DO NOTHING`,
-    ).run(attemptId, level, now);
+      )
+      .run(attemptId, level, now);
   }
   legacy?.({ sql, attempt, hint });
   sql.exec(migrations[3]);
@@ -176,7 +200,10 @@ test("attempt UUID replay and later correct submissions award once at the first 
     assert.equal(state.clueUnlocked, true);
     assert.equal(state.highestHintLevel, 1);
     assert.equal(await gameplay.readTotalPoints(f.db, guest()), 70);
-    assert.equal(f.sql.prepare("SELECT count(*) AS n FROM gameplay_events WHERE kind='attempt'").get().n, 3);
+    assert.equal(
+      f.sql.prepare("SELECT count(*) AS n FROM gameplay_events WHERE kind='attempt'").get().n,
+      3,
+    );
   } finally {
     f.close();
   }
@@ -202,7 +229,10 @@ test("committed hint-before-solve order freezes distinct assist penalties across
     assert.equal(state.assistanceCount, 3);
     assert.equal(state.earnedPoints, 5);
     assert.equal(state.highestHintLevel, 3);
-    assert.equal(f.sql.prepare("SELECT count(*) AS n FROM gameplay_events WHERE kind='clue'").get().n, 1);
+    assert.equal(
+      f.sql.prepare("SELECT count(*) AS n FROM gameplay_events WHERE kind='clue'").get().n,
+      1,
+    );
     f.sql.exec("DELETE FROM hint_events");
     assert.equal((await f.progress()).earnedPoints, 5);
     assert.equal((await f.progress()).highestHintLevel, 3);
@@ -275,7 +305,10 @@ test("legacy solved puzzles remain unrated and old failed attempts preserve clue
     assert.equal(state.assistanceCount, 3);
     assert.equal(state.nextAttemptPoints, 8);
     await f.clue();
-    assert.equal(f.sql.prepare("SELECT count(*) AS n FROM gameplay_events WHERE kind='clue'").get().n, 0);
+    assert.equal(
+      f.sql.prepare("SELECT count(*) AS n FROM gameplay_events WHERE kind='clue'").get().n,
+      0,
+    );
     f.attempt(guest(), true);
     assert.equal((await f.progress()).earnedPoints, 8);
     f.attempt(guest(), true, { puzzle: "q2" });
@@ -299,10 +332,12 @@ test("guest link merges chronology and duplicate clue events without double awar
     assert.equal((await f.progress(player())).earnedPoints, 100);
     await gameplay.transferClueStatement(f.db, "g1", "t1", "p1").run();
     assert.equal((await f.progress()).clueUnlocked, true);
-    f.sql.prepare(
-      `INSERT INTO sessions(id,player_id,token_hash,kind,channel,rotated_from_session_id,
+    f.sql
+      .prepare(
+        `INSERT INTO sessions(id,player_id,token_hash,kind,channel,rotated_from_session_id,
          created_at,expires_at,last_seen_at) VALUES ('replacement','p1','new','telegram','web','g1',1,?,1)`,
-    ).run(now + 3600);
+      )
+      .run(now + 3600);
     f.sql.exec("BEGIN");
     f.sql.exec("UPDATE attempts SET player_id='p1' WHERE session_id='g1' AND player_id IS NULL");
     await gameplay.transferClueStatement(f.db, "g1", "replacement", null).run();
@@ -312,7 +347,14 @@ test("guest link merges chronology and duplicate clue events without double awar
     assert.equal(state.assistanceCount, 1);
     assert.equal(state.attemptCount, 1);
     assert.equal(await gameplay.readTotalPoints(f.db, player()), 50);
-    assert.equal(f.sql.prepare("SELECT count(*) AS n FROM gameplay_events WHERE kind='clue' AND clue_player_id='p1'").get().n, 2);
+    assert.equal(
+      f.sql
+        .prepare(
+          "SELECT count(*) AS n FROM gameplay_events WHERE kind='clue' AND clue_player_id='p1'",
+        )
+        .get().n,
+      2,
+    );
     assert.equal((await f.progress()).earnedPoints, null);
     f.sql.exec("DELETE FROM sessions WHERE id='g1'");
     assert.equal((await f.progress(player())).earnedPoints, 50);
@@ -334,7 +376,9 @@ test("guest retention removes gameplay while linked scoring survives expired ses
     await f.clue(player());
     f.attempt(player(), true);
     assert.equal((await f.progress(player())).earnedPoints, 50);
-    f.sql.exec("DELETE FROM attempts WHERE session_id='g1'; DELETE FROM sessions WHERE id IN ('g1','t1')");
+    f.sql.exec(
+      "DELETE FROM attempts WHERE session_id='g1'; DELETE FROM sessions WHERE id IN ('g1','t1')",
+    );
     assert.equal(await gameplay.readTotalPoints(f.db, guest()), 0);
     assert.equal((await f.progress(player())).earnedPoints, 50);
   } finally {

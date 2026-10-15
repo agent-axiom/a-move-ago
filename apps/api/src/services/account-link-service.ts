@@ -6,8 +6,8 @@ import {
   claimHandoffForSession,
   findClaimableHandoff,
 } from "../db/auth-flows";
-import { findPlayer, prepareMiniAppPlayerUpsert, toTelegramProfile } from "../db/players";
 import { transferClueStatement } from "../db/gameplay";
+import { findPlayer, prepareMiniAppPlayerUpsert, toTelegramProfile } from "../db/players";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
 

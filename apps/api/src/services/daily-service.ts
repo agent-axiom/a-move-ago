@@ -8,8 +8,8 @@ import { readGameProgress } from "../db/gameplay";
 import { publicPuzzleId } from "../db/puzzle-identity";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
-import { caseTitleLocalizations, publicPuzzleLocalizations } from "./localization-service";
 import { neutralCaseTitles, neutralPuzzleTitles, puzzleProgressStates } from "./gameplay-service";
+import { caseTitleLocalizations, publicPuzzleLocalizations } from "./localization-service";
 
 function dailyNotFound(): ApiError {
   return new ApiError(404, "DAILY_NOT_FOUND", "Daily case not found.");
@@ -40,8 +40,13 @@ export async function getDailyCase(
   const rows = await findPublishedDaily(env.DB, requestedDate, today);
   const first = rows[0];
   if (!first) throw dailyNotFound();
-  if (typeof first.title !== "string" || first.title.length === 0) throw new Error("Stored daily title is invalid");
-  const rawProgress = await readGameProgress(env.DB, actor, rows.map((row) => row.puzzle_row_id));
+  if (typeof first.title !== "string" || first.title.length === 0)
+    throw new Error("Stored daily title is invalid");
+  const rawProgress = await readGameProgress(
+    env.DB,
+    actor,
+    rows.map((row) => row.puzzle_row_id),
+  );
   const entitled = (rowId: string) => {
     const progress = rawProgress.get(rowId);
     return progress !== undefined && (progress.clueUnlocked || progress.earnedPoints !== null);
@@ -86,11 +91,16 @@ export async function getDailyCase(
       ...publicFields,
       id: alias,
       title: visible ? puzzle.title : neutral.en,
-      ...(localizations === undefined ? {} : {
-        localizations: Object.fromEntries(Object.entries(localizations).map(([locale, text]) => [
-          locale, { ...text, title: visible ? text.title : neutral[locale as "ru" | "zh"] },
-        ])),
-      }),
+      ...(localizations === undefined
+        ? {}
+        : {
+            localizations: Object.fromEntries(
+              Object.entries(localizations).map(([locale, text]) => [
+                locale,
+                { ...text, title: visible ? text.title : neutral[locale as "ru" | "zh"] },
+              ]),
+            ),
+          }),
     });
   }
 
@@ -110,12 +120,29 @@ export async function getDailyCase(
     id: first.case_id,
     date: first.case_date,
     title: caseEntitled ? first.title : neutralCaseTitles.en.title,
-    ...(includeLocalizations ? { localizations: caseEntitled ? titles?.get(first.case_id) : { ru: neutralCaseTitles.ru, zh: neutralCaseTitles.zh } } : {}),
+    ...(includeLocalizations
+      ? {
+          localizations: caseEntitled
+            ? titles?.get(first.case_id)
+            : { ru: neutralCaseTitles.ru, zh: neutralCaseTitles.zh },
+        }
+      : {}),
     puzzles,
     solvedPuzzleIds: puzzles.filter((puzzle) => solved.has(puzzle.id)).map((puzzle) => puzzle.id),
-    ...(includeGameProgress ? {
-      progressStates: Object.fromEntries([...(await puzzleProgressStates(env, actor, rows.map((row) => row.puzzle_row_id), includeLocalizations))].map(([rowId, state]) => [physicalToPublic.get(rowId), state])),
-    } : {}),
+    ...(includeGameProgress
+      ? {
+          progressStates: Object.fromEntries(
+            [
+              ...(await puzzleProgressStates(
+                env,
+                actor,
+                rows.map((row) => row.puzzle_row_id),
+                includeLocalizations,
+              )),
+            ].map(([rowId, state]) => [physicalToPublic.get(rowId), state]),
+          ),
+        }
+      : {}),
   });
   if (!response.success) throw new Error("Stored daily response is invalid");
   return response.data;
