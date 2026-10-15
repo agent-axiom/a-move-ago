@@ -3,6 +3,11 @@ name: Pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - ".github/workflows/site-domain.yml"
+      - "ops/site-domain.json"
+      - "tools/scripts/connect-site-domain.mjs"
+      - "tools/test/connect-site-domain.test.mjs"
   workflow_dispatch:
 
 permissions:

@@ -6,26 +6,66 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/site-domain.yml"
+      - "ops/site-domain.json"
+      - "tools/scripts/connect-site-domain.mjs"
+      - "tools/test/connect-site-domain.test.mjs"
+  pull_request:
+    paths:
+      - ".github/workflows/site-domain.yml"
+      - "ops/site-domain.json"
+      - "tools/scripts/connect-site-domain.mjs"
+      - "tools/test/connect-site-domain.test.mjs"
 
 permissions:
   contents: read
-  pages: read
 
 concurrency:
   group: site-domain
   cancel-in-progress: false
 
 jobs:
-  inspect:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node --test tools/test/connect-site-domain.test.mjs
+  configure:
+    needs: verify
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - id: request
+        name: Validate the requested domain and connection phase
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from "node:fs/promises";
+          const request = JSON.parse(await readFile("ops/site-domain.json", "utf8"));
+          if (Object.keys(request).sort().join(",") !== "domain,phase" ||
+              request.domain !== "chess.kosarevsky.dev" ||
+              !["inspect", "connect", "check-https"].includes(request.phase)) {
+            throw new Error("INVALID_SITE_DOMAIN_REQUEST");
+          }
+          await appendFile(process.env.GITHUB_OUTPUT, `phase=${request.phase}\n`);
+          NODE
       - name: Inspect DNS and Pages access without changing settings
+        if: steps.request.outputs.phase == 'inspect'
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -81,4 +121,26 @@ jobs:
             };
           }
           console.log(JSON.stringify(summary));
+          NODE
+      - name: Connect the requested Pages domain or confirm HTTPS
+        if: steps.request.outputs.phase != 'inspect'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOMAIN_PHASE: ${{ steps.request.outputs.phase }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { connectSiteDomain } from "./tools/scripts/connect-site-domain.mjs";
+          try {
+            const phase = process.env.DOMAIN_PHASE;
+            let result;
+            for (let attempt = 0; attempt < 12; attempt += 1) {
+              result = await connectSiteDomain({ token: process.env.GH_TOKEN, phase });
+              if (result.status === "ready" || phase !== "connect") break;
+              if (attempt < 11) await new Promise(resolve => setTimeout(resolve, 10_000));
+            }
+            console.log(JSON.stringify(result));
+          } catch (error) {
+            console.error(JSON.stringify({ ok: false, code: error.message }));
+            process.exitCode = 1;
+          }
           NODE

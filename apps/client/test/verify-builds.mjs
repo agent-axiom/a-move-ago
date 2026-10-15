@@ -20,8 +20,9 @@ assert(
 );
 assert.match(decodedPages, /connect-src[^;]*https:\/\/api\.test/);
 assert.match(pages, /["']\.\/assets\//);
-const pagesAssets = [...pages.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/gu)]
-  .map((match) => match[1]);
+const pagesAssets = [...pages.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/gu)].map(
+  (match) => match[1],
+);
 assert(pagesAssets.length > 0, "Pages must include its application assets");
 for (const location of [
   "https://agent-axiom.github.io/a-move-ago/",

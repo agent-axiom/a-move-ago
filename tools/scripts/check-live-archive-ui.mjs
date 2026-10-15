@@ -8,8 +8,14 @@ let browser;
 try {
   stage = "SITE_URL";
   const pageUrl = new URL(process.env.WEB_APP_URL ?? "https://agent-axiom.github.io/a-move-ago/");
-  assert.ok(pageUrl.protocol === "https:" && !pageUrl.username && !pageUrl.password &&
-    !pageUrl.search && !pageUrl.hash && pageUrl.pathname.endsWith("/"));
+  assert.ok(
+    pageUrl.protocol === "https:" &&
+      !pageUrl.username &&
+      !pageUrl.password &&
+      !pageUrl.search &&
+      !pageUrl.hash &&
+      pageUrl.pathname.endsWith("/"),
+  );
   pageUrl.searchParams.set("view", "archive");
   pageUrl.searchParams.set("release", process.env.GITHUB_SHA ?? "current");
   browser = await chromium.launch();
