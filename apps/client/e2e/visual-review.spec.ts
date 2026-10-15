@@ -107,3 +107,22 @@ test("desktop guest progress", async ({ page }, info) => {
   await capture(page, info, "desktop-progress");
   await checkLayout(page);
 });
+
+test("archive remains readable on desktop and mobile", async ({ page }, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await installApiMock(page, { archive: true });
+  await page.goto("./?view=archive");
+  await expect(page.getByRole("heading", { name: "The archive", exact: true })).toBeVisible();
+  await page.getByLabel("Archive month", { exact: true }).selectOption({ label: "September 2026" });
+  await capture(page, info, "desktop-archive");
+  await checkLayout(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel("Archive month", { exact: true }).selectOption({ label: "October 2026" });
+  await capture(page, info, "mobile-archive");
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await checkLayout(page);
+  }
+});

@@ -4,7 +4,7 @@ import { StatsPanel } from "../stats/StatsPanel";
 import { nextUnsolvedIndex } from "./case-progress";
 import type { DailyCase } from "./use-daily-case";
 
-export function CaseGame({ daily }: { daily: DailyCase }) {
+export function CaseGame({ daily, onToday }: { daily: DailyCase; onToday?: () => void }) {
   const [solved, setSolved] = useState<ReadonlySet<string>>(() => new Set(daily.solvedPuzzleIds));
   const puzzleIds = useMemo(() => daily.puzzles.map((puzzle) => puzzle.id), [daily.puzzles]);
   const index = nextUnsolvedIndex(puzzleIds, solved);
@@ -29,9 +29,15 @@ export function CaseGame({ daily }: { daily: DailyCase }) {
         <div className="completion-next">
           <span>A new mystery every day, at 00:00 UTC.</span>
           {daily.date !== new Date().toISOString().slice(0, 10) ? (
-            <a href={window.location.pathname}>
-              Back to today’s case <span aria-hidden="true">↗</span>
-            </a>
+            onToday ? (
+              <button className="button-quiet" type="button" onClick={onToday}>
+                Back to today’s case <span aria-hidden="true">↗</span>
+              </button>
+            ) : (
+              <a href={window.location.pathname}>
+                Back to today’s case <span aria-hidden="true">↗</span>
+              </a>
+            )
           ) : (
             <span>Come back tomorrow for the next case.</span>
           )}
