@@ -243,7 +243,7 @@ it("fetches stats only after the player continues from the solved reveal", async
 
   renderApp(runtime);
   await composeCapture(user);
-  await user.click(screen.getByRole("button", { name: "Submit retraction" }));
+  await user.click(screen.getByRole("button", { name: "Check move" }));
 
   expect(await screen.findByRole("status")).toHaveTextContent("Rewinding the last move");
   await waitFor(() => expect(runtime.platform.haptic).toHaveBeenCalledWith("success"));
@@ -269,7 +269,7 @@ it("requires a guest-session restart instead of retrying an expired attempt", as
 
   renderApp(runtime);
   await composeCapture(user);
-  await user.click(screen.getByRole("button", { name: "Submit retraction" }));
+  await user.click(screen.getByRole("button", { name: "Check move" }));
 
   expect(await screen.findByRole("button", { name: "Restart guest session" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Retry attempt" })).not.toBeInTheDocument();
@@ -287,7 +287,7 @@ it("exposes attempt retry as an explicit UI action using the frozen request", as
 
   renderApp(runtime);
   await composeCapture(user);
-  await user.click(screen.getByRole("button", { name: "Submit retraction" }));
+  await user.click(screen.getByRole("button", { name: "Check move" }));
 
   const retry = await screen.findByRole("button", { name: "Retry attempt" });
   expect(runtime.api.submitAttempt).toHaveBeenCalledOnce();
@@ -315,7 +315,7 @@ it("exposes hint retry as an explicit UI action using the same level", async () 
 
   renderApp(runtime);
   await composeCapture(user);
-  await user.click(screen.getByRole("button", { name: "Submit retraction" }));
+  await user.click(screen.getByRole("button", { name: "Check move" }));
   await user.click(await screen.findByRole("button", { name: "Get hint" }));
 
   const retry = await screen.findByRole("button", { name: "Retry hint" });
@@ -341,7 +341,7 @@ it("requires an application reload instead of retrying an invalid hint response"
 
   renderApp(runtime);
   await composeCapture(user);
-  await user.click(screen.getByRole("button", { name: "Submit retraction" }));
+  await user.click(screen.getByRole("button", { name: "Check move" }));
   await user.click(await screen.findByRole("button", { name: "Get hint" }));
 
   expect(await screen.findByRole("button", { name: "Reload application" })).toBeInTheDocument();
@@ -371,7 +371,7 @@ it("advances acts on Continue and fetches stats after acknowledging the final re
 
   renderApp(runtime);
   await composeCapture(user);
-  await user.click(screen.getByRole("button", { name: "Submit retraction" }));
+  await user.click(screen.getByRole("button", { name: "Check move" }));
 
   expect(await screen.findByRole("heading", { name: "Solved" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: secondPuzzle.title })).not.toBeInTheDocument();
@@ -380,7 +380,7 @@ it("advances acts on Continue and fetches stats after acknowledging the final re
   expect(runtime.api.getStats).not.toHaveBeenCalled();
 
   await composeCapture(user);
-  await user.click(screen.getByRole("button", { name: "Submit retraction" }));
+  await user.click(screen.getByRole("button", { name: "Check move" }));
 
   expect(await screen.findByRole("heading", { name: "Solved" })).toBeInTheDocument();
   expect(runtime.api.getStats).not.toHaveBeenCalled();

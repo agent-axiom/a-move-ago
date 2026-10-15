@@ -28,7 +28,10 @@
   },
   "overrides": [
     {
-      "includes": ["assets/branding/telegram-mini-app-splash-icon.svg"],
+      "includes": [
+        "assets/branding/telegram-mini-app-splash-icon.svg",
+        "apps/client/src/assets/pieces/*.svg"
+      ],
       "linter": {
         "rules": {
           "a11y": {

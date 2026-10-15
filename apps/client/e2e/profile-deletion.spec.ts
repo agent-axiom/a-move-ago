@@ -61,7 +61,7 @@ test("deletes a restored Telegram profile, preserves its token, and continues as
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();
   await page.getByRole("gridcell", { name: "e4, empty" }).click();
   await page.getByLabel("Captured piece").selectOption("p");
-  await page.getByRole("button", { name: "Submit retraction" }).click();
+  await page.getByRole("button", { name: "Check move" }).click();
   await expect(page.getByRole("heading", { name: "Solved" })).toBeVisible();
 });
 

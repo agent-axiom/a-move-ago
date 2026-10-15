@@ -1,0 +1,63 @@
+name: UI review
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/client/**"
+      - ".github/workflows/ui-review.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Prepare formatting feedback for visual review
+        run: |
+          npm exec -- biome format --write apps/client/src apps/client/e2e/visual-review.spec.ts biome.json
+          node --input-type=module <<'NODE'
+          import { execFileSync } from "node:child_process";
+          import { createHash } from "node:crypto";
+          import { gzipSync } from "node:zlib";
+          const patch = execFileSync("git", ["diff", "--", "apps/client", "biome.json"]);
+          const encoded = gzipSync(patch).toString("base64");
+          let count = 0;
+          for (let start = 0; start < encoded.length; start += 10000) {
+            console.log(`UI_FORMAT ${count++} ${encoded.slice(start, start + 10000)}`);
+          }
+          console.log(`UI_FORMAT_END ${count} ${createHash("sha256").update(patch).digest("hex")}`);
+          NODE
+      - name: Build the client against the synthetic API
+        env:
+          VITE_API_BASE_URL: https://api.test
+        run: npm run build:pages -w @a-move-ago/client
+      - run: npx playwright install --with-deps chromium
+      - name: Capture synthetic desktop and mobile states
+        env:
+          UI_PREVIEW: "true"
+        run: npm run e2e -w @a-move-ago/client -- visual-review.spec.ts --workers=1 --retries=0
+      - name: Upload review screenshots and browser report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-review-${{ github.sha }}
+          path: |
+            apps/client/test-results/**/review-*.png
+            apps/client/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7

@@ -105,3 +105,25 @@ it("cancels the reveal animation when it is unmounted", () => {
   expect(vi.getTimerCount()).toBe(0);
   expect(complete).not.toHaveBeenCalled();
 });
+
+it("lets players inspect either position and replay without advancing the case", () => {
+  vi.useFakeTimers();
+  const complete = vi.fn();
+  render(<RevealPlayer onComplete={complete} postFen={postFen} solution={solution} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Before", exact: true }));
+  expect(screen.getByRole("grid", { name: "Reconstructed previous position" })).toBeInTheDocument();
+  expect(screen.getByRole("gridcell", { name: "e4, white pawn" })).toBeInTheDocument();
+  act(() => vi.runAllTimers());
+  expect(screen.getByRole("grid", { name: "Reconstructed previous position" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "After", exact: true }));
+  expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Replay move" }));
+  expect(screen.getByRole("status")).toHaveTextContent("Rewinding the last move");
+  act(() => vi.advanceTimersByTime(50));
+  expect(screen.getByRole("grid", { name: "Reconstructed previous position" })).toBeInTheDocument();
+  act(() => vi.runAllTimers());
+  expect(screen.getByRole("status")).toHaveTextContent("Solution replay complete");
+  expect(complete).not.toHaveBeenCalled();
+});

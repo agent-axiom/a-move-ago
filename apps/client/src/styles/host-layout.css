@@ -11,9 +11,236 @@
 }
 
 .app-shell {
+  display: flex;
+  flex-direction: column;
+  inline-size: min(100%, 1264px);
   min-height: var(--host-stable-height);
-  padding-top: max(1rem, var(--host-safe-top), var(--host-content-safe-top));
-  padding-right: max(1rem, var(--host-safe-right), var(--host-content-safe-right));
+  margin-inline: auto;
+  padding-top: max(1.3rem, var(--host-safe-top), var(--host-content-safe-top));
+  padding-right: max(clamp(1rem, 4vw, 3rem), var(--host-safe-right), var(--host-content-safe-right));
   padding-bottom: max(1rem, var(--host-safe-bottom), var(--host-content-safe-bottom));
-  padding-left: max(1rem, var(--host-safe-left), var(--host-content-safe-left));
+  padding-left: max(clamp(1rem, 4vw, 3rem), var(--host-safe-left), var(--host-content-safe-left));
+}
+
+.app-header {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.2rem 1.4rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand,
+.app-nav {
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  gap: 0.7rem;
+  min-inline-size: 0;
+}
+
+.brand-mark {
+  flex: none;
+  inline-size: 46px;
+  block-size: 46px;
+  color: var(--color-accent);
+}
+
+.brand-wordmark {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+}
+
+.brand-caption {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--color-muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.035em;
+}
+
+.app-nav {
+  gap: 0.5rem;
+}
+
+.nav-button {
+  color: var(--color-text);
+}
+
+.how-to-play > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-block-size: 44px;
+  padding: 0.65rem 0.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  list-style: none;
+}
+
+.how-to-play > summary::-webkit-details-marker {
+  display: none;
+}
+
+.help-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 1.3rem;
+  block-size: 1.3rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.help-panel {
+  position: absolute;
+  inset: calc(100% + 0.5rem) 0 auto auto;
+  inline-size: min(24rem, 100%);
+  padding: 1.5rem;
+  border: 1px solid #53594c;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: 0 20px 60px #0006;
+}
+
+.help-panel h2 {
+  margin-block: 0.5rem 0.8rem;
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 400;
+}
+
+.help-panel p:not(.eyebrow),
+.help-panel ol {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.help-panel ol {
+  display: grid;
+  gap: 0.8rem;
+  padding-inline-start: 1.2rem;
+}
+
+.help-panel strong {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.help-panel .help-note {
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.75rem;
+}
+
+.app-body {
+  flex: 1;
+  min-inline-size: 0;
+  padding-block: clamp(1.75rem, 4vw, 3rem) 3rem;
+}
+
+.app-body:focus {
+  outline: none;
+}
+
+.app-footer,
+.app-footer > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.app-footer {
+  flex-wrap: wrap;
+  padding-block: 1.1rem 0.4rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.67rem;
+}
+
+.app-footer a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: var(--color-text);
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 50;
+  inset: 0 auto auto 1rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  transform: translateY(-120%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (max-width: 600px) {
+  .app-shell {
+    padding-top: max(0.8rem, var(--host-safe-top), var(--host-content-safe-top));
+  }
+
+  .app-header {
+    gap: 0.5rem;
+    padding-bottom: 1rem;
+  }
+
+  .brand-mark {
+    inline-size: 36px;
+    block-size: 36px;
+  }
+
+  .brand-wordmark {
+    max-inline-size: 7ch;
+    font-size: 0.7rem;
+    line-height: 1.4;
+  }
+
+  .brand-caption,
+  .help-label {
+    display: none;
+  }
+
+  .app-nav {
+    gap: 0.15rem;
+  }
+
+  .nav-button {
+    padding-inline: 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  .how-to-play > summary {
+    justify-content: center;
+    min-inline-size: 44px;
+  }
+
+  .app-footer {
+    gap: 0.6rem;
+    font-size: 0.62rem;
+  }
 }

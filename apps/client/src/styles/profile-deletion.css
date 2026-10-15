@@ -1,15 +1,33 @@
 .profile-deletion {
-  border-block-start: 1px solid rgb(245 242 234 / 30%);
+  border-block-start: 1px solid var(--color-border);
   margin-block-start: 2rem;
   padding-block-start: 1.25rem;
 }
 
+.profile-deletion > button {
+  border-color: transparent;
+  background: transparent;
+  color: #d6a79a;
+  font-size: 0.75rem;
+}
+
 .profile-deletion__confirmation {
-  border: 1px solid #ff8a80;
-  border-radius: 0.5rem;
+  border: 1px solid #98675d;
+  border-radius: var(--radius-md);
   margin-block-start: 0.75rem;
   max-inline-size: 42rem;
-  padding: 1rem;
+  padding: 1.4rem;
+  background: var(--color-surface);
+  font-size: 0.85rem;
+}
+
+.profile-deletion__confirmation h2 {
+  margin-bottom: 0.75rem;
+}
+
+.profile-deletion__confirmation p {
+  margin-bottom: 1rem;
+  color: var(--color-muted);
 }
 
 .profile-deletion__actions {
@@ -25,13 +43,13 @@
 
 .profile-deletion__danger {
   border: 1px solid #ffb4ab;
-  background: #b42318;
+  background: #8f352d;
   color: #fff;
   font-weight: 700;
 }
 
 .profile-deletion button:focus-visible,
 .profile-deletion [tabindex="-1"]:focus {
-  outline: 0.2rem solid #8ecaff;
+  outline: 0.2rem solid var(--color-accent);
   outline-offset: 0.2rem;
 }

@@ -5,7 +5,7 @@ async function chooseCorrectRetraction(page: import("@playwright/test").Page) {
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();
   await page.getByRole("gridcell", { name: "e4, empty" }).click();
   await page.getByLabel("Captured piece").selectOption("p");
-  await page.getByRole("button", { name: "Submit retraction" }).click();
+  await page.getByRole("button", { name: "Check move" }).click();
 }
 
 test("guest survives a lost success response and retries the exact UUID", async ({ page }) => {
@@ -45,7 +45,7 @@ test("incorrect attempt retries the same hint level, then solves", async ({ page
   await page.goto("./?case=2026-08-03");
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();
   await page.getByRole("gridcell", { name: "c4, empty" }).click();
-  await page.getByRole("button", { name: "Submit retraction" }).click();
+  await page.getByRole("button", { name: "Check move" }).click();
   await expect(page.getByText("That does not explain the missing pawn.")).toBeVisible();
   await page.getByRole("button", { name: "Get hint" }).click();
   await expect(page.getByRole("button", { name: "Retry hint" })).toBeVisible();
