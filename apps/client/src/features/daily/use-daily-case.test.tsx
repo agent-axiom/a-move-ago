@@ -41,7 +41,87 @@ function DailyProbe(props: { enabled: boolean; caseDate: string | null }) {
   return <output>{state.tag === "ready" ? state.daily.id : state.tag}</output>;
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+it("loads the next daily case at UTC midnight without reloading the app", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-08-03T23:59:59.000Z"));
+  const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+  runtime.now = Date.now;
+  const nextDaily = { ...daily, id: "case-2026-08-04", date: "2026-08-04" };
+  runtime.api.getDaily = vi.fn().mockResolvedValueOnce(daily).mockResolvedValueOnce(nextDaily);
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <RuntimeProvider runtime={runtime}>{children}</RuntimeProvider>
+  );
+  const { result, unmount } = renderHook(() => useDailyCase(true, null), { wrapper });
+  await act(async () => undefined);
+  expect(result.current.state).toMatchObject({ tag: "ready", daily: { id: daily.id } });
+
+  await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+  expect(runtime.api.getDaily).toHaveBeenCalledTimes(2);
+  expect(runtime.api.getDaily).toHaveBeenLastCalledWith(undefined, expect.any(AbortSignal));
+  expect(result.current.state).toMatchObject({ tag: "ready", daily: { id: nextDaily.id } });
+  unmount();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("refreshes a resumed tab after UTC rollover without repeating same-day loads", async () => {
+  let now = Date.parse("2026-08-03T20:00:00.000Z");
+  const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+  runtime.now = () => now;
+  const nextDaily = { ...daily, id: "case-2026-08-05", date: "2026-08-05" };
+  runtime.api.getDaily = vi.fn().mockResolvedValueOnce(daily).mockResolvedValueOnce(nextDaily);
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <RuntimeProvider runtime={runtime}>{children}</RuntimeProvider>
+  );
+  const visibility = vi.spyOn(document, "visibilityState", "get");
+  const { result } = renderHook(() => useDailyCase(true, null), { wrapper });
+  await waitFor(() => expect(result.current.state.tag).toBe("ready"));
+
+  visibility.mockReturnValue("visible");
+  act(() => document.dispatchEvent(new Event("visibilitychange")));
+  act(() => window.dispatchEvent(new Event("focus")));
+  expect(runtime.api.getDaily).toHaveBeenCalledOnce();
+
+  now = Date.parse("2026-08-05T08:00:00.000Z");
+  visibility.mockReturnValue("hidden");
+  act(() => document.dispatchEvent(new Event("visibilitychange")));
+  expect(runtime.api.getDaily).toHaveBeenCalledOnce();
+
+  visibility.mockReturnValue("visible");
+  act(() => document.dispatchEvent(new Event("visibilitychange")));
+  await waitFor(() =>
+    expect(result.current.state).toMatchObject({ tag: "ready", daily: { id: nextDaily.id } }),
+  );
+  act(() => window.dispatchEvent(new Event("focus")));
+  expect(runtime.api.getDaily).toHaveBeenCalledTimes(2);
+});
+
+it("keeps an explicitly selected archive case across midnight and host resume", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-08-03T23:59:59.000Z"));
+  const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+  runtime.now = Date.now;
+  runtime.api.getDaily = vi.fn().mockResolvedValue(daily);
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <RuntimeProvider runtime={runtime}>{children}</RuntimeProvider>
+  );
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  const { result } = renderHook(() => useDailyCase(true, "2026-08-03"), { wrapper });
+  await act(async () => undefined);
+
+  await act(async () => vi.advanceTimersByTimeAsync(1_000));
+  act(() => document.dispatchEvent(new Event("visibilitychange")));
+  act(() => window.dispatchEvent(new Event("focus")));
+
+  expect(runtime.api.getDaily).toHaveBeenCalledOnce();
+  expect(result.current.state).toMatchObject({ tag: "ready", daily: { id: daily.id } });
+});
 
 it("does not request daily content until a session is ready", async () => {
   const runtime = runtimeFixture({ storedToken: null, platformKind: "web" });

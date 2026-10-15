@@ -20,8 +20,7 @@ export function RevealPlayer(props: {
     [props.postFen, props.solution],
   );
   const [timeline, setTimeline] = useState<RevealTimeline>({ key: revealKey, stage: "post" });
-  const complete = useRef(props.onComplete);
-  complete.current = props.onComplete;
+  const continued = useRef(false);
   const previous = useMemo(
     () => parseFen(props.solution.previousFen),
     [props.solution.previousFen],
@@ -31,26 +30,18 @@ export function RevealPlayer(props: {
   useEffect(() => {
     let active = true;
     const reduced = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const rewindAt = reduced ? 0 : 50;
-    const forwardAt = reduced ? 0 : 800;
-    const doneAt = reduced ? 0 : 1_550;
+    continued.current = false;
+    setTimeline({ key: revealKey, stage: reduced ? "done" : "post" });
+    if (reduced) return;
 
     const advance = (stage: RevealStage) => {
       if (!active) return;
       setTimeline((current) => (current.key === revealKey ? { ...current, stage } : current));
     };
 
-    setTimeline({ key: revealKey, stage: "post" });
-    const rewind = setTimeout(() => advance("previous"), rewindAt);
-    const forward = setTimeout(() => advance("forward"), forwardAt);
-    const done = setTimeout(() => {
-      if (!active) return;
-      active = false;
-      setTimeline((current) =>
-        current.key === revealKey ? { ...current, stage: "done" } : current,
-      );
-      complete.current();
-    }, doneAt);
+    const rewind = setTimeout(() => advance("previous"), 50);
+    const forward = setTimeout(() => advance("forward"), 800);
+    const done = setTimeout(() => advance("done"), 1_550);
     return () => {
       active = false;
       clearTimeout(rewind);
@@ -90,6 +81,17 @@ export function RevealPlayer(props: {
       <p>
         <strong>{props.solution.forwardSan}</strong> — {props.solution.explanation}
       </p>
+      <button
+        type="button"
+        disabled={stage !== "done"}
+        onClick={() => {
+          if (continued.current) return;
+          continued.current = true;
+          props.onComplete();
+        }}
+      >
+        Continue
+      </button>
     </section>
   );
 }

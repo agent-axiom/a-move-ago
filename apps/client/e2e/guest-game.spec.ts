@@ -32,6 +32,9 @@ test("guest survives a lost success response and retries the exact UUID", async 
   expect(observed.attemptBodies[1]).toEqual(observed.attemptBodies[0]);
   await expect(page.getByRole("heading", { name: "Solved" })).toBeVisible();
   expect(observed.statsRequests).toBe(0);
+  await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+  expect(observed.statsRequests).toBe(0);
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Case complete" })).toBeVisible();
   await expect.poll(() => observed.statsRequests).toBe(1);
   await expect(page.getByText("Current streak")).toBeVisible();
@@ -57,5 +60,7 @@ test("incorrect attempt retries the same hint level, then solves", async ({ page
 
   await page.getByRole("button", { name: "Reset" }).click();
   await chooseCorrectRetraction(page);
+  await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Case complete" })).toBeVisible();
 });

@@ -83,6 +83,33 @@ function validateApiOrigin(value: string): string {
   return value;
 }
 
+function productionAllowedOrigins(source: string): string {
+  const matches = [...source.matchAll(/"WEB_AUTH_RETURN_URL"\s*:\s*("(?:\\.|[^"\\])*")/g)];
+  if (matches.length !== 1) {
+    throw new Error("Expected exactly one Web auth return URL sentinel");
+  }
+  let value: string;
+  let target: URL;
+  try {
+    value = JSON.parse(matches[0]?.[1] ?? "");
+    target = new URL(value);
+  } catch {
+    throw new Error("Invalid production Web auth return URL");
+  }
+  if (
+    target.protocol !== "https:" ||
+    target.username !== "" ||
+    target.password !== "" ||
+    target.search !== "" ||
+    target.hash !== "" ||
+    target.href !== value ||
+    target.origin.includes(",")
+  ) {
+    throw new Error("Invalid production Web auth return URL");
+  }
+  return [...new Set([target.origin, "https://localhost"])].join(",");
+}
+
 function validateFingerprints(value: string | undefined): string {
   const fingerprints = value ?? "";
   if (fingerprints.trim() === "") return "";
@@ -128,6 +155,7 @@ export function renderWranglerConfig(source: string, input: ProductionWranglerIn
   }
   const fingerprints = validateFingerprints(input.androidFingerprints);
   const namespaceIds = validateRateLimitNamespaceIds(input.rateLimitNamespaceIds);
+  const allowedOrigins = productionAllowedOrigins(source);
 
   let rendered = source;
   rendered = replaceSentinel(
@@ -141,6 +169,12 @@ export function renderWranglerConfig(source: string, input: ProductionWranglerIn
     "environment",
     /"ENVIRONMENT"\s*:\s*"development"/g,
     '"ENVIRONMENT": "production"',
+  );
+  rendered = replaceSentinel(
+    rendered,
+    "allowed origins",
+    /"ALLOWED_ORIGINS"\s*:\s*"http:\/\/localhost:5173,https:\/\/agent-axiom\.github\.io,https:\/\/localhost"/g,
+    `"ALLOWED_ORIGINS": ${JSON.stringify(allowedOrigins)}`,
   );
   rendered = replaceSentinel(
     rendered,
@@ -185,6 +219,7 @@ export function renderWranglerConfig(source: string, input: ProductionWranglerIn
     "00000000-0000-0000-0000-000000000000",
     ".invalid",
     "amoveago-debug:",
+    "http://localhost:5173",
     ...rateLimitSentinels,
   ];
   if (

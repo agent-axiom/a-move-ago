@@ -6,12 +6,13 @@
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json",
     "content:import": "tsx src/content-import.ts",
+    "content:private": "tsx src/private-content.ts",
+    "dev:seed": "tsx src/seed-local.ts",
     "render:wrangler": "tsx src/render-wrangler-config.ts",
     "test": "vitest run src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "validate-content": "tsx src/validate-content.ts ../content/samples",
-    "write:worker-secrets": "tsx src/write-worker-secrets.ts",
-    "content:private": "tsx src/private-content.ts"
+    "write:worker-secrets": "tsx src/write-worker-secrets.ts"
   },
   "dependencies": {
     "@a-move-ago/api-contract": "0.0.0",

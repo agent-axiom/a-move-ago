@@ -14,7 +14,7 @@
   "dependencies": {
     "@a-move-ago/api-contract": "0.0.0",
     "@a-move-ago/game-core": "0.0.0",
-    "hono": "4.12.33",
+    "hono": "4.13.13",
     "jose": "6.2.3",
     "zod": "4.4.3"
   },

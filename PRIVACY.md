@@ -19,6 +19,11 @@ Every client starts as a guest. The client stores a random opaque bearer token:
   are not guaranteed to be encrypted or excluded from device backups; access
   to a compromised/unlocked device or its backup can expose the bearer token.
 
+If the browser blocks local storage, Web and Telegram Mini App keep the token
+only in memory for the current app instance. Closing or reloading that instance
+can make unsaved guest progress inaccessible. A linked Telegram profile can be
+reconnected through an explicit **Save progress with Telegram** action.
+
 The token is not a profile and contains no identity claims. D1 stores only its
 cryptographic hash with a server-side pepper, plus the session ID, channel,
 kind, creation/expiry/revocation times, and last-seen time. Clearing browser or

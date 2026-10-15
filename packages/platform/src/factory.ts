@@ -1,6 +1,7 @@
 import { createTelegramAdapter } from "./telegram/telegram-adapter";
 import type { TelegramWebAppLike } from "./telegram/telegram-types";
 import type { PlatformAdapter } from "./types";
+import { createMemoryStorage, isStorageSecurityError } from "./web/token-store";
 import { type BrowserPort, createWebAdapter } from "./web/web-adapter";
 
 export async function createPlatformAdapter(input: {
@@ -17,6 +18,13 @@ export async function createPlatformAdapter(input: {
 }
 
 export function browserPortFromWindow(browserWindow: Window): BrowserPort {
+  let storage: BrowserPort["storage"];
+  try {
+    storage = browserWindow.localStorage;
+  } catch (error) {
+    if (!isStorageSecurityError(error)) throw error;
+    storage = createMemoryStorage();
+  }
   return {
     href: () => browserWindow.location.href,
     height: () => browserWindow.innerHeight,
@@ -26,6 +34,6 @@ export function browserPortFromWindow(browserWindow: Window): BrowserPort {
       browserWindow.open(url, "_blank", "noopener,noreferrer");
     },
     navigate: (url) => browserWindow.location.assign(url),
-    storage: browserWindow.localStorage,
+    storage,
   };
 }

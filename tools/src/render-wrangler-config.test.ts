@@ -24,6 +24,8 @@ const productionInput: ProductionWranglerInput = {
 const sentinels = [
   '"database_id": "00000000-0000-0000-0000-000000000000"',
   '"ENVIRONMENT": "development"',
+  '"ALLOWED_ORIGINS": "http://localhost:5173,https://agent-axiom.github.io,https://localhost"',
+  '"WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/"',
   '"TELEGRAM_OIDC_CLIENT_ID": "123456789"',
   '"TELEGRAM_OIDC_CALLBACK_URL": "https://a-move-ago-api.example.invalid/v1/auth/telegram/oidc/callback"',
   '"API_ORIGIN": "https://a-move-ago-api.example.invalid"',
@@ -45,6 +47,9 @@ describe("renderWranglerConfig", () => {
 
     expect(rendered).toContain(`"database_id": "${databaseId}"`);
     expect(rendered).toContain('"ENVIRONMENT": "production"');
+    expect(rendered).toContain(
+      '"ALLOWED_ORIGINS": "https://agent-axiom.github.io,https://localhost"',
+    );
     expect(rendered).toContain('"TELEGRAM_OIDC_CLIENT_ID": "987654321"');
     expect(rendered).toContain(`"API_ORIGIN": "${apiOrigin}"`);
     expect(rendered).toContain(
@@ -58,7 +63,38 @@ describe("renderWranglerConfig", () => {
     expect(rendered).not.toContain("00000000-0000-0000-0000-000000000000");
     expect(rendered).not.toContain(".invalid");
     expect(rendered).not.toContain("amoveago-debug:");
+    expect(rendered).not.toContain("http://localhost:5173");
     expect(rendered).not.toMatch(/90000000[1-4]/);
+  });
+
+  it("derives the exact Web origin from its return URL while retaining Capacitor", async () => {
+    const source = (await sourceText()).replace(
+      "https://agent-axiom.github.io/a-move-ago/",
+      "https://play.example:8443/a-move-ago/",
+    );
+
+    expect(renderWranglerConfig(source, productionInput)).toContain(
+      '"ALLOWED_ORIGINS": "https://play.example:8443,https://localhost"',
+    );
+  });
+
+  it.each([
+    "not-a-url",
+    "http://play.example/a-move-ago/",
+    "https://user:pass@play.example/a-move-ago/",
+    "https://play.example/a-move-ago/?query=yes",
+    "https://play.example/a-move-ago/#fragment",
+    "https://PLAY.example/a-move-ago/",
+    "https://play.example:443/a-move-ago/",
+    "https://play.example",
+    "https://play.example,other.example/a-move-ago/",
+  ])("rejects an invalid or noncanonical Web auth return URL: %s", async (returnUrl) => {
+    const source = (await sourceText()).replace(
+      "https://agent-axiom.github.io/a-move-ago/",
+      returnUrl,
+    );
+
+    expect(() => renderWranglerConfig(source, productionInput)).toThrow(/Web auth return URL/i);
   });
 
   it("keeps Android association fail-closed when fingerprints are blank", async () => {
@@ -125,6 +161,9 @@ describe("renderWranglerConfig", () => {
     expect(() => renderWranglerConfig(`${source}\n// amoveago-debug:`, productionInput)).toThrow(
       /marker/i,
     );
+    expect(() =>
+      renderWranglerConfig(`${source}\n// http://localhost:5173`, productionInput),
+    ).toThrow(/marker/i);
   });
 
   it.each([

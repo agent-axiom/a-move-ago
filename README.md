@@ -63,16 +63,21 @@ TELEGRAM_BOT_TOKEN=replace-with-a-local-test-value
 TELEGRAM_OIDC_CLIENT_SECRET=replace-with-a-local-test-value
 ```
 
-Never commit real Telegram or Cloudflare credentials. Apply the migrations,
-then start the Worker:
+Never commit real Telegram or Cloudflare credentials. Seed today's local daily
+case from the public example, then start the Worker:
 
 ```sh
-npm run db:migrate:local -w @a-move-ago/api
+npm run dev:seed
 npm run dev -w @a-move-ago/api
 ```
 
 Wrangler serves the Worker on `http://localhost:8787` by default. The health
 check is `GET /v1/healthz`.
+
+`dev:seed` applies local migrations and publishes a clearly marked
+**Development sample** for today's UTC date. It uses only local D1, accepts no
+arguments, and preserves existing local data. Run it again on a new day. It
+does not create or import production puzzles.
 
 ## Run the client
 
@@ -99,6 +104,10 @@ npm run build -w @a-move-ago/api
 
 The full pull-request gate, including both client artifacts and Playwright, is
 listed in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+CI also seeds local D1 and runs a real Worker/browser game through a correct
+retraction, the solution reveal, statistics and a reload. These checks complement
+the mocked API tests for network failures and Telegram host behavior.
 
 ## Pages and Android web builds
 
@@ -209,6 +218,54 @@ secrets belong in ignored `.dev.vars`. Client variables are public build
 configuration and must never contain secrets.
 
 ## Production release gate
+
+The August 23, 2026 release deployed the Worker and Pages and
+passed CI and the Android debug build. That establishes a deployed MVP, not
+completion of the public-launch checks below. The private production puzzle
+corpus and current remote D1 content must be verified separately.
+
+On October 15, 2026, the protected private-content workflow published 30 original
+English daily cases covering October 15 through November 13. Renew this coverage
+before it expires using the process in [ops/README.md](ops/README.md).
+
+After deploying, check the real guest flow, browser CORS configuration and
+today's published content:
+
+```sh
+npm run deployment:check -- --api-origin https://a-move-ago-api.if-ab6.workers.dev --web-origin https://agent-axiom.github.io
+```
+
+This dependency-free Node 24 check creates one empty guest session, reads its
+identity and statistics, and loads today's daily case from D1. It does not
+submit attempts, send Telegram proof, or print tokens or puzzle payloads. Each
+request has a ten-second timeout and redirects are rejected. A successful
+`/v1/healthz` alone does not establish that daily gameplay is available.
+
+The API workflow deploys from `main` through an explicit manual run or a reviewed
+change to `ops/api-release.json`. It uses the protected `production` environment
+and runs this check after deployment. The **Deployment health**
+workflow runs it daily at 00:31 UTC using the repository `API_ORIGIN` variable;
+it can also be run manually. If the web deployment changes origin, update its
+fixed origin in both workflows and `WEB_AUTH_RETURN_URL` in the config template.
+Production config derives its browser origin from that return URL, retains
+the Capacitor origin, and removes the Vite development origin.
+
+The protected API workflow separately checks one synthetic guest solve, a replay
+of the same attempt UUID, reloaded progress, and unchanged statistics. It reads
+only today's first private solution from D1 in runner memory and prints no
+answers or tokens. Pages delivery checks the published HTML against that build
+and verifies its application bundle is available.
+
+On relevant pull requests from this repository, the health workflow also
+checks the currently deployed version. That check is advisory on pull
+requests, so an existing content outage does not block a fix; the local
+Worker/browser integration still verifies the proposed code independently.
+
+Before launch, verify that the private D1 corpus has today's case and at least
+the next seven UTC dates published, with validated solutions and recorded
+provenance/licenses. The local development sample is not a production corpus.
+The daily check detects missing current content; it does not inspect unpublished
+future solutions or replace this operator check.
 
 Before opening the public Pages version, the operator must verify all of these
 against the deployed Worker and production D1:

@@ -229,7 +229,7 @@ it("renders fatal startup exclusively without game or loading content", async ()
   expect(runtime.platform.requestTelegramProof).not.toHaveBeenCalled();
 });
 
-it("fetches stats only after the solved reveal finishes", async () => {
+it("fetches stats only after the player continues from the solved reveal", async () => {
   const user = userEvent.setup();
   const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
   runtime.api.getDaily = vi.fn().mockResolvedValue(daily);
@@ -248,7 +248,13 @@ it("fetches stats only after the solved reveal finishes", async () => {
   expect(await screen.findByRole("status")).toHaveTextContent("Rewinding the last move");
   await waitFor(() => expect(runtime.platform.haptic).toHaveBeenCalledWith("success"));
   expect(runtime.api.getStats).not.toHaveBeenCalled();
-  await waitFor(() => expect(runtime.api.getStats).toHaveBeenCalledOnce(), { timeout: 3_000 });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled(), {
+    timeout: 3_000,
+  });
+  expect(screen.getByText(reveal.explanation, { exact: false })).toBeInTheDocument();
+  expect(runtime.api.getStats).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await waitFor(() => expect(runtime.api.getStats).toHaveBeenCalledOnce());
   expect(screen.getByRole("heading", { level: 1, name: daily.title })).toBeInTheDocument();
   expect(await screen.findByRole("heading", { name: "Case complete" })).toBeInTheDocument();
 });
@@ -343,7 +349,7 @@ it("requires an application reload instead of retrying an invalid hint response"
   expect(runtime.api.requestHint).toHaveBeenCalledOnce();
 });
 
-it("advances server-ordered acts and fetches stats only after the final reveal", async () => {
+it("advances acts on Continue and fetches stats after acknowledging the final reveal", async () => {
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({ matches: true })),
@@ -367,12 +373,18 @@ it("advances server-ordered acts and fetches stats only after the final reveal",
   await composeCapture(user);
   await user.click(screen.getByRole("button", { name: "Submit retraction" }));
 
+  expect(await screen.findByRole("heading", { name: "Solved" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: secondPuzzle.title })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   expect(await screen.findByRole("heading", { name: secondPuzzle.title })).toBeInTheDocument();
   expect(runtime.api.getStats).not.toHaveBeenCalled();
 
   await composeCapture(user);
   await user.click(screen.getByRole("button", { name: "Submit retraction" }));
 
+  expect(await screen.findByRole("heading", { name: "Solved" })).toBeInTheDocument();
+  expect(runtime.api.getStats).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
   expect(await screen.findByRole("heading", { name: "Case complete" })).toBeInTheDocument();
   await waitFor(() => expect(runtime.api.getStats).toHaveBeenCalledOnce());
   expect(runtime.platform.haptic).toHaveBeenCalledTimes(2);

@@ -1,5 +1,5 @@
 import type { AcceptedSolution } from "@a-move-ago/api-contract";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { RevealPlayer } from "./RevealPlayer";
 
@@ -28,22 +28,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("shows the prior position, replays forward, then completes", () => {
+it("replays the solution and leaves it readable until the player continues", () => {
   vi.useFakeTimers();
   const complete = vi.fn();
   render(<RevealPlayer onComplete={complete} postFen={postFen} solution={solution} />);
 
   expect(screen.getByRole("status")).toHaveTextContent("Rewinding the last move");
+  expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   act(() => vi.advanceTimersByTime(50));
   expect(screen.getByRole("status")).toHaveTextContent("Previous position reconstructed");
   act(() => vi.advanceTimersByTime(750));
   expect(screen.getByRole("status")).toHaveTextContent("Playing exd5 forward");
   expect(complete).not.toHaveBeenCalled();
   act(() => vi.advanceTimersByTime(750));
+  expect(screen.getByRole("status")).toHaveTextContent("Solution replay complete");
+  expect(screen.getByText(solution.explanation, { exact: false })).toBeInTheDocument();
+  act(() => vi.advanceTimersByTime(60_000));
+  expect(complete).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(complete).toHaveBeenCalledOnce();
 });
 
-it("completes the same reveal deterministically when reduced motion is preferred", () => {
+it("shows a stable solution with reduced motion and waits for Continue", () => {
   vi.useFakeTimers();
   vi.stubGlobal(
     "matchMedia",
@@ -56,6 +63,9 @@ it("completes the same reveal deterministically when reduced motion is preferred
   act(() => vi.runAllTimers());
 
   expect(screen.getByRole("status")).toHaveTextContent("Solution replay complete");
+  expect(screen.getByText(solution.explanation, { exact: false })).toBeInTheDocument();
+  expect(complete).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(complete).toHaveBeenCalledOnce();
 });
 
@@ -76,6 +86,7 @@ it("restarts from the post position when the solution identity changes", () => {
   );
 
   expect(screen.getByRole("status")).toHaveTextContent("Rewinding the last move");
+  expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   act(() => vi.advanceTimersByTime(50));
   expect(screen.getByRole("status")).toHaveTextContent("Previous position reconstructed");
   act(() => vi.advanceTimersByTime(750));
@@ -83,20 +94,14 @@ it("restarts from the post position when the solution identity changes", () => {
   expect(complete).not.toHaveBeenCalled();
 });
 
-it("completes once when reduced-motion preference changes during a reveal", () => {
+it("cancels the reveal animation when it is unmounted", () => {
   vi.useFakeTimers();
-  let reduced = false;
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn(() => ({ matches: reduced })),
-  );
   const complete = vi.fn();
-  render(<RevealPlayer onComplete={complete} postFen={postFen} solution={solution} />);
-
-  reduced = true;
-  act(() => vi.advanceTimersByTime(1_550));
-  expect(complete).toHaveBeenCalledOnce();
+  const view = render(<RevealPlayer onComplete={complete} postFen={postFen} solution={solution} />);
+  act(() => vi.advanceTimersByTime(50));
+  view.unmount();
 
   act(() => vi.runAllTimers());
-  expect(complete).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+  expect(complete).not.toHaveBeenCalled();
 });
