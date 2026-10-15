@@ -10,7 +10,8 @@
     "test": "vitest run src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "validate-content": "tsx src/validate-content.ts ../content/samples",
-    "write:worker-secrets": "tsx src/write-worker-secrets.ts"
+    "write:worker-secrets": "tsx src/write-worker-secrets.ts",
+    "content:private": "tsx src/private-content.ts"
   },
   "dependencies": {
     "@a-move-ago/api-contract": "0.0.0",
