@@ -1,7 +1,9 @@
 import type {
   AttemptRequestSchema,
   AttemptResultSchema,
+  ClueResponse,
   HintResponseSchema,
+  PuzzleProgress,
   Retraction,
 } from "@a-move-ago/api-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -32,6 +34,11 @@ export type HintState =
   | { tag: "loading"; items: readonly Hint[]; request: HintRequest }
   | { tag: "retry"; items: readonly Hint[]; request: HintRequest; failure: ClientFailure };
 
+export type ClueState =
+  | { tag: "idle"; content: ClueResponse | null }
+  | { tag: "loading"; content: null }
+  | { tag: "retry"; content: null; failure: ClientFailure };
+
 function frozenRetraction(value: Retraction): Retraction {
   return Object.freeze({
     ...value,
@@ -40,32 +47,45 @@ function frozenRetraction(value: Retraction): Retraction {
   });
 }
 
-export function useAttempt(caseId: string, puzzleId: string) {
+export function useAttempt(caseId: string, puzzleId: string, initialProgress?: PuzzleProgress) {
   const runtime = useRuntime();
   const [attempt, setAttempt] = useState<AttemptState>({ tag: "idle" });
-  const [hints, setHints] = useState<HintState>({ tag: "idle", items: [] });
+  const [progress, setProgress] = useState(initialProgress);
+  const [hints, setHints] = useState<HintState>({
+    tag: "idle",
+    items: initialProgress?.earnedHints ?? [],
+  });
+  const [clue, setClue] = useState<ClueState>({ tag: "idle", content: null });
+  const seed = useRef(initialProgress);
+  seed.current = initialProgress;
   const attemptAbort = useRef<AbortController | null>(null);
   const hintAbort = useRef<AbortController | null>(null);
+  const clueAbort = useRef<AbortController | null>(null);
   const activeLifecycle = useRef({ caseId, puzzleId, runtime });
 
   useEffect(() => {
     activeLifecycle.current = { caseId, puzzleId, runtime };
     attemptAbort.current?.abort();
     hintAbort.current?.abort();
+    clueAbort.current?.abort();
     attemptAbort.current = null;
     hintAbort.current = null;
+    clueAbort.current = null;
     setAttempt({ tag: "idle" });
-    setHints({ tag: "idle", items: [] });
+    setProgress(seed.current);
+    setHints({ tag: "idle", items: seed.current?.earnedHints ?? [] });
+    setClue({ tag: "idle", content: null });
 
     return () => {
       attemptAbort.current?.abort();
       hintAbort.current?.abort();
+      clueAbort.current?.abort();
     };
   }, [caseId, puzzleId, runtime]);
 
   const sendAttempt = useCallback(
     async (request: AttemptRequest) => {
-      if (attemptAbort.current) return;
+      if (attemptAbort.current || hintAbort.current || clueAbort.current) return;
       const controller = new AbortController();
       attemptAbort.current = controller;
       setAttempt({ tag: "submitting", request });
@@ -78,6 +98,10 @@ export function useAttempt(caseId: string, puzzleId: string) {
           activeLifecycle.current.puzzleId !== request.puzzleId
         ) {
           return;
+        }
+        if (result.progress) {
+          setProgress(result.progress);
+          setHints({ tag: "idle", items: result.progress.earnedHints });
         }
         setAttempt(
           result.correct
@@ -102,19 +126,26 @@ export function useAttempt(caseId: string, puzzleId: string) {
 
   const submit = useCallback(
     async (retraction: Retraction) => {
-      if (attempt.tag === "submitting" || attemptAbort.current) return;
+      if (
+        attempt.tag === "submitting" ||
+        attempt.tag === "retry" ||
+        attempt.tag === "solved" ||
+        hints.tag !== "idle" ||
+        clue.tag !== "idle" ||
+        attemptAbort.current ||
+        hintAbort.current ||
+        clueAbort.current
+      )
+        return;
       const request = Object.freeze({
         attemptUuid: runtime.attemptUuid(),
         caseId,
         puzzleId,
         retraction: frozenRetraction(retraction),
       }) satisfies AttemptRequest;
-      hintAbort.current?.abort();
-      hintAbort.current = null;
-      setHints({ tag: "idle", items: [] });
       await sendAttempt(request);
     },
-    [attempt.tag, caseId, puzzleId, runtime, sendAttempt],
+    [attempt.tag, caseId, clue.tag, hints.tag, puzzleId, runtime, sendAttempt],
   );
 
   const retryAttempt = useCallback(async () => {
@@ -123,7 +154,7 @@ export function useAttempt(caseId: string, puzzleId: string) {
 
   const sendHint = useCallback(
     async (request: HintRequest, items: readonly Hint[]) => {
-      if (hintAbort.current) return;
+      if (attemptAbort.current || hintAbort.current || clueAbort.current) return;
       const controller = new AbortController();
       hintAbort.current = controller;
       setHints({ tag: "loading", items, request });
@@ -133,8 +164,17 @@ export function useAttempt(caseId: string, puzzleId: string) {
           request.level,
           controller.signal,
         );
-        if (controller.signal.aborted || activeLifecycle.current.runtime !== runtime) return;
-        const next = items.some((item) => item.level === hint.level) ? items : [...items, hint];
+        if (
+          controller.signal.aborted ||
+          activeLifecycle.current.runtime !== runtime ||
+          activeLifecycle.current.caseId !== caseId ||
+          activeLifecycle.current.puzzleId !== puzzleId
+        )
+          return;
+        if (hint.progress) setProgress(hint.progress);
+        const next =
+          hint.progress?.earnedHints ??
+          (items.some((item) => item.level === hint.level) ? items : [...items, hint]);
         setHints({ tag: "idle", items: next });
       } catch (error) {
         if (!controller.signal.aborted && activeLifecycle.current.runtime === runtime) {
@@ -144,17 +184,77 @@ export function useAttempt(caseId: string, puzzleId: string) {
         if (hintAbort.current === controller) hintAbort.current = null;
       }
     },
-    [runtime],
+    [caseId, puzzleId, runtime],
   );
 
   const requestHint = useCallback(async () => {
-    if (attempt.tag !== "incorrect" || hints.tag !== "idle") return;
-    await sendHint({ attemptId: attempt.result.id, level: hints.items.length + 1 }, hints.items);
-  }, [attempt, hints, sendHint]);
+    if (attempt.tag !== "incorrect" || hints.tag !== "idle" || clue.tag !== "idle") return;
+    const highest = Math.max(progress?.highestHintLevel ?? 0, hints.items.at(-1)?.level ?? 0);
+    await sendHint({ attemptId: attempt.result.id, level: highest + 1 }, hints.items);
+  }, [attempt, clue.tag, hints, progress?.highestHintLevel, sendHint]);
 
   const retryHint = useCallback(async () => {
     if (hints.tag === "retry") await sendHint(hints.request, hints.items);
   }, [hints, sendHint]);
 
-  return { attempt, hints, submit, retryAttempt, requestHint, retryHint };
+  const sendClue = useCallback(async () => {
+    if (attemptAbort.current || hintAbort.current || clueAbort.current) return;
+    const controller = new AbortController();
+    clueAbort.current = controller;
+    setClue({ tag: "loading", content: null });
+    try {
+      const result = await runtime.api.requestClue(caseId, puzzleId, controller.signal);
+      if (
+        controller.signal.aborted ||
+        activeLifecycle.current.runtime !== runtime ||
+        activeLifecycle.current.caseId !== caseId ||
+        activeLifecycle.current.puzzleId !== puzzleId
+      )
+        return;
+      setProgress(result.progress);
+      setHints({ tag: "idle", items: result.progress.earnedHints });
+      setClue({ tag: "idle", content: result });
+    } catch (error) {
+      if (!controller.signal.aborted && activeLifecycle.current.runtime === runtime) {
+        setClue({ tag: "retry", content: null, failure: classifyFailure(error) });
+      }
+    } finally {
+      if (clueAbort.current === controller) clueAbort.current = null;
+    }
+  }, [caseId, puzzleId, runtime]);
+
+  const requestClue = useCallback(async () => {
+    if (
+      progress?.clueUnlocked ||
+      clue.content ||
+      clue.tag !== "idle" ||
+      hints.tag !== "idle" ||
+      attempt.tag === "submitting" ||
+      attempt.tag === "retry" ||
+      attempt.tag === "solved"
+    )
+      return;
+    await sendClue();
+  }, [attempt.tag, clue, hints.tag, progress?.clueUnlocked, sendClue]);
+
+  const retryClue = useCallback(async () => {
+    if (clue.tag === "retry") await sendClue();
+  }, [clue.tag, sendClue]);
+
+  const busy = attempt.tag === "submitting" || hints.tag === "loading" || clue.tag === "loading";
+  const blocked = busy || attempt.tag === "retry" || hints.tag === "retry" || clue.tag === "retry";
+  return {
+    attempt,
+    hints,
+    clue,
+    progress,
+    busy,
+    blocked,
+    submit,
+    retryAttempt,
+    requestHint,
+    retryHint,
+    requestClue,
+    retryClue,
+  };
 }

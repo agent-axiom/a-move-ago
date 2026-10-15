@@ -73,8 +73,10 @@ test("guest solves the seeded case through Worker and retains D1 progress after 
     currentStreak: 1,
     bestStreak: 1,
     lastCompletedDate: daily.date,
+    points: 100,
   });
   await expect(page.getByRole("heading", { name: "Case complete", exact: true })).toBeVisible();
+  await expect(page.locator(".personal-rating-total strong")).toHaveText("100");
   await expect(page.locator("dt", { hasText: "Current streak" }).locator("+ dd")).toHaveText("1");
 
   const restoredDailyPromise = page.waitForResponse(
@@ -94,6 +96,7 @@ test("guest solves the seeded case through Worker and retains D1 progress after 
   expect(restoredStatsResponse.status()).toBe(200);
   expect(StatsResponseSchema.parse(await restoredStatsResponse.json())).toEqual(stats);
   await expect(page.getByRole("heading", { name: "Case complete", exact: true })).toBeVisible();
+  await expect(page.locator(".personal-rating-total strong")).toHaveText("100");
   expect(guestRequests).toBe(1);
   expect(statsRequests).toBe(2);
 });

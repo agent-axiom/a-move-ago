@@ -1,4 +1,4 @@
-import type { AcceptedSolution } from "@a-move-ago/api-contract";
+import type { AcceptedSolution, PuzzleProgress } from "@a-move-ago/api-contract";
 import { parseFen } from "@a-move-ago/game-core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { localizedText, useI18n } from "../../../i18n";
@@ -13,6 +13,8 @@ interface RevealTimeline {
 export function RevealPlayer(props: {
   postFen: string;
   solution: AcceptedSolution;
+  progress?: PuzzleProgress | undefined;
+  attemptId?: string;
   onComplete(): void;
 }) {
   const { locale, t } = useI18n();
@@ -29,6 +31,8 @@ export function RevealPlayer(props: {
     [props.solution.previousFen],
   );
   const post = useMemo(() => parseFen(props.postFen), [props.postFen]);
+  const awardedHere =
+    props.progress?.awardAttemptId != null && props.progress.awardAttemptId === props.attemptId;
 
   const startReplay = useCallback(() => {
     for (const timer of timers.current) clearTimeout(timer);
@@ -116,6 +120,25 @@ export function RevealPlayer(props: {
           </span>
           <h2 id="solution-heading">{t("game.solved")}</h2>
         </div>
+        {props.progress && props.progress.earnedPoints !== null ? (
+          <aside className="solution-reward" aria-live="polite">
+            <strong>
+              {props.progress.legacySolved
+                ? t("game.score.legacy")
+                : t(awardedHere ? "game.score.awarded" : "game.score.already", {
+                    points: props.progress.earnedPoints,
+                    count: props.progress.earnedPoints,
+                  })}
+            </strong>
+            <p>
+              {props.progress.legacySolved
+                ? t("game.score.legacyCopy")
+                : awardedHere
+                  ? t("game.score.awardAttempt", { number: props.progress.attemptCount })
+                  : t("game.score.alreadyCopy")}
+            </p>
+          </aside>
+        ) : null}
         <p className="solution-notation">{props.solution.forwardSan}</p>
         <p className="solution-explanation">
           {localizedText(props.solution, "explanation", locale)}

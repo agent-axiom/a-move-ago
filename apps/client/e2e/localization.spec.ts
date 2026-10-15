@@ -18,7 +18,7 @@ test("English is the default and language changes preserve the selected date and
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(language(page)).toHaveValue("en");
   await expect(language(page).locator("option")).toHaveText(["English", "Русский", "中文"]);
-  await expect(page.getByRole("heading", { name: "A quiet beginning", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
   await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
@@ -26,7 +26,7 @@ test("English is the default and language changes preserve the selected date and
 
   await language(page).selectOption("ru");
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
-  await expect(page.getByRole("heading", { name: "Тихое начало", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Задача дня", exact: true })).toBeVisible();
   await expect(page.getByText("Что произошло ход назад?", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("gridcell", { name: "d5, белая пешка", exact: true }),
@@ -37,7 +37,7 @@ test("English is the default and language changes preserve the selected date and
 
   await language(page).selectOption("zh");
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-  await expect(page.getByRole("heading", { name: "安静的开始", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "每日棋题", exact: true })).toBeVisible();
   await expect(page.getByText("上一步发生了什么？", { exact: true })).toBeVisible();
   await expect(page.getByLabel("被吃的棋子", { exact: true })).toHaveValue("p");
   await expect(page.getByRole("button", { name: "检查走法", exact: true })).toBeEnabled();
@@ -47,10 +47,10 @@ test("English is the default and language changes preserve the selected date and
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
   await expect(language(page)).toHaveValue("zh");
-  await expect(page.getByRole("heading", { name: "安静的开始", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "每日棋题", exact: true })).toBeVisible();
   expect(new URL(page.url()).searchParams.get("case")).toBe("2026-09-10");
   await language(page).selectOption("en");
-  await expect(page.getByRole("heading", { name: "A quiet beginning", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
 });
 
 test("authorized hints and solution explanations translate without restarting an attempt", async ({
@@ -71,7 +71,7 @@ test("authorized hints and solution explanations translate without restarting an
   await expect(
     page.getByText("That does not explain the missing pawn.", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Get hint", exact: true }).click();
+  await page.getByRole("button", { name: /^Get hint/, exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry hint", exact: true })).toBeVisible();
 
   await language(page).selectOption("ru");
@@ -125,7 +125,7 @@ test("archive month, progress navigation and historical links remain selected ac
   await language(page).selectOption("ru");
   await expect(page.getByRole("heading", { name: "Архив задач", exact: true })).toBeVisible();
   await expect(page.getByLabel("Месяц архива", { exact: true })).toHaveValue("2026-09");
-  await expect(page.locator(".archive-cases")).toContainText("Тихое начало");
+  await expect(page.locator(".archive-cases")).toContainText("Задача дня");
   await expect(page.locator(".archive-cases")).not.toContainText("A quiet beginning");
   await page
     .locator(".archive-cases li")
@@ -134,13 +134,13 @@ test("archive month, progress navigation and historical links remain selected ac
     })
     .getByRole("button")
     .click();
-  await expect(page.getByRole("heading", { name: "Тихое начало", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Задача дня", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Прогресс", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Статистика", exact: true })).toBeVisible();
   await language(page).selectOption("zh");
   await expect(page.getByRole("heading", { name: "统计", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "返回谜题", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "安静的开始", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "每日棋题", exact: true })).toBeVisible();
   expect(new URL(page.url()).searchParams.get("case")).toBe("2026-09-10");
   await page.getByRole("button", { name: "档案", exact: true }).click();
   await expect(page.getByRole("heading", { name: "谜题档案", exact: true })).toBeVisible();

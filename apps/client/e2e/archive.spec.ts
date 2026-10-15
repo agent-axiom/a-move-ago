@@ -4,16 +4,14 @@ import { installApiMock } from "./api-mock";
 test("archive dates retain progress, deep links and browser navigation", async ({ page }) => {
   const observed = await installApiMock(page, { archive: true });
   await page.goto("./");
-  await expect(
-    page.getByRole("heading", { name: "Today's synthetic case", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Archive", exact: true }).click();
   await expect(page.getByRole("heading", { name: "The archive", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/[?&]view=archive(?:&|$)/);
   await page.getByLabel("Archive month", { exact: true }).selectOption({ label: "September 2026" });
   const firstCase = page.getByRole("button", {
-    name: "Open case for 10 September 2026: A quiet beginning",
+    name: "Open case for 10 September 2026: Daily case",
     exact: true,
   });
   await expect(firstCase).toContainText("Not started");
@@ -21,36 +19,34 @@ test("archive dates retain progress, deep links and browser navigation", async (
     page.getByRole("button", { name: /^Open case for 11 September 2026:/ }),
   ).toContainText("Completed");
   await firstCase.click();
-  await expect(page.getByRole("heading", { name: "A quiet beginning", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/[?&]case=2026-09-10(?:&|$)/);
   expect(observed.dailyDates).toContain("2026-09-10");
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "A quiet beginning", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/[?&]case=2026-09-10(?:&|$)/);
   await page.goBack();
   await expect(page.getByRole("heading", { name: "The archive", exact: true })).toBeVisible();
   await expect(page.getByLabel("Archive month", { exact: true })).toHaveValue("2026-09");
   await page.getByLabel("Archive month", { exact: true }).selectOption({ label: "October 2026" });
   const recentCase = page.getByRole("button", {
-    name: "Open case for 14 October 2026: The missing tempo",
+    name: "Open case for 14 October 2026: Daily case",
     exact: true,
   });
   await expect(recentCase).toContainText("In progress");
   await expect(recentCase).toContainText(/1\s*(?:of|\/)\s*2/);
   await recentCase.click();
-  await expect(page.getByRole("heading", { name: "The missing tempo", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/[?&]case=2026-10-14(?:&|$)/);
   expect(observed.dailyDates).toContain("2026-10-14");
 
   await page.getByRole("button", { name: "Progress", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Progress", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to case", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "The missing tempo", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to today", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Today's synthetic case", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await expect.poll(() => new URL(page.url()).searchParams.has("case")).toBe(false);
   expect(observed.guestChannels).toEqual(["web"]);
   expect(observed.archiveRequests).toBeGreaterThan(0);

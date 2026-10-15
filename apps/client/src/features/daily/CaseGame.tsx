@@ -71,6 +71,7 @@ export function CaseGame({ daily, onToday }: { daily: DailyCase; onToday?: () =>
         key={puzzle.id}
         onSolved={() => setSolved((current) => new Set([...current, puzzle.id]))}
         puzzle={puzzle}
+        progress={daily.progressStates?.[puzzle.id]}
       />
     </section>
   );
