@@ -84,9 +84,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           selectedSquare={selectedSquare}
         />
         <p className="board-caption" aria-live="polite">
-          {showingPreview
-            ? "Your reconstruction · switch to Now to edit"
-            : instruction}
+          {showingPreview ? "Your reconstruction · switch to Now to edit" : instruction}
         </p>
       </div>
       <div className="retraction-panel">
@@ -110,9 +108,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
             ),
           )}
         </ol>
-        <p className="composer-instruction">
-          {instruction}
-        </p>
+        <p className="composer-instruction">{instruction}</p>
         {draft.tag === "configure" ? (
           <output className="move-summary" aria-label="Selected retraction">
             <span>{draft.currentSquare}</span>

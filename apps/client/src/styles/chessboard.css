@@ -104,7 +104,7 @@
 }
 .board-cell.dark .square-rank,
 .board-cell.dark .square-file {
-  color: #f5f1e8;
+  color: #1a2117;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { expect, type Page, test, type TestInfo } from "@playwright/test";
+import { expect, type Page, type TestInfo, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
 
 test.skip(process.env.UI_PREVIEW !== "true", "Screenshots run only in the UI review workflow.");
