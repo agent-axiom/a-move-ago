@@ -168,6 +168,28 @@ it("restores purchased hints and server score without charging or revealing anot
   expect(screen.getByRole("button", { name: "Открыть улику · 1 → 1 очко" })).toBeEnabled();
   expect(runtime.api.requestClue).not.toHaveBeenCalled();
   expect(runtime.api.requestHint).not.toHaveBeenCalled();
+
+  runtime.api.submitAttempt = vi.fn().mockResolvedValue({
+    id: "22222222-2222-4222-8222-222222222222",
+    attemptUuid: "22222222-2222-4222-8222-222222222222",
+    correct: false,
+    contradiction: { code: "NOT_THE_LAST_MOVE", message: "The puzzle was solved in another tab." },
+    progress: { ...progress, earnedPoints: 35, nextAttemptPoints: 0, awardAttemptId: awardId },
+  });
+  await user.click(screen.getByRole("gridcell", { name: "d5, белая пешка" }));
+  await user.click(screen.getByRole("gridcell", { name: "e4, пусто" }));
+  await user.selectOptions(screen.getByLabelText("Взятая фигура"), "p");
+  await user.click(screen.getByRole("button", { name: "Проверить ход" }));
+  await screen.findByText("The puzzle was solved in another tab.");
+  const clueButton = screen.getByRole("button", { name: "Открыть улику · 0 → 0 очков" });
+  const hintButton = screen.getByRole("button", { name: "Подсказка · 0 → 0 очков" });
+  expect(clueButton).toBeDisabled();
+  expect(hintButton).toBeDisabled();
+  expect(screen.queryByRole("button", { name: /0 → 1/ })).not.toBeInTheDocument();
+  await user.click(clueButton);
+  await user.click(hintButton);
+  expect(runtime.api.requestClue).not.toHaveBeenCalled();
+  expect(runtime.api.requestHint).not.toHaveBeenCalled();
 });
 
 it("announces only the original award and correctly labels tiny rewards, replay and legacy solves", async () => {

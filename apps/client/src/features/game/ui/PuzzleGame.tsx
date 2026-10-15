@@ -35,7 +35,7 @@ function ReloadButton({ failure }: { failure: ClientFailure }) {
 }
 
 function afterAssistance(points: number): number {
-  return Math.max(1, Math.floor(points / 2));
+  return points === 0 ? 0 : Math.max(1, Math.floor(points / 2));
 }
 
 export function PuzzleGame(props: {
@@ -50,6 +50,7 @@ export function PuzzleGame(props: {
   const post = useMemo(() => parseFen(props.puzzle.postFen), [props.puzzle.postFen]);
   const controller = useAttempt(props.caseId, props.puzzle.id, props.progress);
   const progress = controller.progress;
+  const alreadyScored = progress !== undefined && progress.earnedPoints !== null;
 
   useEffect(() => {
     if (controller.attempt.tag === "solved") void runtime.platform.haptic("success");
@@ -105,7 +106,7 @@ export function PuzzleGame(props: {
             <button
               className="button-secondary hint-request"
               type="button"
-              disabled={controller.blocked}
+              disabled={controller.blocked || alreadyScored}
               onClick={() => {
                 void controller.requestHint();
               }}
@@ -178,7 +179,12 @@ export function PuzzleGame(props: {
           <p className="puzzle-prompt">{localizedText(props.puzzle, "prompt", locale)}</p>
           {progress ? (
             <>
-              <div className="puzzle-score" aria-label={t("game.score.label")} aria-live="polite">
+              <div
+                className="puzzle-score"
+                role="status"
+                aria-label={t("game.score.label")}
+                aria-live="polite"
+              >
                 <span className="score-attempt">
                   {t("game.score.attempt", { number: progress.attemptCount + 1 })}
                 </span>
@@ -211,7 +217,7 @@ export function PuzzleGame(props: {
                       <button
                         className="button-secondary clue-request"
                         type="button"
-                        disabled={controller.blocked}
+                        disabled={controller.blocked || alreadyScored}
                         onClick={() => {
                           void controller.requestClue();
                         }}
