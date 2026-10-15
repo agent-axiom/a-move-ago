@@ -3,6 +3,11 @@ name: Pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - ".github/workflows/site-domain.yml"
+      - "ops/site-domain.json"
+      - "tools/scripts/connect-site-domain.mjs"
+      - "tools/test/connect-site-domain.test.mjs"
   workflow_dispatch:
 
 permissions:
@@ -47,10 +52,16 @@ jobs:
       - name: Verify the published page and its application bundle
         env:
           DEPLOYED_SHA: ${{ github.sha }}
+          WEB_APP_URL: ${{ vars.WEB_APP_URL || steps.deployment.outputs.page_url }}
         run: |
           node --input-type=module <<'NODE'
           import { readFile } from "node:fs/promises";
-          const page = "https://agent-axiom.github.io/a-move-ago/";
+          const location = new URL(process.env.WEB_APP_URL);
+          if (location.protocol !== "https:" || location.username || location.password ||
+              location.search || location.hash || !location.pathname.endsWith("/")) {
+            throw new Error("Invalid published application URL");
+          }
+          const page = location.href;
           const expected = await readFile("apps/client/dist/pages/index.html", "utf8");
           let verified = false;
           for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -67,7 +78,7 @@ jobs:
           const source = expected.match(/<script[^>]+src="([^"]+\.js)"/u)?.[1];
           if (!source) throw new Error("Application script missing from page");
           const asset = new URL(source, page);
-          if (asset.origin !== new URL(page).origin || !asset.pathname.startsWith("/a-move-ago/assets/")) {
+          if (asset.origin !== new URL(page).origin || !asset.pathname.startsWith(new URL("assets/", page).pathname)) {
             throw new Error("Unexpected application script location");
           }
           const bundle = await fetch(asset, {
@@ -81,6 +92,10 @@ jobs:
       - name: Install the production browser smoke-check runtime
         run: npx playwright install --with-deps chromium
       - name: Verify the live archive, historical dates and return to today
+        env:
+          WEB_APP_URL: ${{ vars.WEB_APP_URL || steps.deployment.outputs.page_url }}
         run: node tools/scripts/check-live-archive-ui.mjs
       - name: Verify English default, Russian and Chinese on the live site
+        env:
+          WEB_APP_URL: ${{ vars.WEB_APP_URL || steps.deployment.outputs.page_url }}
         run: node tools/scripts/check-live-locales-ui.mjs

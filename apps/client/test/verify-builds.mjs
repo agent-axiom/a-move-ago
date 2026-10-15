@@ -19,7 +19,22 @@ assert(
   "Pages CSP and Telegram script must precede the app module",
 );
 assert.match(decodedPages, /connect-src[^;]*https:\/\/api\.test/);
-assert.match(pages, /\/a-move-ago\/assets\//);
+assert.match(pages, /["']\.\/assets\//);
+const pagesAssets = [...pages.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/gu)].map(
+  (match) => match[1],
+);
+assert(pagesAssets.length > 0, "Pages must include its application assets");
+for (const location of [
+  "https://agent-axiom.github.io/a-move-ago/",
+  "https://chess.kosarevsky.dev/",
+]) {
+  for (const source of pagesAssets) {
+    assert(source.startsWith("./assets/"), "Pages assets must be relative to the deployed page");
+    const asset = new URL(source, location);
+    assert.equal(asset.origin, new URL(location).origin);
+    assert(asset.pathname.startsWith(new URL("assets/", location).pathname));
+  }
+}
 assert.doesNotMatch(decodedPages, /unsafe-eval|script-src[^;]*\*|connect-src[^;]*\*/);
 const androidCsp = android.indexOf("Content-Security-Policy");
 const androidApplication = android.indexOf('type="module"');

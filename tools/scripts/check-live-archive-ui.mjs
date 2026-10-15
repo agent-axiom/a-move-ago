@@ -1,12 +1,23 @@
 import assert from "node:assert/strict";
 import { chromium } from "@playwright/test";
 
-const pageUrl = `https://agent-axiom.github.io/a-move-ago/?view=archive&release=${encodeURIComponent(process.env.GITHUB_SHA ?? "current")}`;
 const request = { from: "2026-09-10", through: "2026-10-14" };
 let stage = "START";
 let browser;
 
 try {
+  stage = "SITE_URL";
+  const pageUrl = new URL(process.env.WEB_APP_URL ?? "https://agent-axiom.github.io/a-move-ago/");
+  assert.ok(
+    pageUrl.protocol === "https:" &&
+      !pageUrl.username &&
+      !pageUrl.password &&
+      !pageUrl.search &&
+      !pageUrl.hash &&
+      pageUrl.pathname.endsWith("/"),
+  );
+  pageUrl.searchParams.set("view", "archive");
+  pageUrl.searchParams.set("release", process.env.GITHUB_SHA ?? "current");
   browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
@@ -26,7 +37,7 @@ try {
   // allows the archive catalog to become visible during the concurrent import.
   let ready = false;
   for (let retry = 0; retry < 30; retry += 1) {
-    await page.goto(pageUrl, { waitUntil: "domcontentloaded" });
+    await page.goto(pageUrl.href, { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "The archive", exact: true }).waitFor();
     const select = page.getByLabel("Archive month", { exact: true });
     await select.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});

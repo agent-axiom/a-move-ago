@@ -39,7 +39,7 @@
   "triggers": { "crons": ["17 0 * * *"] },
   "vars": {
     "ENVIRONMENT": "development",
-    "ALLOWED_ORIGINS": "http://localhost:5173,https://agent-axiom.github.io,https://localhost",
+    "ALLOWED_ORIGINS": "http://localhost:5173,https://agent-axiom.github.io,https://chess.kosarevsky.dev,https://localhost",
     "SESSION_TTL_SECONDS": "7776000",
     "TELEGRAM_OIDC_CLIENT_ID": "123456789",
     "TELEGRAM_OIDC_CALLBACK_URL": "https://a-move-ago-api.example.invalid/v1/auth/telegram/oidc/callback",

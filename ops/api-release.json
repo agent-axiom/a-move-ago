@@ -1,4 +1,4 @@
 {
   "release": "2026-10-15",
-  "reason": "Publish opt-in Russian and Chinese content localizations while preserving English gameplay events"
+  "reason": "Allow the exact chess.kosarevsky.dev and GitHub Pages web origins before the custom domain cutover"
 }

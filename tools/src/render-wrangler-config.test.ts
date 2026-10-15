@@ -12,6 +12,8 @@ const sourceUrl = new URL("../../apps/api/wrangler.jsonc", import.meta.url);
 const databaseId = "123e4567-e89b-42d3-a456-426614174000";
 const apiOrigin = "https://api.a-move-ago.example";
 const fingerprint = Array.from({ length: 32 }, () => "AB").join(":");
+const sourceOrigins =
+  "http://localhost:5173,https://agent-axiom.github.io,https://chess.kosarevsky.dev,https://localhost";
 
 const productionInput: ProductionWranglerInput = {
   databaseId,
@@ -24,7 +26,7 @@ const productionInput: ProductionWranglerInput = {
 const sentinels = [
   '"database_id": "00000000-0000-0000-0000-000000000000"',
   '"ENVIRONMENT": "development"',
-  '"ALLOWED_ORIGINS": "http://localhost:5173,https://agent-axiom.github.io,https://localhost"',
+  `"ALLOWED_ORIGINS": "${sourceOrigins}"`,
   '"WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/"',
   '"TELEGRAM_OIDC_CLIENT_ID": "123456789"',
   '"TELEGRAM_OIDC_CALLBACK_URL": "https://a-move-ago-api.example.invalid/v1/auth/telegram/oidc/callback"',
@@ -48,7 +50,7 @@ describe("renderWranglerConfig", () => {
     expect(rendered).toContain(`"database_id": "${databaseId}"`);
     expect(rendered).toContain('"ENVIRONMENT": "production"');
     expect(rendered).toContain(
-      '"ALLOWED_ORIGINS": "https://agent-axiom.github.io,https://localhost"',
+      '"ALLOWED_ORIGINS": "https://agent-axiom.github.io,https://chess.kosarevsky.dev,https://localhost"',
     );
     expect(rendered).toContain('"TELEGRAM_OIDC_CLIENT_ID": "987654321"');
     expect(rendered).toContain(`"API_ORIGIN": "${apiOrigin}"`);
@@ -65,17 +67,61 @@ describe("renderWranglerConfig", () => {
     expect(rendered).not.toContain("amoveago-debug:");
     expect(rendered).not.toContain("http://localhost:5173");
     expect(rendered).not.toMatch(/90000000[1-4]/);
+    expect(rendered).toContain(
+      '"WEB_AUTH_RETURN_URL": "https://agent-axiom.github.io/a-move-ago/"',
+    );
   });
 
-  it("derives the exact Web origin from its return URL while retaining Capacitor", async () => {
-    const source = (await sourceText()).replace(
-      "https://agent-axiom.github.io/a-move-ago/",
-      "https://play.example:8443/a-move-ago/",
-    );
+  it("uses the explicit trusted Web origins while retaining Capacitor", async () => {
+    const source = (await sourceText())
+      .replace("https://agent-axiom.github.io/a-move-ago/", "https://play.example:8443/a-move-ago/")
+      .replace(sourceOrigins, "https://play.example:8443,https://localhost");
 
     expect(renderWranglerConfig(source, productionInput)).toContain(
       '"ALLOWED_ORIGINS": "https://play.example:8443,https://localhost"',
     );
+  });
+
+  it("requires the auth return origin to appear in the explicit allowlist", async () => {
+    const source = (await sourceText()).replace(
+      "https://agent-axiom.github.io/a-move-ago/",
+      "https://other.example/a-move-ago/",
+    );
+    expect(() => renderWranglerConfig(source, productionInput)).toThrow(/not explicitly allowed/i);
+  });
+
+  it.each([
+    "",
+    "https://agent-axiom.github.io,,https://localhost",
+    "https://agent-axiom.github.io,https://localhost,",
+    "https://agent-axiom.github.io,https://localhost,https://localhost",
+    "https://agent-axiom.github.io,https://localhost,http://localhost:5173,http://localhost:5173",
+    "https://agent-axiom.github.io,https://localhost,*",
+    "https://agent-axiom.github.io,https://localhost,https://*.example",
+    "https://agent-axiom.github.io,https://localhost,http://other.example",
+    "https://agent-axiom.github.io,https://localhost,https://user:pass@other.example",
+    "https://agent-axiom.github.io,https://localhost,https://other.example/path",
+    "https://agent-axiom.github.io,https://localhost,https://other.example/",
+    "https://agent-axiom.github.io,https://localhost,https://other.example?query=yes",
+    "https://agent-axiom.github.io,https://localhost,https://other.example#fragment",
+    "https://agent-axiom.github.io,https://localhost,https://OTHER.example",
+    "https://agent-axiom.github.io,https://localhost,https://other.example:443",
+    "https://agent-axiom.github.io, https://localhost",
+    "https://agent-axiom.github.io",
+  ])("rejects malformed or incomplete explicit production origins: %s", async (origins) => {
+    const source = (await sourceText()).replace(
+      JSON.stringify(sourceOrigins),
+      JSON.stringify(origins),
+    );
+    expect(() => renderWranglerConfig(source, productionInput)).toThrow(/allowed origins/i);
+  });
+
+  it("rejects duplicate nonstring declarations before rendering config", async () => {
+    const source = (await sourceText()).replace(
+      `"ALLOWED_ORIGINS": "${sourceOrigins}"`,
+      `"ALLOWED_ORIGINS": "${sourceOrigins}", "ALLOWED_ORIGINS": false`,
+    );
+    expect(() => renderWranglerConfig(source, productionInput)).toThrow(/sentinel/i);
   });
 
   it.each([
