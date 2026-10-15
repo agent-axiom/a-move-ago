@@ -82,7 +82,11 @@ function harness() {
           state.row.envelope_digest = params[0] ?? "";
         }
       } else if (sql.startsWith("UPDATE") && sql.includes("private_key = NULL")) {
-        if (state.row?.envelope_digest === params[3] && state.row.completed_digest === null) {
+        if (
+          state.row &&
+          state.row.envelope_digest === params[3] &&
+          state.row.completed_digest === null
+        ) {
           state.row.private_key = null;
           state.row.completed_digest = params[0] ?? "";
           state.row.completed_summary = params[1] ?? "";
