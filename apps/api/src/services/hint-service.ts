@@ -75,9 +75,10 @@ export async function requestHint(
     throw new Error("Stored attempt correctness is invalid");
   }
   if (attempt.correct === 1) throw attemptAlreadyCorrect();
+  const puzzleRowId = attempt.puzzle_id;
 
   async function result(hint: HintResponse) {
-    return includeLocalizations ? await localizeHint(env.DB, attempt.puzzle_id, hint) : hint;
+    return includeLocalizations ? await localizeHint(env.DB, puzzleRowId, hint) : hint;
   }
 
   const replay = await findHintForActor(env.DB, actor, attemptId, requestedLevel, now);
