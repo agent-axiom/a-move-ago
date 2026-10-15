@@ -20,6 +20,7 @@ function harness({
   httpsError,
   requestError,
   putStatus = 204,
+  credential = token,
 } = {}) {
   const site = {
     cname,
@@ -31,7 +32,7 @@ function harness({
   const dnsRequests = [];
   const run = (phase = "connect") =>
     connectSiteDomain(
-      { token, phase },
+      { token: credential, phase },
       {
         resolveCname: async (name) => {
           dnsRequests.push(name);
@@ -49,7 +50,7 @@ function harness({
             return new Response("site", { status });
           }
           assert.equal(url, pagesUrl);
-          assert.equal(init.headers.authorization, `Bearer ${token}`);
+          assert.equal(init.headers.authorization, `Bearer ${credential}`);
           if (requestError) throw new Error(`${token} ${privateBody}`);
           if (apiError) return new Response(privateBody, { status: apiError });
           if (init.method === "PUT") {
@@ -262,4 +263,55 @@ test("only fixed supported phases and a token are accepted before DNS or HTTP", 
   );
   await assert.rejects(() => connectSiteDomain({}, dependencies), /MISSING_GH_TOKEN/);
   assert.equal(touched, false);
+});
+
+test("GitHub credentials remain opaque, including dotted and long token formats", async (t) => {
+  for (const [name, credential] of [
+    ["dotted", "opaque.header.payload.signature"],
+    ["long", `opaque.${"x".repeat(2048)}.signature`],
+    ["additional token characters", "opaque+token/with=padding"],
+  ]) {
+    await t.test(name, async () => {
+      const h = harness({ credential });
+      const summary = await h.run();
+      assert.equal(summary.status, "pending-certificate");
+      assert.deepEqual(puts(h), [{ cname: domain }]);
+      assert.equal(JSON.stringify(summary).includes(credential), false);
+    });
+  }
+});
+
+test("missing, blank, whitespace and control characters fail before DNS or HTTP", async (t) => {
+  for (const [name, credential] of [
+    ["missing", undefined],
+    ["empty", ""],
+    ["blank", " "],
+    ["embedded space", "opaque token"],
+    ["newline", "opaque\ntoken"],
+    ["carriage return", "opaque\rtoken"],
+    ["tab", "opaque\ttoken"],
+    ["NUL", "opaque\u0000token"],
+    ["C1 control", "opaque\u0085token"],
+    ["Unicode whitespace", "opaque\u00a0token"],
+  ]) {
+    await t.test(name, async () => {
+      let touched = false;
+      const dependencies = {
+        resolveCname: async () => {
+          touched = true;
+        },
+        fetch: async () => {
+          touched = true;
+        },
+      };
+      await assert.rejects(
+        () => connectSiteDomain({ token: credential }, dependencies),
+        (error) => {
+          assert.equal(error.message, "MISSING_GH_TOKEN");
+          return true;
+        },
+      );
+      assert.equal(touched, false);
+    });
+  }
 });

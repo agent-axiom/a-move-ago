@@ -33,7 +33,10 @@ export async function connectSiteDomain(
 ) {
   try {
     ensure(["connect", "check-https"].includes(phase), "INVALID_DOMAIN_ARGUMENTS");
-    ensure(typeof token === "string" && /^[A-Za-z0-9_-]{10,512}$/.test(token), "MISSING_GH_TOKEN");
+    ensure(
+      typeof token === "string" && token.length > 0 && !/[\s\p{Cc}]/u.test(token),
+      "MISSING_GH_TOKEN",
+    );
     let names;
     try {
       names = await lookup(domain);
