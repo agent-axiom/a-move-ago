@@ -10,6 +10,7 @@ on:
       - "ops/content-envelope.json"
       - "tools/src/private-content.ts"
       - "tools/src/localization-import.ts"
+      - "tools/scripts/check-localizations-production.mjs"
   pull_request:
     paths:
       - ".github/workflows/content.yml"
@@ -19,6 +20,8 @@ on:
       - "tools/src/localization-import.ts"
       - "tools/src/private-content.test.ts"
       - "tools/src/localization-import.test.ts"
+      - "tools/scripts/check-localizations-production.mjs"
+      - "tools/test/check-localizations-production.test.mjs"
 
 permissions:
   contents: read

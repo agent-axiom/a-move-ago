@@ -274,3 +274,128 @@ test("network failures produce fixed diagnostics without returning response bodi
       await assert.rejects(harness(undefined, override).run, { message: code });
     });
 });
+
+function addLegacyCase(localized, english, localizations) {
+  const item = {
+    id: "legacy-identifier-must-not-be-returned",
+    date: "2026-08-03",
+    slug: "legacy-slug",
+    title: "Legacy title must not be returned",
+    puzzleCount: 1,
+    solvedPuzzles: 0,
+    completed: false,
+    ...(localizations === undefined ? {} : { localizations }),
+  };
+  localized["/v1/archive"].cases.push(item);
+  english["/v1/archive"].cases.push(strip(structuredClone(item)));
+  localized["/v1/archive"].startsOn = item.date;
+  english["/v1/archive"].startsOn = item.date;
+}
+
+test("legacy catalog cases outside the publication range need no translations and report only safe metadata", async () => {
+  const check = harness((localized, english) => addLegacyCase(localized, english));
+  const result = await check.run();
+  assert.deepEqual(result.outsideRangeCases, [{ date: "2026-08-03", locales: [] }]);
+  assert.equal(result.cases, 2);
+  assert.equal(result.englishCompatible, true);
+  assert.equal(JSON.stringify(result).includes("legacy"), false);
+  assert.equal(
+    check.requests.some((request) => request.path.includes("2026-08-03")),
+    false,
+  );
+});
+
+test("partial public translations outside the publication range remain strict and are reported accurately", async () => {
+  const check = harness((localized, english) =>
+    addLegacyCase(localized, english, { ru: titles.ru }),
+  );
+  const result = await check.run();
+  assert.deepEqual(result.outsideRangeCases, [{ date: "2026-08-03", locales: ["ru"] }]);
+});
+
+test("requested dates still require both locales and legacy catalog fields remain private and compatible", async (t) => {
+  for (const [name, change, code] of [
+    [
+      "missing requested map",
+      (localized) => {
+        delete localized["/v1/archive"].cases[0].localizations;
+      },
+      "LOCALES_TRANSLATIONS_FAILED",
+    ],
+    [
+      "legacy private map",
+      (localized, english) => {
+        addLegacyCase(localized, english, { ru: { ...titles.ru, hints: [secret] } });
+      },
+      "LOCALES_PRIVATE_FIELDS",
+    ],
+    [
+      "legacy unexpected title field",
+      (localized, english) => {
+        addLegacyCase(localized, english, { ru: { ...titles.ru, internal: secret } });
+      },
+      "LOCALES_TRANSLATIONS_FAILED",
+    ],
+    [
+      "legacy unexpected locale",
+      (localized, english) => {
+        addLegacyCase(localized, english, { de: { title: "Example" } });
+      },
+      "LOCALES_TRANSLATIONS_FAILED",
+    ],
+    [
+      "legacy unexpected catalog field",
+      (localized, english) => {
+        addLegacyCase(localized, english);
+        localized["/v1/archive"].cases.at(-1).internal = secret;
+      },
+      "LOCALES_CATALOG_FAILED",
+    ],
+    [
+      "legacy English drift",
+      (localized, english) => {
+        addLegacyCase(localized, english);
+        english["/v1/archive"].cases.at(-1).title = "Changed title";
+      },
+      "LOCALES_ENGLISH_COMPATIBILITY_FAILED",
+    ],
+  ])
+    await t.test(name, async () => {
+      await assert.rejects(harness(change).run, (error) => {
+        assert.equal(error.message, code);
+        assert.equal(error.message.includes(secret), false);
+        return true;
+      });
+    });
+});
+
+test("outside-range diagnostics are capped and contain only dates and recognized locales", async () => {
+  const check = harness((localized, english) => {
+    for (let index = 0; index < 65; index += 1) {
+      const date = new Date(Date.parse("2026-08-03") - index * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      const item = {
+        id: `legacy-${index}`,
+        date,
+        slug: `legacy-${index}`,
+        title: secret,
+        puzzleCount: 1,
+        solvedPuzzles: 0,
+        completed: false,
+      };
+      localized["/v1/archive"].cases.push(item);
+      english["/v1/archive"].cases.push(structuredClone(item));
+    }
+    localized["/v1/archive"].startsOn = localized["/v1/archive"].cases.at(-1).date;
+    english["/v1/archive"].startsOn = english["/v1/archive"].cases.at(-1).date;
+  });
+  const result = await check.run();
+  assert.equal(result.outsideRangeCases.length, 60);
+  assert.equal(JSON.stringify(result).includes(secret), false);
+  assert.ok(
+    result.outsideRangeCases.every(
+      (item) => Object.keys(item).join(",") === "date,locales" && item.locales.length === 0,
+    ),
+  );
+});

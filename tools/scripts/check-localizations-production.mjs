@@ -54,9 +54,18 @@ function isoDate(value) {
       : Number.NaN;
   return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
 }
-function translated(value, fields) {
-  ensure(keys(value, locales), "LOCALES_TRANSLATIONS_FAILED");
-  for (const locale of locales) {
+function translated(value, fields, requireAll = true) {
+  const present =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? Object.keys(value)
+      : null;
+  ensure(
+    present &&
+      present.every((locale) => locales.includes(locale)) &&
+      (!requireAll || locales.every((locale) => present.includes(locale))),
+    "LOCALES_TRANSLATIONS_FAILED",
+  );
+  for (const locale of present) {
     ensure(
       keys(value[locale], fields) &&
         fields.every(
@@ -175,9 +184,12 @@ export async function checkLocalizationsCoverage(
   );
   let previous = "9999-12-31";
   const byDate = new Map();
+  const outsideRangeCases = [];
   for (const item of catalog.cases) {
+    const hasLocalizations =
+      item !== null && typeof item === "object" && Object.hasOwn(item, "localizations");
     ensure(
-      keys(item, [...caseFields, "localizations"]) &&
+      keys(item, [...caseFields, ...(hasLocalizations ? ["localizations"] : [])]) &&
         isoDate(item.date) &&
         item.date < previous &&
         item.date <= catalog.today &&
@@ -190,7 +202,16 @@ export async function checkLocalizationsCoverage(
         item.completed === false,
       "LOCALES_CATALOG_FAILED",
     );
-    translated(item.localizations, ["title"]);
+    const inRange = item.date >= from && item.date <= through;
+    if (inRange || hasLocalizations) {
+      translated(item.localizations, ["title"], inRange);
+    }
+    if (!inRange) {
+      const available = locales.filter((locale) => Object.hasOwn(item.localizations ?? {}, locale));
+      if (available.length !== locales.length && outsideRangeCases.length < 60) {
+        outsideRangeCases.push({ date: item.date, locales: available });
+      }
+    }
     previous = item.date;
     byDate.set(item.date, item);
   }
@@ -262,6 +283,7 @@ export async function checkLocalizationsCoverage(
     puzzles,
     locales,
     englishCompatible: true,
+    ...(outsideRangeCases.length ? { outsideRangeCases } : {}),
   };
 }
 
