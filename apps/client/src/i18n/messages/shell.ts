@@ -2,6 +2,15 @@
 type Translation = string | { other: string; one?: string; few?: string; many?: string };
 
 const en = {
+  "shell.ratingTitle": "Personal rating",
+  "shell.ratingStart": "New solves earn points. Earlier progress stays in your history.",
+  "shell.ratingRules": "Points per puzzle",
+  "shell.ratingTry1": "1st try",
+  "shell.ratingTry2": "2nd try",
+  "shell.ratingTry3": "3rd try",
+  "shell.ratingTry4": "4th try or later",
+  "shell.ratingHints": "Each revealed clue or hint halves the points, rounded down to a minimum of 1.",
+  "shell.ratingUnit": {"one": "point", "other": "points"},
   "shell.language": "Language",
   "shell.startupEyebrow": "A moment before the next move",
   "shell.startupUnavailable": "Startup unavailable",
@@ -132,6 +141,15 @@ const en = {
 } as const;
 
 const ru = {
+  "shell.ratingTitle": "Личный рейтинг",
+  "shell.ratingStart": "Новые решения приносят баллы. Прежний прогресс остаётся в истории.",
+  "shell.ratingRules": "Баллы за задачу",
+  "shell.ratingTry1": "1-я попытка",
+  "shell.ratingTry2": "2-я попытка",
+  "shell.ratingTry3": "3-я попытка",
+  "shell.ratingTry4": "4-я и далее",
+  "shell.ratingHints": "Каждая открытая улика или подсказка уменьшает баллы вдвое, с округлением вниз, но не ниже 1.",
+  "shell.ratingUnit": {"one": "балл", "few": "балла", "many": "баллов", "other": "балла"},
   "shell.language": "Язык",
   "shell.startupEyebrow": "Мгновение до следующего хода",
   "shell.startupUnavailable": "Не удалось запустить приложение",
@@ -284,6 +302,15 @@ const ru = {
 } satisfies Record<keyof typeof en, Translation>;
 
 const zh = {
+  "shell.ratingTitle": "个人评分",
+  "shell.ratingStart": "新解开的谜题可获得积分。此前的进度仍保留在记录中。",
+  "shell.ratingRules": "每题得分",
+  "shell.ratingTry1": "第 1 次尝试",
+  "shell.ratingTry2": "第 2 次尝试",
+  "shell.ratingTry3": "第 3 次尝试",
+  "shell.ratingTry4": "第 4 次及以后",
+  "shell.ratingHints": "每揭示一条线索或提示，得分减半，向下取整，至少得 1 分。",
+  "shell.ratingUnit": {"other": "分"},
   "shell.language": "语言",
   "shell.startupEyebrow": "下一步之前的片刻",
   "shell.startupUnavailable": "暂时无法启动",

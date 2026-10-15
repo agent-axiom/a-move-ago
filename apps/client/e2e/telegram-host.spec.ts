@@ -31,7 +31,7 @@ test("Telegram ready/layout/back work while identity waits for explicit consent"
     });
   });
   await page.goto("./?case=2026-08-03#tgWebAppData=kept");
-  await expect(page.getByRole("heading", { name: "The missing pawn" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case" })).toBeVisible();
   expect(observed.guestChannels).toEqual(["telegram"]);
   expect(observed.miniAppProofs).toEqual([]);
   expect(await page.evaluate(() => (window as unknown as { __tgReady: number }).__tgReady)).toBe(1);
@@ -54,6 +54,6 @@ test("Telegram ready/layout/back work while identity waits for explicit consent"
   await expect.poll(() => observed.statsRequests).toBe(2);
   expect(observed.miniAppProofs[0]).toBe("query_id=raw%2Bproof&hash=unchanged");
   await page.evaluate(() => (window as unknown as { __tgBack: null | (() => void) }).__tgBack?.());
-  await expect(page.getByRole("heading", { name: "The missing pawn" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case" })).toBeVisible();
   expect(new URL(page.url()).hash).toBe("#tgWebAppData=kept");
 });

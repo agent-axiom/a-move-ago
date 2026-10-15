@@ -18,7 +18,7 @@ test("deletes a restored Telegram profile, preserves its token, and continues as
   const observed = await installApiMock(page, { initialIdentity: "telegram" });
 
   await page.goto("./?case=2026-08-03");
-  await expect(page.getByRole("heading", { name: "The missing pawn" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case" })).toBeVisible();
   expect(observed.guestChannels).toEqual([]);
   expect(observed.dailyIdentities).toEqual(["telegram"]);
 
@@ -55,7 +55,7 @@ test("deletes a restored Telegram profile, preserves its token, and continues as
   expect(await page.evaluate((key) => localStorage.getItem(key), storageKey)).toBe(telegramToken);
 
   await page.getByRole("button", { name: "Back to case" }).click();
-  await expect(page.getByRole("heading", { name: "A pawn vanished" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case" })).toBeVisible();
   await expect.poll(() => observed.dailyIdentities.slice()).toEqual(["telegram", "guest"]);
 
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();

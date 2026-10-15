@@ -8,7 +8,7 @@ async function openSyntheticCase(page: Page) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installApiMock(page);
   await page.goto("./?case=2026-08-03");
-  await expect(page.getByRole("heading", { name: "The missing pawn", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
 }
 
 async function capture(page: Page, info: TestInfo, name: string) {
@@ -37,7 +37,7 @@ async function checkLayout(page: Page) {
   expect(widths.document, "Page must fit without horizontal scrolling").toBeLessThanOrEqual(
     widths.viewport + 1,
   );
-  const smallTargets = await page.locator("button, select, a[href]").evaluateAll((elements) =>
+  const smallTargets = await page.locator("button, select, a[href], summary").evaluateAll((elements) =>
     elements.flatMap((element) => {
       if (element.closest(".chessboard")) return [];
       const rect = element.getBoundingClientRect();
@@ -75,8 +75,14 @@ test("desktop daily, configured move and solution reveal", async ({ page }, info
   await capture(page, info, "desktop-configured");
   await checkLayout(page);
 
+  await page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true }).click();
+  await expect(page.locator(".unlocked-clue")).toHaveText("A pawn vanished");
+  await expect(page.locator(".score-potential")).toHaveText("Available: 50 points");
+  await capture(page, info, "desktop-clue");
+  await checkLayout(page);
   await page.getByRole("button", { name: "Check move", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Solved", exact: true })).toBeVisible();
+  await expect(page.locator(".solution-reward")).toHaveText("+50 points earned");
   await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
   await capture(page, info, "desktop-reveal");
   await checkLayout(page);
@@ -96,6 +102,11 @@ test("mobile and tablet daily stay usable at 390, 320 and 768 pixels", async ({ 
     expect(board.width).toBeGreaterThanOrEqual(Math.min(width - 72, 550));
     expect(Math.abs(board.height - board.width)).toBeLessThanOrEqual(2);
   }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true }).click();
+  await expect(page.locator(".unlocked-clue")).toHaveText("A pawn vanished");
+  await capture(page, info, "mobile-clue");
+  await checkLayout(page);
 });
 
 test("desktop guest progress", async ({ page }, info) => {
@@ -147,7 +158,7 @@ for (const locale of ["ru", "zh"] as const) {
     await page.getByLabel("Language", { exact: true }).selectOption(locale);
     await expect(
       page.getByRole("heading", {
-        name: locale === "ru" ? "Тихое начало" : "安静的开始",
+        name: locale === "ru" ? "Задача дня" : "每日棋题",
         exact: true,
       }),
     ).toBeVisible();
@@ -160,6 +171,18 @@ for (const locale of ["ru", "zh"] as const) {
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await capture(page, info, `${locale}-mobile-daily`);
+    await page.getByRole("button", {
+      name: locale === "ru" ? "Открыть улику · 100 → 50 очков" : "揭示线索 · 100 → 50 分", exact: true,
+    }).click();
+    await expect(page.locator(".unlocked-clue")).toHaveText(locale === "ru" ? "Исчезнувшая пешка" : "一枚兵消失了");
+    await capture(page, info, `${locale}-mobile-clue`);
+    await checkLayout(page);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await checkLayout(page);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await capture(page, info, `${locale}-desktop-clue`);
+    await checkLayout(page);
+    await page.setViewportSize({ width: 390, height: 844 });
 
     await page.getByRole("button", { name: labels.archiveButton, exact: true }).click();
     await expect(page.getByRole("heading", { name: labels.archive, exact: true })).toBeVisible();

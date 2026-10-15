@@ -17,7 +17,7 @@ test("guest survives a lost success response and retries the exact UUID", async 
     }
   });
   await page.goto("./?case=2026-08-03");
-  await expect(page.getByRole("heading", { name: "The missing pawn" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily case" })).toBeVisible();
   await expect.poll(() => dailyPayloads.length).toBe(1);
   const dailyPayload = JSON.stringify(dailyPayloads[0]);
   expect(dailyPayload).not.toContain("acceptedSolutions");
@@ -31,6 +31,7 @@ test("guest survives a lost success response and retries the exact UUID", async 
   expect(observed.attemptBodies[1]?.attemptUuid).toBe(observed.attemptBodies[0]?.attemptUuid);
   expect(observed.attemptBodies[1]).toEqual(observed.attemptBodies[0]);
   await expect(page.getByRole("heading", { name: "Solved" })).toBeVisible();
+  await expect(page.locator(".solution-reward")).toHaveText("+100 points earned");
   expect(observed.statsRequests).toBe(0);
   await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
   expect(observed.statsRequests).toBe(0);
@@ -47,7 +48,7 @@ test("incorrect attempt retries the same hint level, then solves", async ({ page
   await page.getByRole("gridcell", { name: "c4, empty" }).click();
   await page.getByRole("button", { name: "Check move" }).click();
   await expect(page.getByText("That does not explain the missing pawn.")).toBeVisible();
-  await page.getByRole("button", { name: "Get hint" }).click();
+  await page.getByRole("button", { name: /^Get hint/ }).click();
   await expect(page.getByRole("button", { name: "Retry hint" })).toBeVisible();
   await page.getByRole("button", { name: "Retry hint" }).click();
   await expect
