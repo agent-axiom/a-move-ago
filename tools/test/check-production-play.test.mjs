@@ -255,7 +255,11 @@ test("upstream errors, daily leakage and replay regressions have safe failures",
       assert.equal(output.length, 1);
       assert.deepEqual(JSON.parse(output[0]), { ok: false, code });
       assertSafe(output[0]);
-      if (name === "private daily") assert.equal(check.requests.some((r) => r.isD1), false);
+      if (name === "private daily")
+        assert.equal(
+          check.requests.some((r) => r.isD1),
+          false,
+        );
     });
   }
 });
