@@ -36,4 +36,4 @@ jobs:
         run: >-
           npm run deployment:check --
           --api-origin "$API_ORIGIN"
-          --web-origin https://agent-axiom.github.io
+          --web-origin https://chess.kosarevsky.dev

@@ -5,6 +5,8 @@ unknown move and reconstructs the immediately preceding position. This
 repository contains the TypeScript MVP, public sample puzzles, and delivery
 plans; it does not contain the production puzzle corpus.
 
+Production web app: [chess.kosarevsky.dev](https://chess.kosarevsky.dev/).
+
 ## Product loop
 
 1. Start with an opaque guest session.
@@ -244,7 +246,7 @@ After deploying, check the real guest flow, browser CORS configuration and
 today's published content:
 
 ```sh
-npm run deployment:check -- --api-origin https://a-move-ago-api.if-ab6.workers.dev --web-origin https://agent-axiom.github.io
+npm run deployment:check -- --api-origin https://a-move-ago-api.if-ab6.workers.dev --web-origin https://chess.kosarevsky.dev
 ```
 
 This dependency-free Node 24 check creates one empty guest session, reads its
@@ -257,10 +259,11 @@ The API workflow deploys from `main` through an explicit manual run or a reviewe
 change to `ops/api-release.json`. It uses the protected `production` environment
 and runs this check after deployment. The **Deployment health**
 workflow runs it daily at 00:31 UTC using the repository `API_ORIGIN` variable;
-it can also be run manually. If the web deployment changes origin, update its
-fixed origin in both workflows and `WEB_AUTH_RETURN_URL` in the config template.
-Production config derives its browser origin from that return URL, retains
-the Capacitor origin, and removes the Vite development origin.
+it can also be run manually. When changing the web origin, update the explicit
+`ALLOWED_ORIGINS` list, the fixed origin in both workflows, and
+`WEB_AUTH_RETURN_URL` in the config template. Production config validates the
+explicit HTTPS allowlist, requires the auth return origin to appear in it,
+retains the Capacitor origin, and removes the Vite development origin.
 
 The protected API workflow separately checks one synthetic guest solve, a replay
 of the same attempt UUID, reloaded progress, and unchanged statistics. It reads
