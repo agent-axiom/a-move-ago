@@ -122,7 +122,8 @@ export async function checkProductionAccess(
     d1 = {
       ok: true,
       coverage: dates.map(
-        (date) => rows.get(date) ?? { date, status: "missing", puzzleCount: 0, publishedPuzzleCount: 0 },
+        (date) =>
+          rows.get(date) ?? { date, status: "missing", puzzleCount: 0, publishedPuzzleCount: 0 },
       ),
     };
   } catch (error) {
@@ -131,10 +132,14 @@ export async function checkProductionAccess(
 
   let telegram;
   try {
-    const data = await call("TELEGRAM", `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`, {
-      method: "GET",
-      headers: { accept: "application/json" },
-    });
+    const data = await call(
+      "TELEGRAM",
+      `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`,
+      {
+        method: "GET",
+        headers: { accept: "application/json" },
+      },
+    );
     ensure(data?.ok === true && data.result?.is_bot === true, "TELEGRAM_ACCESS_FAILED");
     telegram = { ok: true };
   } catch (error) {

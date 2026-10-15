@@ -43,7 +43,11 @@ function harness({ d1Rows = [row], override } = {}) {
 function assertSafe(value) {
   const text = typeof value === "string" ? value : JSON.stringify(value);
   for (const secret of [...Object.values(env), sensitive, "example_bot", "api.telegram.org/bot"]) {
-    assert.equal(text.includes(secret), false, "diagnostics must not contain credentials or payloads");
+    assert.equal(
+      text.includes(secret),
+      false,
+      "diagnostics must not contain credentials or payloads",
+    );
   }
 }
 
@@ -74,7 +78,10 @@ test("both services confirm access and return only dates, statuses and aggregate
   assert.deepEqual(params, ["2026-10-31", "2026-11-14"]);
   assert.match(sql, /^SELECT /);
   assert.doesNotMatch(sql, /\b(INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER|PRAGMA|ATTACH)\b|;/i);
-  assert.doesNotMatch(sql, /\b(players|sessions|attempts|puzzle_solutions|solution_json|public_json)\b/i);
+  assert.doesNotMatch(
+    sql,
+    /\b(players|sessions|attempts|puzzle_solutions|solution_json|public_json)\b/i,
+  );
   assert.match(sql, /LIMIT 15$/);
   assert.equal(telegram.method, "GET");
   assert.equal(telegram.url, `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`);
@@ -116,11 +123,23 @@ test("service failures are fixed diagnostics and do not prevent the other access
   for (const service of ["d1", "telegram"]) {
     const prefix = service.toUpperCase();
     for (const [name, response, code] of [
-      ["transport", () => Promise.reject(new Error(`${sensitive} ${env.TELEGRAM_BOT_TOKEN}`)), `${prefix}_TRANSPORT_FAILED`],
+      [
+        "transport",
+        () => Promise.reject(new Error(`${sensitive} ${env.TELEGRAM_BOT_TOKEN}`)),
+        `${prefix}_TRANSPORT_FAILED`,
+      ],
       ["HTTP", () => new Response(sensitive, { status: 403 }), `${prefix}_HTTP_FAILED`],
       ["invalid JSON", () => new Response(sensitive), `${prefix}_INVALID_JSON`],
-      ["interrupted body", () => ({ status: 200, json: () => Promise.reject(new Error(sensitive)) }), `${prefix}_INVALID_JSON`],
-      ["API rejection", () => new Response(JSON.stringify({ success: false, ok: false, errors: [sensitive] })), service === "d1" ? "D1_QUERY_FAILED" : "TELEGRAM_ACCESS_FAILED"],
+      [
+        "interrupted body",
+        () => ({ status: 200, json: () => Promise.reject(new Error(sensitive)) }),
+        `${prefix}_INVALID_JSON`,
+      ],
+      [
+        "API rejection",
+        () => new Response(JSON.stringify({ success: false, ok: false, errors: [sensitive] })),
+        service === "d1" ? "D1_QUERY_FAILED" : "TELEGRAM_ACCESS_FAILED",
+      ],
     ]) {
       await t.test(`${service} ${name}`, async () => {
         const check = harness({
@@ -164,10 +183,14 @@ test("CLI failures print only safe diagnostic codes", async () => {
   for (const args of [[], [sensitive]]) {
     const logs = [];
     const errors = [];
-    const status = await runCli(args, { CLOUDFLARE_API_TOKEN: env.CLOUDFLARE_API_TOKEN }, {
-      log: (line) => logs.push(line),
-      errorLog: (line) => errors.push(line),
-    });
+    const status = await runCli(
+      args,
+      { CLOUDFLARE_API_TOKEN: env.CLOUDFLARE_API_TOKEN },
+      {
+        log: (line) => logs.push(line),
+        errorLog: (line) => errors.push(line),
+      },
+    );
     assert.equal(status, 1);
     assert.deepEqual(logs, []);
     assert.equal(errors.length, 1);
