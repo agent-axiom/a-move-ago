@@ -81,7 +81,7 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("server-authoritative clues and personal points", () => {
-  it("masks every default title and semantic ID, then records a clue once before disclosure", async () => {
+  it("masks default titles, prompts and semantic IDs, then records a clue once before disclosure", async () => {
     const content = await fixture();
     await testEnv.DB.prepare("UPDATE puzzles SET public_json = ? WHERE id = ?")
       .bind(
@@ -108,15 +108,21 @@ describe("server-authoritative clues and personal points", () => {
     expect(daily.puzzles[0]).toMatchObject({
       id: content.alias,
       title: "Puzzle 1",
-      prompt: content.puzzle.public.prompt,
+      prompt: "Reconstruct the last move.",
     });
     expect(JSON.stringify(daily)).not.toContain(content.puzzle.contentKey);
     expect(JSON.stringify(daily)).not.toContain("Embedded spoiler");
+    expect(JSON.stringify(daily)).not.toContain("Embedded prompt");
+    expect(JSON.stringify(daily)).not.toContain(content.puzzle.public.prompt);
     expect(daily.puzzles[0]?.localizations).toBeUndefined();
     expect(daily.progressStates).toBeUndefined();
+    const masked = DailyCaseResponseSchema.parse((await call("/v1/daily", guest.token)).body);
+    expect(masked.puzzles[0]?.prompt).toBe("Reconstruct the last move.");
+    expect(masked.progressStates?.[content.alias]?.clueUnlocked).toBe(false);
     const path = `/v1/cases/${content.caseId}/puzzles/${content.alias}/clue`;
     const clue = ClueResponseSchema.parse((await call(path, guest.token, {})).body);
     expect(clue.title).toBe(content.puzzle.public.title);
+    expect(clue.prompt).toBe(content.puzzle.public.prompt);
     expect(clue.progress).toMatchObject({
       clueUnlocked: true,
       assistanceCount: 1,
@@ -130,10 +136,16 @@ describe("server-authoritative clues and personal points", () => {
     const restored = DailyCaseResponseSchema.parse((await call("/v1/daily", guest.token)).body);
     expect(restored.title).toBe("The missing pawn");
     expect(restored.puzzles[0]?.title).toBe(content.puzzle.public.title);
+    expect(restored.puzzles[0]?.prompt).toBe(content.puzzle.public.prompt);
+    expect(restored.progressStates?.[content.alias]?.clueUnlocked).toBe(true);
     expect(
       DailyCaseResponseSchema.parse((await call("/v1/daily", stranger.token)).body).puzzles[0]
         ?.title,
     ).toBe("Puzzle 1");
+    expect(
+      DailyCaseResponseSchema.parse((await call("/v1/daily", stranger.token)).body).puzzles[0]
+        ?.prompt,
+    ).toBe("Reconstruct the last move.");
   });
 
   it("awards a first solve once and treats alias/canonical UUID replays as one puzzle", async () => {
@@ -175,6 +187,7 @@ describe("server-authoritative clues and personal points", () => {
     const daily = DailyCaseResponseSchema.parse((await call("/v1/daily", guest.token)).body);
     expect(daily.solvedPuzzleIds).toEqual([content.alias]);
     expect(daily.progressStates?.[content.alias]?.earnedPoints).toBe(100);
+    expect(daily.puzzles[0]?.prompt).toBe(content.puzzle.public.prompt);
   });
 
   it("halves the second-attempt reward for a title clue and each distinct hint", async () => {

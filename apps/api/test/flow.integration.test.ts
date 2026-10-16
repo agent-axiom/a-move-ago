@@ -147,6 +147,7 @@ describe("complete guest gameplay flow", () => {
           ...openingPuzzleFixture.public,
           id: publicPuzzleId("case-2026-08-03", 1, 1),
           title: "Puzzle 1",
+          prompt: "Reconstruct the last move.",
         },
       ],
       solvedPuzzleIds: [],
@@ -157,6 +158,7 @@ describe("complete guest gameplay flow", () => {
     expect(initialDaily).not.toContain(privateSolutionMarker);
     expect(initialDaily).not.toContain(openingPuzzleFixture.contentKey);
     expect(initialDaily).not.toContain(openingPuzzleFixture.public.title);
+    expect(initialDaily).not.toContain(openingPuzzleFixture.public.prompt);
 
     const incorrect = await jsonRequest("/v1/attempts", requestEnv, {
       method: "POST",

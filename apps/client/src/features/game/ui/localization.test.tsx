@@ -126,6 +126,10 @@ it("switches an earned hint and feedback without reposting or losing the configu
     </RuntimeProvider>,
   );
 
+  expect(screen.getByText("Reconstruct the last move.")).toBeInTheDocument();
+  expect(screen.queryByText(puzzle.title)).not.toBeInTheDocument();
+  expect(screen.queryByText(puzzle.prompt)).not.toBeInTheDocument();
+
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
   await user.click(screen.getByRole("gridcell", { name: "e4, empty" }));
   await user.selectOptions(screen.getByLabelText("Captured piece"), "p");
@@ -135,7 +139,9 @@ it("switches an earned hint and feedback without reposting or losing the configu
   await screen.findByText("Look at the pawn's file.");
 
   await user.click(screen.getByRole("button", { name: "Русский" }));
-  expect(screen.getByText("Восстановите последнее взятие.")).toBeInTheDocument();
+  expect(screen.getByText("Восстановите последний ход.")).toBeInTheDocument();
+  expect(screen.queryByText(puzzle.localizations.ru.title)).not.toBeInTheDocument();
+  expect(screen.queryByText(puzzle.localizations.ru.prompt)).not.toBeInTheDocument();
   expect(screen.getByText("Попробуйте другое исходное поле.")).toBeInTheDocument();
   expect(screen.getByText("Обратите внимание на вертикаль пешки.")).toBeInTheDocument();
   expect(screen.getByLabelText("Взятая фигура")).toHaveValue("p");
@@ -147,7 +153,9 @@ it("switches an earned hint and feedback without reposting or losing the configu
   );
 
   await user.click(screen.getByRole("button", { name: "中文" }));
-  expect(screen.getByText("还原最后一次吃子。")).toBeInTheDocument();
+  expect(screen.getByText("还原上一步棋。")).toBeInTheDocument();
+  expect(screen.queryByText(puzzle.localizations.zh.title)).not.toBeInTheDocument();
+  expect(screen.queryByText(puzzle.localizations.zh.prompt)).not.toBeInTheDocument();
   expect(screen.getByText("请尝试其他起始格。")).toBeInTheDocument();
   expect(screen.getByText("留意兵所在的直线。")).toBeInTheDocument();
   expect(screen.getByLabelText("被吃的棋子")).toHaveValue("p");

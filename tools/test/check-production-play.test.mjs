@@ -37,7 +37,7 @@ function daily(solved = false, count = 2) {
       id: `p-synthetic-case-${i + 1}-v1`,
       version: 1,
       title: "Synthetic",
-      prompt: "Synthetic",
+      prompt: solved && i === 0 ? "Synthetic unlocked conditions" : "Reconstruct the last move.",
       postFen: "synthetic-fen",
       retractingColor: "w",
       maxHints: 2,
@@ -320,8 +320,13 @@ function localizedHarness({ override } = {}) {
         payload = daily(solved);
         if (localized) {
           payload.localizations = localizationMap(["title"]);
-          for (const puzzle of payload.puzzles)
+          for (const puzzle of payload.puzzles) {
             puzzle.localizations = localizationMap(["title", "prompt", "provenance", "license"]);
+            if (!solved || puzzle.id !== "p-synthetic-case-1-v1") {
+              puzzle.localizations.ru.prompt = "Восстановите последний ход.";
+              puzzle.localizations.zh.prompt = "还原上一步棋。";
+            }
+          }
         }
       } else if (path === "/v1/me/stats") {
         payload = { ...expectedStats(solved ? 1 : 0), attempts, hintsUsed: hints };
@@ -554,12 +559,13 @@ test("localized wrapper masks private configuration parse failures before any re
   assertSafe(output);
 });
 
-test("solve-unlocked public titles may change while neutral puzzle aliases remain stable", async () => {
+test("solving unlocks title and conditions while neutral puzzle aliases remain stable", async () => {
   const check = harness({
     override: (request, payload, status, headers) => {
       if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
         payload.title = "Unlocked case title";
         payload.puzzles[0].title = "Unlocked composition title";
+        payload.puzzles[0].prompt = "Unlocked composition conditions";
       }
       return new Response(JSON.stringify(payload), { status, headers });
     },
@@ -567,10 +573,11 @@ test("solve-unlocked public titles may change while neutral puzzle aliases remai
   assert.equal((await check.run()).ok, true);
 });
 
-test("title unlocking cannot change the puzzle identity or free mandatory prompt", async (t) => {
+test("unlocking cannot change identity, board or metadata", async (t) => {
   for (const [field, value] of [
     ["id", "thematic-source-id"],
-    ["prompt", secret],
+    ["postFen", secret],
+    ["provenance", secret],
   ]) {
     await t.test(field, async () => {
       const check = harness({
@@ -586,15 +593,28 @@ test("title unlocking cannot change the puzzle identity or free mandatory prompt
   }
 });
 
-test("localized title unlocking preserves all other public translations", async () => {
+test("localized title and conditions unlock together", async () => {
   const check = localizedHarness({
     override: (request, payload, status, headers) => {
       if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0) {
         payload.puzzles[0].localizations.ru.title = "Раскрытая композиция";
         payload.puzzles[0].localizations.zh.title = "已揭晓的棋题";
+        payload.puzzles[0].localizations.ru.prompt = "Раскрытые условия";
+        payload.puzzles[0].localizations.zh.prompt = "已揭示的条件";
       }
       return new Response(JSON.stringify(payload), { status, headers });
     },
   });
   assert.equal((await check.run()).ok, true);
+});
+
+test("solving one puzzle cannot unlock another puzzle's conditions", async () => {
+  const check = harness({
+    override: (request, payload, status, headers) => {
+      if (request.path === "/v1/daily" && payload.solvedPuzzleIds.length > 0)
+        payload.puzzles[1].prompt = "Unrelated private conditions";
+      return new Response(JSON.stringify(payload), { status, headers });
+    },
+  });
+  await assert.rejects(check.run(), { message: "RELOADED_DAILY_FAILED" });
 });

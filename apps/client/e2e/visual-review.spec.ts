@@ -79,6 +79,9 @@ test("desktop daily, configured move and solution reveal", async ({ page }, info
 
   await page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true }).click();
   await expect(page.locator(".unlocked-clue")).toHaveText("A pawn vanished");
+  await expect(page.locator(".clue-prompt")).toHaveText(
+    "The last move was a white pawn capture. Retract it.",
+  );
   await expect(page.locator(".score-potential")).toHaveText("Available: 50 points");
   await capture(page, info, "desktop-clue");
   await checkLayout(page);
@@ -107,6 +110,9 @@ test("mobile and tablet daily stay usable at 390, 320 and 768 pixels", async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true }).click();
   await expect(page.locator(".unlocked-clue")).toHaveText("A pawn vanished");
+  await expect(page.locator(".clue-prompt")).toHaveText(
+    "The last move was a white pawn capture. Retract it.",
+  );
   await capture(page, info, "mobile-clue");
   await checkLayout(page);
 });
@@ -181,6 +187,11 @@ for (const locale of ["ru", "zh"] as const) {
       .click();
     await expect(page.locator(".unlocked-clue")).toHaveText(
       locale === "ru" ? "Исчезнувшая пешка" : "一枚兵消失了",
+    );
+    await expect(page.locator(".clue-prompt")).toHaveText(
+      locale === "ru"
+        ? "Последним ходом белых было взятие пешкой. Отмените его."
+        : "白方上一步用兵吃子。请撤回这一步。",
     );
     await capture(page, info, `${locale}-mobile-clue`);
     await checkLayout(page);

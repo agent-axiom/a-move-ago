@@ -44,9 +44,13 @@ test("a fresh unassisted solve awards 100 once across UUID replay, another UUID 
   expect(publicBody.puzzles[0].id).toBe("p-case-2026-08-03-1-v1");
   expect(JSON.stringify(publicBody)).not.toContain("The missing pawn");
   expect(JSON.stringify(publicBody)).not.toContain("A pawn vanished");
+  expect(JSON.stringify(publicBody)).not.toContain("The last move was a white pawn capture.");
+  expect(JSON.stringify(publicBody)).not.toContain("Последним ходом белых было взятие пешкой.");
+  expect(JSON.stringify(publicBody)).not.toContain("白方上一步用兵吃子。");
   await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
-  await expect(page.locator(".puzzle-prompt")).toHaveText("What happened one move ago?");
+  await expect(page.locator(".puzzle-prompt")).toHaveText("Reconstruct the last move.");
   await expect(page.locator(".unlocked-clue")).toHaveCount(0);
+  await expect(page.locator(".clue-prompt")).toHaveCount(0);
   await expect(page.locator(".score-attempt")).toHaveText("Attempt 1");
   await expect(page.locator(".score-potential")).toHaveText("Available: 100 points");
   await expect(
@@ -89,6 +93,10 @@ test("wrong move and a retried clue grant yield 35, retaining assistance across 
   await expect(page.getByRole("button", { name: "Retry clue", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Retry clue", exact: true }).click();
   await expect(page.locator(".unlocked-clue")).toHaveText("A pawn vanished");
+  await expect(page.locator(".clue-prompt")).toHaveText(
+    "The last move was a white pawn capture. Retract it.",
+  );
+  await expect(page.locator(".puzzle-prompt")).toHaveText("Reconstruct the last move.");
   await expect(page.locator(".score-potential")).toHaveText("Available: 35 points");
   expect(observed.clueRequests).toEqual([
     { caseId: "case-2026-09-10", puzzleId: "p-case-2026-09-10-1-v1" },
@@ -96,17 +104,26 @@ test("wrong move and a retried clue grant yield 35, retaining assistance across 
   ]);
   await language(page).selectOption("ru");
   await expect(page.locator(".unlocked-clue")).toHaveText("Исчезнувшая пешка");
+  await expect(page.locator(".clue-prompt")).toHaveText(
+    "Последним ходом белых было взятие пешкой. Отмените его.",
+  );
+  await expect(page.locator(".puzzle-prompt")).toHaveText("Восстановите последний ход.");
   await expect(page.locator(".score-potential")).toHaveText("Доступно: 35 очков");
   await language(page).selectOption("zh");
   await expect(page.locator(".unlocked-clue")).toHaveText("一枚兵消失了");
+  await expect(page.locator(".clue-prompt")).toHaveText("白方上一步用兵吃子。请撤回这一步。");
+  await expect(page.locator(".puzzle-prompt")).toHaveText("还原上一步棋。");
   await expect(page.locator(".score-potential")).toHaveText("可得：35 分");
   await page.goto("./?case=2026-09-12");
   await expect(page.locator(".score-potential")).toHaveText("可得：100 分");
+  await expect(page.locator(".clue-prompt")).toHaveCount(0);
   await page.goto("./?case=2026-09-10");
   await expect(page.locator(".unlocked-clue")).toHaveText("一枚兵消失了");
+  await expect(page.locator(".clue-prompt")).toHaveText("白方上一步用兵吃子。请撤回这一步。");
   await expect(page.locator(".score-potential")).toHaveText("可得：35 分");
   await page.reload();
   await expect(page.locator(".score-potential")).toHaveText("可得：35 分");
+  await expect(page.locator(".clue-prompt")).toHaveText("白方上一步用兵吃子。请撤回这一步。");
   expect(observed.clueRequests).toHaveLength(2);
   await page.getByRole("gridcell", { name: "d5, 白兵", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, 空格", exact: true }).click();

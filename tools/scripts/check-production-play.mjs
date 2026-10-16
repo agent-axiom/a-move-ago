@@ -155,16 +155,26 @@ function validDaily(value, date, localized = false) {
   );
 }
 
-// Successful solves reveal titles; every other public field must remain immutable.
-function stablePublicPuzzle(puzzle) {
-  const { title: _title, localizations, ...base } = puzzle;
+function neutralPrompt(puzzle, localized) {
+  return (
+    puzzle.prompt === "Reconstruct the last move." &&
+    (!localized ||
+      (puzzle.localizations.ru.prompt === "Восстановите последний ход." &&
+        puzzle.localizations.zh.prompt === "还原上一步棋。"))
+  );
+}
+
+// Solving unlocks only that puzzle's title and conditions; other content stays immutable.
+function stablePublicPuzzle(puzzle, unlocked) {
+  if (!unlocked) return puzzle;
+  const { title: _title, prompt: _prompt, localizations, ...base } = puzzle;
   return {
     ...base,
     ...(localizations
       ? {
           localizations: Object.fromEntries(
             Object.entries(localizations).map(([locale, value]) => {
-              const { title: _localizedTitle, ...text } = value;
+              const { title: _localizedTitle, prompt: _localizedPrompt, ...text } = value;
               return [locale, text];
             }),
           ),
@@ -243,7 +253,9 @@ export async function checkProductionPlay(
   const dailyPath = `/v1/daily?date=${date}`;
   const { data: daily } = await api(dailyPath);
   ensure(
-    validDaily(daily, date, localized) && daily.solvedPuzzleIds.length === 0,
+    validDaily(daily, date, localized) &&
+      daily.solvedPuzzleIds.length === 0 &&
+      daily.puzzles.every((puzzle) => neutralPrompt(puzzle, localized)),
     "PUBLIC_DAILY_FAILED",
   );
   async function stats(expected) {
@@ -405,8 +417,10 @@ export async function checkProductionPlay(
     validDaily(reloaded, date, localized) &&
       reloaded.id === daily.id &&
       isDeepStrictEqual(
-        reloaded.puzzles.map(stablePublicPuzzle),
-        daily.puzzles.map(stablePublicPuzzle),
+        reloaded.puzzles.map((puzzle) =>
+          stablePublicPuzzle(puzzle, puzzle.id === attempt.puzzleId),
+        ),
+        daily.puzzles.map((puzzle) => stablePublicPuzzle(puzzle, puzzle.id === attempt.puzzleId)),
       ) &&
       isDeepStrictEqual(reloaded.solvedPuzzleIds, [attempt.puzzleId]),
     "RELOADED_DAILY_FAILED",

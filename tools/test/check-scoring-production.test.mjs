@@ -78,7 +78,10 @@ function harness({ count = 2, mutate, transport } = {}) {
         id: `p-${caseId}-${index + 1}-v1`,
         version: 1,
         title: index === 0 && (actor.clue || actor.solved) ? secret : `Puzzle ${index + 1}`,
-        prompt: "Synthetic mandatory conditions",
+        prompt:
+          index === 0 && (actor.clue || actor.solved)
+            ? "Synthetic mandatory conditions"
+            : "Reconstruct the last move.",
         postFen: "synthetic-position",
         retractingColor: "w",
         maxHints: 2,
@@ -90,7 +93,10 @@ function harness({ count = 2, mutate, transport } = {}) {
               index === 0 && (actor.clue || actor.solved)
                 ? `ru-title-${secret}`
                 : `Задача ${index + 1}`,
-            prompt: "ru-prompt",
+            prompt:
+              index === 0 && (actor.clue || actor.solved)
+                ? "ru-prompt"
+                : "Восстановите последний ход.",
             provenance: "ru-author",
             license: "ru-license",
           },
@@ -99,7 +105,7 @@ function harness({ count = 2, mutate, transport } = {}) {
               index === 0 && (actor.clue || actor.solved)
                 ? `zh-title-${secret}`
                 : `棋题 ${index + 1}`,
-            prompt: "zh-prompt",
+            prompt: index === 0 && (actor.clue || actor.solved) ? "zh-prompt" : "还原上一步棋。",
             provenance: "zh-author",
             license: "zh-license",
           },
@@ -152,6 +158,7 @@ function harness({ count = 2, mutate, transport } = {}) {
                 {
                   case_id: caseId,
                   puzzle_id: puzzleId,
+                  prompt: "Synthetic mandatory conditions",
                   solution_json: JSON.stringify(originalSolution()),
                 },
               ],
@@ -278,6 +285,8 @@ test("scoring checker isolates two actors, awards 100/35 and prevents replay/new
     duplicateAwardsPrevented: true,
     reloadVerified: true,
     actorIsolationVerified: true,
+    conditionsHidden: true,
+    clueConditionsVerified: true,
   });
   assertSafe(result);
   assert.equal(check.actors.length, 2);
@@ -392,6 +401,16 @@ test("scoring checker masks transport, payload, pricing, persistence and idempot
       },
       "FRESH_DAILY_FAILED",
     ],
+    ...["en", "ru", "zh"].map((locale) => [
+      `spoiler conditions ${locale}`,
+      (r, p) => {
+        if (r.path === "/v1/daily") {
+          if (locale === "en") p.puzzles[0].prompt = secret;
+          else p.puzzles[0].localizations[locale].prompt = secret;
+        }
+      },
+      "FRESH_DAILY_FAILED",
+    ]),
     [
       "thematic ID",
       (r, p) => {
@@ -491,6 +510,20 @@ test("scoring checker masks transport, payload, pricing, persistence and idempot
       "SCORING_RELOAD_FAILED",
     ],
     [
+      "reload lost original conditions",
+      (r, p, _s, _h, a) => {
+        if (r.path === "/v1/daily" && a.solved) p.puzzles[0].prompt = "Reconstruct the last move.";
+      },
+      "SCORING_RELOAD_FAILED",
+    ],
+    [
+      "reload unrelated conditions leaked",
+      (r, p, _s, _h, a) => {
+        if (r.path === "/v1/daily" && a.solved) p.puzzles[1].prompt = secret;
+      },
+      "SCORING_RELOAD_FAILED",
+    ],
+    [
       "wrong attempt counted twice",
       (r, p) => {
         if (r.path === "/v1/attempts" && !p.correct) p.progress.attemptCount = 2;
@@ -512,7 +545,7 @@ test("scoring checker masks transport, payload, pricing, persistence and idempot
       "SCORING_CLUE_FAILED",
     ],
     [
-      "clue hides mandatory conditions",
+      "clue returns different original conditions",
       (r, p) => {
         if (r.path.endsWith("/clue")) p.prompt = secret;
       },

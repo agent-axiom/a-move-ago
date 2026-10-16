@@ -534,6 +534,11 @@
   font-size: 1.15rem;
   font-weight: 400;
 }
+.optional-clue .clue-prompt {
+  margin: 0.65rem 0 0;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
 .clue-request,
 .hint-request {
   max-width: 100%;

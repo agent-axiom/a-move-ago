@@ -1,6 +1,7 @@
 import {
   ArchiveResponseSchema,
   AttemptResultSchema,
+  ClueResponseSchema,
   DailyCaseResponseSchema,
   HintResponseSchema,
 } from "@a-move-ago/api-contract";
@@ -72,7 +73,7 @@ function attemptBody(content: Awaited<ReturnType<typeof seedLocalizedContent>>, 
 beforeEach(resetDatabase);
 
 describe("opt-in content localizations", () => {
-  it("keeps legacy responses English and exposes only public translations in daily and archive", async () => {
+  it("keeps legacy responses English and masks unearned conditions in every locale", async () => {
     const content = await seedLocalizedContent();
     const guest = await issueGuest();
     for (const headers of [{}, { "accept-language": "ru" }, { "x-content-locales": "0" }]) {
@@ -81,6 +82,7 @@ describe("opt-in content localizations", () => {
       });
       expect(daily.response.status).toBe(200);
       expect(JSON.stringify(daily.body)).not.toContain("localizations");
+      expect(JSON.stringify(daily.body)).not.toContain(content.puzzle.public.prompt);
     }
     const daily = await authenticatedJson(`/v1/daily?date=${content.date}`, guest.token, {
       headers: localizedHeaders,
@@ -90,9 +92,11 @@ describe("opt-in content localizations", () => {
     expect(parsed.localizations?.ru?.title).toBe("Задача дня");
     expect(parsed.puzzles[0]?.id).toBe(publicPuzzleId(content.caseId, 1, 1));
     expect(parsed.puzzles[0]?.title).toBe("Puzzle 1");
+    expect(parsed.puzzles[0]?.prompt).toBe("Reconstruct the last move.");
     expect(parsed.puzzles[0]?.localizations?.ru?.title).toBe("Задача 1");
     expect(parsed.puzzles[0]?.localizations?.zh?.title).toBe("棋题 1");
-    expect(parsed.puzzles[0]?.localizations?.zh?.prompt).toBe("Prompt zh");
+    expect(parsed.puzzles[0]?.localizations?.ru?.prompt).toBe("Восстановите последний ход.");
+    expect(parsed.puzzles[0]?.localizations?.zh?.prompt).toBe("还原上一步棋。");
     const publicJson = JSON.stringify(daily.body);
     for (const secret of [
       privateHintOne,
@@ -102,11 +106,14 @@ describe("opt-in content localizations", () => {
       "explanations",
       "hints",
       content.puzzle.public.title,
+      content.puzzle.public.prompt,
       content.puzzle.contentKey,
       "Case ru",
       "Case zh",
       "Puzzle ru",
       "Puzzle zh",
+      "Prompt ru",
+      "Prompt zh",
     ]) {
       expect(publicJson).not.toContain(secret);
     }
@@ -117,6 +124,48 @@ describe("opt-in content localizations", () => {
       "每日棋题",
     );
     expect(JSON.stringify(archive.body)).not.toContain(privateExplanation);
+  });
+
+  it("unlocks original conditions in all locales with one shared clue charge", async () => {
+    const content = await seedLocalizedContent();
+    const guest = await issueGuest();
+    const path = `/v1/cases/${content.caseId}/puzzles/${publicPuzzleId(content.caseId, 1, 1)}/clue`;
+    for (let request = 0; request < 2; request += 1) {
+      const response = await authenticatedJson(path, guest.token, {
+        method: "POST",
+        body: {},
+        headers: localizedHeaders,
+      });
+      const clue = ClueResponseSchema.parse(response.body);
+      expect(response.response.status).toBe(200);
+      expect(clue.prompt).toBe(content.puzzle.public.prompt);
+      expect(clue.localizations?.ru?.prompt).toBe("Prompt ru");
+      expect(clue.localizations?.zh?.prompt).toBe("Prompt zh");
+      expect(clue.progress).toMatchObject({
+        clueUnlocked: true,
+        assistanceCount: 1,
+        nextAttemptPoints: 50,
+      });
+    }
+    const events = await testEnv.DB.prepare(
+      "SELECT COUNT(*) AS count FROM gameplay_events WHERE kind = 'clue'",
+    ).first<{ count: number }>();
+    expect(events?.count).toBe(1);
+    const restored = DailyCaseResponseSchema.parse(
+      (
+        await authenticatedJson(`/v1/daily?date=${content.date}`, guest.token, {
+          headers: localizedHeaders,
+        })
+      ).body,
+    );
+    expect(restored.puzzles[0]?.prompt).toBe(content.puzzle.public.prompt);
+    expect(restored.puzzles[0]?.localizations?.ru?.prompt).toBe("Prompt ru");
+    expect(restored.puzzles[0]?.localizations?.zh?.prompt).toBe("Prompt zh");
+    const legacy = DailyCaseResponseSchema.parse(
+      (await authenticatedJson(`/v1/daily?date=${content.date}`, guest.token)).body,
+    );
+    expect(legacy.puzzles[0]?.prompt).toBe(content.puzzle.public.prompt);
+    expect(legacy.puzzles[0]?.localizations).toBeUndefined();
   });
 
   it("enriches an existing correct replay without changing its canonical response or stats", async () => {
@@ -147,6 +196,16 @@ describe("opt-in content localizations", () => {
       total: number;
     }>();
     expect(count?.total).toBe(1);
+    const daily = DailyCaseResponseSchema.parse(
+      (
+        await authenticatedJson(`/v1/daily?date=${content.date}`, guest.token, {
+          headers: localizedHeaders,
+        })
+      ).body,
+    );
+    expect(daily.puzzles[0]?.prompt).toBe(content.puzzle.public.prompt);
+    expect(daily.puzzles[0]?.localizations?.ru?.prompt).toBe("Prompt ru");
+    expect(daily.puzzles[0]?.localizations?.zh?.prompt).toBe("Prompt zh");
   });
 
   it("translates only an earned hint level and preserves ownership and sequential hint checks", async () => {

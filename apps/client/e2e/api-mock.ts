@@ -56,7 +56,7 @@ const contentText = {
     firstCaseTitle: "Тихое начало",
     recentCaseTitle: "Потерянный темп",
     puzzleTitle: "Исчезнувшая пешка",
-    prompt: "Что произошло ход назад?",
+    prompt: "Последним ходом белых было взятие пешкой. Отмените его.",
     provenance: "Учебный пример A MOVE AGO",
     license: "CC BY 4.0",
     contradiction: "Этот ход не объясняет исчезновение пешки.",
@@ -68,7 +68,7 @@ const contentText = {
     firstCaseTitle: "安静的开始",
     recentCaseTitle: "丢失的一步",
     puzzleTitle: "一枚兵消失了",
-    prompt: "上一步发生了什么？",
+    prompt: "白方上一步用兵吃子。请撤回这一步。",
     provenance: "A MOVE AGO 教学示例",
     license: "CC BY 4.0",
     contradiction: "这一步无法解释兵为何消失。",
@@ -95,7 +95,12 @@ function withLocalizations(value: unknown): unknown {
             title: /^Puzzle \d+$/.test(String(object.title))
               ? `${locale === "ru" ? "Задача" : "棋题"} ${String(object.title).split(" ")[1]}`
               : text.puzzleTitle,
-            prompt: text.prompt,
+            prompt:
+              object.prompt === "Reconstruct the last move."
+                ? locale === "ru"
+                  ? "Восстановите последний ход."
+                  : "还原上一步棋。"
+                : text.prompt,
             provenance: text.provenance,
             license: text.license,
           },
@@ -431,7 +436,9 @@ export async function installApiMock(
           id: state.puzzleId,
           version: 1,
           title: entitled(state) ? "A pawn vanished" : `Puzzle ${index + 1}`,
-          prompt: "What happened one move ago?",
+          prompt: entitled(state)
+            ? "The last move was a white pawn capture. Retract it."
+            : "Reconstruct the last move.",
           postFen: "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
           retractingColor: "w",
           maxHints: 2,
@@ -469,7 +476,7 @@ export async function installApiMock(
       }
       await json(route, 200, {
         title: "A pawn vanished",
-        prompt: "What happened one move ago?",
+        prompt: "The last move was a white pawn capture. Retract it.",
         progress: snapshot(state.progress),
       });
       return;
