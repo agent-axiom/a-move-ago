@@ -54,6 +54,7 @@ export function runtimeFixture(options: {
       cases: [],
     })),
     submitAttempt: vi.fn(),
+    getPuzzleReveal: vi.fn(),
     requestHint: vi.fn(),
     getStats: vi.fn(),
     loginMiniApp: vi.fn(async () => ({

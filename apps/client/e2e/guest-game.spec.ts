@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
+import { selectCapturedPiece } from "./game-controls";
 
 async function chooseCorrectRetraction(page: import("@playwright/test").Page) {
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();
   await page.getByRole("gridcell", { name: "e4, empty" }).click();
-  await page.getByLabel("Captured piece").selectOption("p");
+  await selectCapturedPiece(page, "p");
   await page.getByRole("button", { name: "Check move" }).click();
 }
 

@@ -1,5 +1,6 @@
 import { DailyCaseResponseSchema, StatsResponseSchema } from "@a-move-ago/api-contract";
 import { expect, test } from "@playwright/test";
+import { selectCapturedPiece } from "./game-controls";
 
 test.skip(process.env.LIVE_API_E2E !== "true", "Requires the seeded local Worker on port 8787.");
 
@@ -41,7 +42,7 @@ test("guest solves the seeded case through Worker and retains D1 progress after 
 
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();
   await page.getByRole("gridcell", { name: "e4, empty" }).click();
-  await page.getByLabel("Captured piece").selectOption("p");
+  await selectCapturedPiece(page, "p");
   const attemptResponsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === "/v1/attempts",

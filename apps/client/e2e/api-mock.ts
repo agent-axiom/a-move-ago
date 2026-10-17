@@ -41,6 +41,7 @@ export interface ApiObservations {
   guestChannels: string[];
   hintRequests: Array<{ attemptId: string; level: number }>;
   clueRequests: Array<{ caseId: string; puzzleId: string }>;
+  revealRequests: Array<{ caseId: string; puzzleId: string }>;
   miniAppProofs: string[];
   dailyIdentities: Array<"guest" | "telegram">;
   dailyDates: Array<string | null>;
@@ -210,6 +211,7 @@ export async function installApiMock(
     guestChannels: [],
     hintRequests: [],
     clueRequests: [],
+    revealRequests: [],
     miniAppProofs: [],
     dailyIdentities: [],
     dailyDates: [],
@@ -455,6 +457,42 @@ export async function installApiMock(
               ),
             }
           : {}),
+      });
+      return;
+    }
+    const review = url.pathname.match(/^\/v1\/cases\/([^/]+)\/puzzles\/([^/]+)\/reveal$/);
+    if (review && request.method() === "GET") {
+      const caseId = decodeURIComponent(review[1] ?? "");
+      const puzzleId = decodeURIComponent(review[2] ?? "");
+      observed.revealRequests.push({ caseId, puzzleId });
+      const state = findState(caseId, puzzleId);
+      if (!state || state.progress.earnedPoints === null) {
+        await json(route, 403, {
+          error: {
+            code: "SOLUTION_LOCKED",
+            message: "Solve this puzzle before reviewing its solution.",
+            requestId: "synthetic-review-request",
+          },
+        });
+        return;
+      }
+      await json(route, 200, {
+        reveal: {
+          retraction: {
+            currentSquare: "d5",
+            previousSquare: "e4",
+            movedPiece: { color: "w", type: "p" },
+            restoredPiece: { color: "b", type: "p", square: "d5" },
+            special: "normal",
+          },
+          previousFen: "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+          forwardSan: "exd5",
+          explanation: "The white e-pawn captured the black pawn on d5.",
+          historyConstraints: [
+            { kind: "previous-castling", value: "KQkq" },
+            { kind: "previous-en-passant", value: "d6" },
+          ],
+        },
       });
       return;
     }

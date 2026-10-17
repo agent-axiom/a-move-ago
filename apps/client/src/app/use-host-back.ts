@@ -5,14 +5,15 @@ import { useRuntime } from "./runtime";
 export function useHostBack(
   navigation: NavigationState,
   dispatch: (event: NavigationEvent) => void,
+  dismissOverlay?: () => void,
 ) {
   const { platform } = useRuntime();
   useEffect(() => {
     void platform.setBackHandler(
-      navigation.stack.length > 1 ? () => dispatch({ type: "back" }) : null,
+      dismissOverlay ?? (navigation.stack.length > 1 ? () => dispatch({ type: "back" }) : null),
     );
     return () => {
       void platform.setBackHandler(null);
     };
-  }, [dispatch, navigation.stack.length, platform]);
+  }, [dismissOverlay, dispatch, navigation.stack.length, platform]);
 }

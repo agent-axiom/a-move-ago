@@ -7,6 +7,7 @@ on:
       - "apps/client/**"
       - "apps/api/**"
       - "packages/api-contract/**"
+      - "packages/game-core/**"
       - "tools/**"
       - ".github/workflows/ui-review.yml"
 
@@ -32,15 +33,15 @@ jobs:
       - run: npm ci
       - name: Prepare formatting feedback for visual review
         run: |
-          npm exec -- biome check --write \
+          npm exec -- biome check --write --max-diagnostics=1000 \
             apps/client/src apps/client/e2e apps/api/src apps/api/test \
-            packages/api-contract/src tools biome.json || true
+            packages/api-contract/src packages/game-core/src tools biome.json || true
           node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           import { createHash } from "node:crypto";
           import { gzipSync } from "node:zlib";
           const patch = execFileSync("git", [
-            "diff", "--", "apps/client", "apps/api", "packages/api-contract", "tools", "biome.json",
+            "diff", "--", "apps/client", "apps/api", "packages/api-contract", "packages/game-core", "tools", "biome.json",
           ]);
           const encoded = gzipSync(patch).toString("base64");
           let count = 0;

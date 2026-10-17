@@ -25,6 +25,8 @@ export interface AppRuntime {
   api: ApiClient;
   platform: PlatformAdapter;
   token: TokenHolder;
+  draftActorKey?(): string | null;
+  setDraftActorKey?(value: string | null): void;
   now(): number;
   attemptUuid(): string;
   sleep(milliseconds: number, signal?: AbortSignal): Promise<void>;
@@ -35,6 +37,7 @@ export async function createBrowserRuntime(
   loadAndroid?: () => Promise<PlatformAdapter | null>,
 ): Promise<AppRuntime> {
   const token = createTokenHolder();
+  let draftActorKey: string | null = null;
   const platform = await createPlatformAdapter({
     browser: browserPortFromWindow(browserWindow),
     telegram: browserWindow.Telegram?.WebApp,
@@ -52,6 +55,10 @@ export async function createBrowserRuntime(
     api,
     platform,
     token,
+    draftActorKey: () => draftActorKey,
+    setDraftActorKey: (value) => {
+      draftActorKey = value;
+    },
     now: Date.now,
     attemptUuid: crypto.randomUUID.bind(crypto),
     sleep(milliseconds, signal) {

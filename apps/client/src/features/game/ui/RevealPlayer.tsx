@@ -1,7 +1,8 @@
 import type { AcceptedSolution, PuzzleProgress } from "@a-move-ago/api-contract";
 import { parseFen } from "@a-move-ago/game-core";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { localizedText, useI18n } from "../../../i18n";
+import { continuationMessages } from "../../../i18n/messages/continuation";
 import { Chessboard } from "./Chessboard";
 
 type RevealStage = "post" | "previous" | "forward" | "done";
@@ -15,9 +16,11 @@ export function RevealPlayer(props: {
   solution: AcceptedSolution;
   progress?: PuzzleProgress | undefined;
   attemptId?: string;
+  review?: boolean;
   onComplete(): void;
 }) {
   const { locale, t } = useI18n();
+  const headingId = useId();
   const revealKey = useMemo(
     () => JSON.stringify([props.postFen, props.solution]),
     [props.postFen, props.solution],
@@ -80,7 +83,7 @@ export function RevealPlayer(props: {
               : t("game.reveal.done");
 
   return (
-    <section className="reveal-layout" aria-labelledby="solution-heading">
+    <section className="reveal-layout" aria-labelledby={headingId}>
       <div className="board-panel">
         <div className="board-toolbar">
           <span className="last-move-label">{t("game.reveal.trueMove")}</span>
@@ -113,14 +116,18 @@ export function RevealPlayer(props: {
         </p>
       </div>
       <div className="solution-panel">
-        <p className="game-eyebrow">{t("game.reveal.eyebrow")}</p>
+        <p className="game-eyebrow">
+          {props.review ? continuationMessages[locale].review : t("game.reveal.eyebrow")}
+        </p>
         <div className="solved-heading">
           <span className="solved-mark" aria-hidden="true">
             ✓
           </span>
-          <h2 id="solution-heading">{t("game.solved")}</h2>
+          <h2 id={headingId}>
+            {props.review ? continuationMessages[locale].reviewTitle : t("game.solved")}
+          </h2>
         </div>
-        {props.progress && props.progress.earnedPoints !== null ? (
+        {!props.review && props.progress && props.progress.earnedPoints !== null ? (
           <aside className="solution-reward" aria-live="polite">
             <strong>
               {props.progress.legacySolved
@@ -165,7 +172,7 @@ export function RevealPlayer(props: {
               props.onComplete();
             }}
           >
-            {t("game.continue")}
+            {props.review ? continuationMessages[locale].back : t("game.continue")}
           </button>
         </div>
       </div>

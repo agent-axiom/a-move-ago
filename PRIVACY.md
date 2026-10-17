@@ -30,6 +30,18 @@ kind, creation/expiry/revocation times, and last-seen time. Clearing browser or
 app data removes the local token and can make guest progress inaccessible.
 The application does not use an authentication cookie.
 
+The client also stores unfinished move drafts and unresolved attempt UUIDs in
+local browser/WebView storage, under `a-move-ago:game:`. These records contain
+the selected squares and move details, case/puzzle/version identifiers, and an
+opaque hash identifying the session. They contain no bearer token, Telegram
+profile fields, hints or solution responses. At most 32 ordinary drafts are
+retained; unresolved attempt records are kept separately so browsing other
+puzzles cannot discard a retry UUID. Records older than 30 days are discarded
+when storage is accessed. Successful
+account linking, issuing a fresh guest session, and confirmed profile deletion
+clear this draft namespace on the current device. The tutorial completion or
+dismissal preference is stored separately as `a-move-ago.tutorial.v1`.
+
 After a linked Telegram profile is deleted, the current opaque token is not
 replaced. Its online D1 session becomes an active unlinked guest session and
 retains the session ID, token hash, `kind = guest`, channel, creation time,

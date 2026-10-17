@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
+import { selectCapturedPiece } from "./game-controls";
 
 const storageKey = "amoveago.session.v1";
 const telegramToken = "t".repeat(43);
@@ -60,7 +61,7 @@ test("deletes a restored Telegram profile, preserves its token, and continues as
 
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();
   await page.getByRole("gridcell", { name: "e4, empty" }).click();
-  await page.getByLabel("Captured piece").selectOption("p");
+  await selectCapturedPiece(page, "p");
   await page.getByRole("button", { name: "Check move" }).click();
   await expect(page.getByRole("heading", { name: "Solved" })).toBeVisible();
 });

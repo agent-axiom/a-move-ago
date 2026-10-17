@@ -14,6 +14,7 @@ import { createDailyRoutes } from "./routes/daily";
 import { me } from "./routes/me";
 import { miniAppAuth } from "./routes/mini-app-auth";
 import { createTelegramOidcRoutes } from "./routes/oidc-auth";
+import { createRevealRoutes } from "./routes/reveals";
 import { sessionAuthRoutes } from "./routes/session-auth";
 import { sessions } from "./routes/sessions";
 
@@ -42,6 +43,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/v1/archive", createArchiveRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/attempts", createAttemptRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/cases", createClueRoutes(options.now ? { now: options.now } : {}));
+  app.route("/v1/cases", createRevealRoutes(options.now ? { now: options.now } : {}));
   app.route("/v1/me", me);
 
   app.notFound(() => {

@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-16-hidden-prompts",
-  "reason": "Hide detailed puzzle conditions and their translations behind the existing single clue unlock, leaving a neutral objective before disclosure"
+  "release": "2026-10-17-gameplay-ux",
+  "reason": "Allow authenticated read-only review of solved puzzles without submitting attempts or changing points"
 }

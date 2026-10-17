@@ -6,10 +6,17 @@ import type {
   PuzzleProgress,
   Retraction,
 } from "@a-move-ago/api-contract";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { z } from "zod";
 import { useRuntime } from "../../../app/runtime";
 import { type ClientFailure, classifyFailure } from "../../../shared/failure";
+import {
+  clearCompletedGame,
+  clearPendingAttempt,
+  type GamePersistenceScope,
+  readPendingAttempt,
+  writePendingAttempt,
+} from "./persistence";
 
 type AttemptRequest = z.infer<typeof AttemptRequestSchema>;
 type AttemptResult = z.infer<typeof AttemptResultSchema>;
@@ -47,9 +54,35 @@ function frozenRetraction(value: Retraction): Retraction {
   });
 }
 
-export function useAttempt(caseId: string, puzzleId: string, initialProgress?: PuzzleProgress) {
+function restoredAttempt(scope?: GamePersistenceScope): AttemptState {
+  const saved = readPendingAttempt(scope);
+  if (!saved) return { tag: "idle" };
+  const request = Object.freeze({ ...saved, retraction: frozenRetraction(saved.retraction) });
+  return { tag: "retry", request, failure: { kind: "offline" } };
+}
+
+export function useAttempt(
+  caseId: string,
+  puzzleId: string,
+  initialProgress?: PuzzleProgress,
+  persistenceScope?: GamePersistenceScope,
+) {
   const runtime = useRuntime();
-  const [attempt, setAttempt] = useState<AttemptState>({ tag: "idle" });
+  const actorKey = persistenceScope?.actorKey;
+  const persistenceCaseId = persistenceScope?.caseId;
+  const persistencePuzzleId = persistenceScope?.puzzleId;
+  const puzzleVersion = persistenceScope?.puzzleVersion;
+  const scope = useMemo(
+    () =>
+      actorKey &&
+      persistenceCaseId === caseId &&
+      persistencePuzzleId === puzzleId &&
+      puzzleVersion !== undefined
+        ? { actorKey, caseId, puzzleId, puzzleVersion }
+        : undefined,
+    [actorKey, caseId, puzzleId, persistenceCaseId, persistencePuzzleId, puzzleVersion],
+  );
+  const [attempt, setAttempt] = useState<AttemptState>(() => restoredAttempt(scope));
   const [progress, setProgress] = useState(initialProgress);
   const [hints, setHints] = useState<HintState>({
     tag: "idle",
@@ -61,17 +94,17 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
   const attemptAbort = useRef<AbortController | null>(null);
   const hintAbort = useRef<AbortController | null>(null);
   const clueAbort = useRef<AbortController | null>(null);
-  const activeLifecycle = useRef({ caseId, puzzleId, runtime });
+  const activeLifecycle = useRef({ caseId, puzzleId, runtime, scope });
 
   useEffect(() => {
-    activeLifecycle.current = { caseId, puzzleId, runtime };
+    activeLifecycle.current = { caseId, puzzleId, runtime, scope };
     attemptAbort.current?.abort();
     hintAbort.current?.abort();
     clueAbort.current?.abort();
     attemptAbort.current = null;
     hintAbort.current = null;
     clueAbort.current = null;
-    setAttempt({ tag: "idle" });
+    setAttempt(restoredAttempt(scope));
     setProgress(seed.current);
     setHints({ tag: "idle", items: seed.current?.earnedHints ?? [] });
     setClue({ tag: "idle", content: null });
@@ -81,24 +114,30 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
       hintAbort.current?.abort();
       clueAbort.current?.abort();
     };
-  }, [caseId, puzzleId, runtime]);
+  }, [caseId, puzzleId, runtime, scope]);
 
   const sendAttempt = useCallback(
     async (request: AttemptRequest) => {
       if (attemptAbort.current || hintAbort.current || clueAbort.current) return;
       const controller = new AbortController();
       attemptAbort.current = controller;
+      // Save before the request can reach the server. A reload must retry this UUID,
+      // including when the server committed the result but its response was lost.
+      writePendingAttempt(scope, request);
       setAttempt({ tag: "submitting", request });
       try {
         const result = await runtime.api.submitAttempt(request, controller.signal);
         if (
           controller.signal.aborted ||
           activeLifecycle.current.runtime !== runtime ||
+          activeLifecycle.current.scope !== scope ||
           activeLifecycle.current.caseId !== request.caseId ||
           activeLifecycle.current.puzzleId !== request.puzzleId
         ) {
           return;
         }
+        if (result.correct) clearCompletedGame(scope);
+        else clearPendingAttempt(scope, request.attemptUuid);
         if (result.progress) {
           setProgress(result.progress);
           setHints({ tag: "idle", items: result.progress.earnedHints });
@@ -112,6 +151,7 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
         if (
           !controller.signal.aborted &&
           activeLifecycle.current.runtime === runtime &&
+          activeLifecycle.current.scope === scope &&
           activeLifecycle.current.caseId === request.caseId &&
           activeLifecycle.current.puzzleId === request.puzzleId
         ) {
@@ -121,7 +161,7 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
         if (attemptAbort.current === controller) attemptAbort.current = null;
       }
     },
-    [runtime],
+    [runtime, scope],
   );
 
   const submit = useCallback(
@@ -137,6 +177,13 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
         clueAbort.current
       )
         return;
+      const pending = readPendingAttempt(scope);
+      if (pending) {
+        await sendAttempt(
+          Object.freeze({ ...pending, retraction: frozenRetraction(pending.retraction) }),
+        );
+        return;
+      }
       const request = Object.freeze({
         attemptUuid: runtime.attemptUuid(),
         caseId,
@@ -145,7 +192,7 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
       }) satisfies AttemptRequest;
       await sendAttempt(request);
     },
-    [attempt.tag, caseId, clue.tag, hints.tag, puzzleId, runtime, sendAttempt],
+    [attempt.tag, caseId, clue.tag, hints.tag, puzzleId, runtime, scope, sendAttempt],
   );
 
   const retryAttempt = useCallback(async () => {
@@ -167,6 +214,7 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
         if (
           controller.signal.aborted ||
           activeLifecycle.current.runtime !== runtime ||
+          activeLifecycle.current.scope !== scope ||
           activeLifecycle.current.caseId !== caseId ||
           activeLifecycle.current.puzzleId !== puzzleId
         )
@@ -177,14 +225,18 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
           (items.some((item) => item.level === hint.level) ? items : [...items, hint]);
         setHints({ tag: "idle", items: next });
       } catch (error) {
-        if (!controller.signal.aborted && activeLifecycle.current.runtime === runtime) {
+        if (
+          !controller.signal.aborted &&
+          activeLifecycle.current.runtime === runtime &&
+          activeLifecycle.current.scope === scope
+        ) {
           setHints({ tag: "retry", items, request, failure: classifyFailure(error) });
         }
       } finally {
         if (hintAbort.current === controller) hintAbort.current = null;
       }
     },
-    [caseId, puzzleId, runtime],
+    [caseId, puzzleId, runtime, scope],
   );
 
   const requestHint = useCallback(async () => {
@@ -207,6 +259,7 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
       if (
         controller.signal.aborted ||
         activeLifecycle.current.runtime !== runtime ||
+        activeLifecycle.current.scope !== scope ||
         activeLifecycle.current.caseId !== caseId ||
         activeLifecycle.current.puzzleId !== puzzleId
       )
@@ -215,13 +268,17 @@ export function useAttempt(caseId: string, puzzleId: string, initialProgress?: P
       setHints({ tag: "idle", items: result.progress.earnedHints });
       setClue({ tag: "idle", content: result });
     } catch (error) {
-      if (!controller.signal.aborted && activeLifecycle.current.runtime === runtime) {
+      if (
+        !controller.signal.aborted &&
+        activeLifecycle.current.runtime === runtime &&
+        activeLifecycle.current.scope === scope
+      ) {
         setClue({ tag: "retry", content: null, failure: classifyFailure(error) });
       }
     } finally {
       if (clueAbort.current === controller) clueAbort.current = null;
     }
-  }, [caseId, puzzleId, runtime]);
+  }, [caseId, puzzleId, runtime, scope]);
 
   const requestClue = useCallback(async () => {
     if (
