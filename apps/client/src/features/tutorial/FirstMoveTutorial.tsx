@@ -168,11 +168,11 @@ export function FirstMoveTutorial({ locale, onClose }: { locale: Locale; onClose
               <p aria-live="polite" className="tutorial-instruction">
                 {instruction}
               </p>
-              <p aria-label={copy.selectedMove} className="tutorial-move">
+              <output aria-label={copy.selectedMove} className="tutorial-move">
                 <span>{selected ? "e4" : "—"}</span>
                 <small>{copy.backTo}</small>
                 <span>{destination ?? "—"}</span>
-              </p>
+              </output>
               <div className="tutorial-actions">
                 <button
                   className="button-primary"

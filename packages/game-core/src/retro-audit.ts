@@ -1,7 +1,7 @@
 import type { Color, PieceType, PuzzlePrivate, Retraction, Square } from "@a-move-ago/api-contract";
+import { Chess } from "chess.js";
 import { parseFen, serializeFen } from "./fen";
 import { applyRetraction } from "./retract";
-import { Chess } from "chess.js";
 
 type Board = ReturnType<typeof parseFen>["board"];
 type Restorable = NonNullable<Retraction["restoredPiece"]>["type"];
@@ -14,8 +14,9 @@ export interface RetroCandidate {
 }
 
 const files = "abcdefgh";
-const squares: Square[] = Array.from({ length: 64 }, (_, index) =>
-  `${files[index % 8]}${Math.floor(index / 8) + 1}`,
+const squares: Square[] = Array.from(
+  { length: 64 },
+  (_, index) => `${files[index % 8]}${Math.floor(index / 8) + 1}`,
 );
 const capturedTypes: Restorable[] = ["p", "n", "b", "r", "q"];
 const promotedTypes = new Set<PieceType>(["n", "b", "r", "q"]);
@@ -140,7 +141,10 @@ export function retroRetractionKey(move: Retraction): string {
  * en passant, both castlings and all four unpromotions. A unique result plus a
  * legal game lineage proves uniqueness without charging for essential conditions.
  */
-export function enumerateRetroCandidates(postFen: string, retractingColor: Color): RetroCandidate[] {
+export function enumerateRetroCandidates(
+  postFen: string,
+  retractingColor: Color,
+): RetroCandidate[] {
   const post = parseFen(postFen);
   if (post.turn !== opposite(retractingColor)) throw new Error("RETRO_TURN_MISMATCH");
   if (!retroMaterialFeasible(post.board)) throw new Error("RETRO_MATERIAL_INVALID");
@@ -159,7 +163,9 @@ export function enumerateRetroCandidates(postFen: string, retractingColor: Color
       }
       if (!retroMaterialFeasible(previous.board)) return;
       const previousFen = serializeFen(previous);
-      const opponent = new Chess(serializeFen({ ...previous, turn: opposite(retractingColor), enPassant: "-" }));
+      const opponent = new Chess(
+        serializeFen({ ...previous, turn: opposite(retractingColor), enPassant: "-" }),
+      );
       if (opponent.isCheck()) return;
       const game = new Chess(previousFen);
       const forward = game.move({
@@ -189,7 +195,11 @@ export function enumerateRetroCandidates(postFen: string, retractingColor: Color
     for (const previousSquare of squares) {
       if (post.board[previousSquare]) continue;
       const move: Retraction = {
-        currentSquare, previousSquare, movedPiece: piece, restoredPiece: null, special: "normal",
+        currentSquare,
+        previousSquare,
+        movedPiece: piece,
+        restoredPiece: null,
+        special: "normal",
       };
       if (!canOriginate(post.board, move)) continue;
       const changesFile = currentSquare[0] !== previousSquare[0];
@@ -201,27 +211,46 @@ export function enumerateRetroCandidates(postFen: string, retractingColor: Color
       for (const dx of [-1, 1]) {
         if (!files[file + dx]) continue;
         const priorRank = rank + (retractingColor === "w" ? -1 : 1);
-        consider({ currentSquare, previousSquare: `${files[file + dx]}${priorRank + 1}`,
-          movedPiece: piece, special: "en-passant",
-          restoredPiece: { color: opposite(retractingColor), type: "p", square: `${files[file]}${priorRank + 1}` },
+        consider({
+          currentSquare,
+          previousSquare: `${files[file + dx]}${priorRank + 1}`,
+          movedPiece: piece,
+          special: "en-passant",
+          restoredPiece: {
+            color: opposite(retractingColor),
+            type: "p",
+            square: `${files[file]}${priorRank + 1}`,
+          },
         });
       }
     }
     if (promotedTypes.has(piece.type) && rank === (retractingColor === "w" ? 7 : 0)) {
       for (const dx of [-1, 0, 1]) {
         if (!files[file + dx]) continue;
-        const move: Retraction = { currentSquare,
+        const move: Retraction = {
+          currentSquare,
           previousSquare: `${files[file + dx]}${retractingColor === "w" ? 7 : 2}`,
-          movedPiece: piece, restoredPiece: null, special: "unpromotion" };
+          movedPiece: piece,
+          restoredPiece: null,
+          special: "unpromotion",
+        };
         if (dx === 0) consider(move);
         else withCapture(move, currentSquare);
       }
     }
     if (piece.type === "k" && rank === (retractingColor === "w" ? 0 : 7)) {
-      for (const [castleFile, special] of [[6, "castle-kingside"], [2, "castle-queenside"]] as const) {
+      for (const [castleFile, special] of [
+        [6, "castle-kingside"],
+        [2, "castle-queenside"],
+      ] as const) {
         if (file !== castleFile) continue;
-        consider({ currentSquare, previousSquare: `e${rank + 1}`, movedPiece: piece,
-          restoredPiece: null, special });
+        consider({
+          currentSquare,
+          previousSquare: `e${rank + 1}`,
+          movedPiece: piece,
+          restoredPiece: null,
+          special,
+        });
       }
     }
   }
@@ -230,13 +259,27 @@ export function enumerateRetroCandidates(postFen: string, retractingColor: Color
 
 /** Counts are safe to log; returned candidates and corpus payloads are private. */
 export function auditRetroCompleteness(puzzle: PuzzlePrivate): {
-  candidates: number; accepted: number; missing: number; impossible: number; unique: boolean;
+  candidates: number;
+  accepted: number;
+  missing: number;
+  impossible: number;
+  unique: boolean;
 } {
-  const candidates = new Set(enumerateRetroCandidates(puzzle.public.postFen, puzzle.public.retractingColor)
-    .map((candidate) => retroRetractionKey(candidate.retraction)));
-  const accepted = new Set(puzzle.acceptedSolutions.map((solution) => retroRetractionKey(solution.retraction)));
+  const candidates = new Set(
+    enumerateRetroCandidates(puzzle.public.postFen, puzzle.public.retractingColor).map(
+      (candidate) => retroRetractionKey(candidate.retraction),
+    ),
+  );
+  const accepted = new Set(
+    puzzle.acceptedSolutions.map((solution) => retroRetractionKey(solution.retraction)),
+  );
   const missing = [...candidates].filter((key) => !accepted.has(key)).length;
   const impossible = [...accepted].filter((key) => !candidates.has(key)).length;
-  return { candidates: candidates.size, accepted: accepted.size, missing, impossible,
-    unique: candidates.size === 1 && missing === 0 && impossible === 0 };
+  return {
+    candidates: candidates.size,
+    accepted: accepted.size,
+    missing,
+    impossible,
+    unique: candidates.size === 1 && missing === 0 && impossible === 0,
+  };
 }
