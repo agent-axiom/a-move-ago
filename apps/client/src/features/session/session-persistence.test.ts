@@ -27,6 +27,13 @@ function fixture() {
   return runtime;
 }
 
+function actorKey(runtime: ReturnType<typeof fixture>): string {
+  const key = runtime.draftActorKey?.();
+  expect(key).toMatch(/^[a-f0-9]{64}$/);
+  if (!key) throw new Error("Expected a prepared draft actor key");
+  return key;
+}
+
 describe("session-scoped game drafts", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -37,20 +44,22 @@ describe("session-scoped game drafts", () => {
   it("restores the same guest after restart without putting its bearer token in storage", async () => {
     const first = fixture();
     await bootstrapSession(first, new URL("https://game.test/"), vi.fn());
-    const key = first.draftActorKey?.();
-    expect(key).toMatch(/^[a-f0-9]{64}$/);
-    writeGameDraft(scope(key!), { tag: "select-previous", currentSquare: "e4" });
+    const key = actorKey(first);
+    writeGameDraft(scope(key), { tag: "select-previous", currentSquare: "e4" });
     const restarted = fixture();
     await bootstrapSession(restarted, new URL("https://game.test/"), vi.fn());
     expect(restarted.draftActorKey?.()).toBe(key);
-    expect(readGameDraft(scope(key!))).toEqual({ tag: "select-previous", currentSquare: "e4" });
+    expect(readGameDraft(scope(key))).toEqual({ tag: "select-previous", currentSquare: "e4" });
     expect(JSON.stringify(localStorage)).not.toContain(first.token.get());
   });
 
   it("clears the old actor on confirmed login and keeps language preferences", async () => {
     const runtime = fixture();
     await prepareDraftActor(runtime, guest);
-    const oldKey = runtime.draftActorKey?.()!;
+    const oldKey = actorKey(runtime);
+    const oldStorageKey = gamePersistenceKey(scope(oldKey));
+    expect(oldStorageKey).not.toBeNull();
+    if (!oldStorageKey) throw new Error("Expected a draft storage key");
     writeGameDraft(scope(oldKey), { tag: "select-previous", currentSquare: "e4" });
     localStorage.setItem("a-move-ago.locale", "ru");
     vi.mocked(runtime.platform.requestTelegramProof).mockResolvedValue({
@@ -59,14 +68,14 @@ describe("session-scoped game drafts", () => {
     });
     await saveProgress(runtime);
     expect(runtime.draftActorKey?.()).not.toBe(oldKey);
-    expect(localStorage.getItem(gamePersistenceKey(scope(oldKey))!)).toBeNull();
+    expect(localStorage.getItem(oldStorageKey)).toBeNull();
     expect(localStorage.getItem("a-move-ago.locale")).toBe("ru");
   });
 
   it("preserves a draft on failed deletion and clears it only after confirmation", async () => {
     const runtime = fixture();
     await prepareDraftActor(runtime, telegram);
-    const oldKey = runtime.draftActorKey?.()!;
+    const oldKey = actorKey(runtime);
     writeGameDraft(scope(oldKey), { tag: "select-previous", currentSquare: "e4" });
     vi.mocked(runtime.api.deleteProfile).mockRejectedValueOnce(new Error("offline"));
     await expect(deleteProfile(runtime)).rejects.toThrow("offline");
