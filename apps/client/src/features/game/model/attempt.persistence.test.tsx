@@ -1,4 +1,8 @@
-import { ApiTransportError, type AttemptRequestSchema, type AttemptResultSchema } from "@a-move-ago/api-contract";
+import {
+  ApiTransportError,
+  type AttemptRequestSchema,
+  type AttemptResultSchema,
+} from "@a-move-ago/api-contract";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -6,7 +10,12 @@ import type { z } from "zod";
 import { type AppRuntime, RuntimeProvider } from "../../../app/runtime";
 import { runtimeFixture } from "../../../test/runtime-fixture";
 import { useAttempt } from "./attempt";
-import { clearGamePersistence, type GamePersistenceScope, readGameDraft, readPendingAttempt } from "./persistence";
+import {
+  clearGamePersistence,
+  type GamePersistenceScope,
+  readGameDraft,
+  readPendingAttempt,
+} from "./persistence";
 
 const scope: GamePersistenceScope = {
   actorKey: "opaque-guest-key",
@@ -60,7 +69,9 @@ it("restores an attempt interrupted by process shutdown and retries the exact pe
     expect(readPendingAttempt(scope)).toEqual(request);
     return new Promise<z.infer<typeof AttemptResultSchema>>(() => undefined);
   });
-  const first = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, scope), { wrapper: wrapperFor(firstRuntime) });
+  const first = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, scope), {
+    wrapper: wrapperFor(firstRuntime),
+  });
   await act(async () => {
     void first.result.current.submit(retraction);
     await Promise.resolve();
@@ -74,7 +85,9 @@ it("restores an attempt interrupted by process shutdown and retries the exact pe
   const nextRuntime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
   nextRuntime.attemptUuid = vi.fn(() => "44444444-4444-4444-8444-444444444444");
   nextRuntime.api.submitAttempt = vi.fn().mockResolvedValue(incorrect);
-  const next = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, { ...scope }), { wrapper: wrapperFor(nextRuntime) });
+  const next = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, { ...scope }), {
+    wrapper: wrapperFor(nextRuntime),
+  });
   expect(next.result.current.attempt.tag).toBe("retry");
   expect(next.result.current.blocked).toBe(true);
   expect(nextRuntime.api.submitAttempt).not.toHaveBeenCalled();
@@ -86,20 +99,33 @@ it("restores an attempt interrupted by process shutdown and retries the exact pe
   expect(next.result.current.attempt.tag).toBe("incorrect");
   expect(next.result.current.blocked).toBe(false);
   expect(readPendingAttempt(scope)).toBeNull();
-  expect(readGameDraft(scope)).toMatchObject({ currentSquare: "d5", previousSquare: "e4", captureType: "p" });
+  expect(readGameDraft(scope)).toMatchObject({
+    currentSquare: "d5",
+    previousSquare: "e4",
+    captureType: "p",
+  });
 });
 
 it("keeps a lost-response request through remount and clears all draft work only after the solve is confirmed", async () => {
   const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
-  runtime.api.submitAttempt = vi.fn().mockRejectedValueOnce(new ApiTransportError(new TypeError("offline"))).mockResolvedValueOnce(correct);
-  const first = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, scope), { wrapper: wrapperFor(runtime) });
+  runtime.api.submitAttempt = vi
+    .fn()
+    .mockRejectedValueOnce(new ApiTransportError(new TypeError("offline")))
+    .mockResolvedValueOnce(correct);
+  const first = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, scope), {
+    wrapper: wrapperFor(runtime),
+  });
   await act(() => first.result.current.submit(retraction));
   expect(first.result.current.attempt.tag).toBe("retry");
   first.unmount();
-  const next = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, scope), { wrapper: wrapperFor(runtime) });
+  const next = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, scope), {
+    wrapper: wrapperFor(runtime),
+  });
   await act(() => next.result.current.retryAttempt());
   expect(next.result.current.attempt.tag).toBe("solved");
-  expect(vi.mocked(runtime.api.submitAttempt).mock.calls[1]?.[0]).toEqual(vi.mocked(runtime.api.submitAttempt).mock.calls[0]?.[0]);
+  expect(vi.mocked(runtime.api.submitAttempt).mock.calls[1]?.[0]).toEqual(
+    vi.mocked(runtime.api.submitAttempt).mock.calls[0]?.[0],
+  );
   expect(readPendingAttempt(scope)).toBeNull();
   expect(readGameDraft(scope)).toBeNull();
 });
@@ -107,28 +133,48 @@ it("keeps a lost-response request through remount and clears all draft work only
 it("aborts an unresolved request when the actor changes and ignores its late result", async () => {
   const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
   let finish: ((value: typeof incorrect) => void) | undefined;
-  runtime.api.submitAttempt = vi.fn(() => new Promise<typeof incorrect>((resolve) => { finish = resolve; }));
-  const hook = renderHook(({ actorKey }) => useAttempt(scope.caseId, scope.puzzleId, undefined, { ...scope, actorKey }), {
-    initialProps: { actorKey: scope.actorKey },
-    wrapper: wrapperFor(runtime),
+  runtime.api.submitAttempt = vi.fn(
+    () =>
+      new Promise<typeof incorrect>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const hook = renderHook(
+    ({ actorKey }) => useAttempt(scope.caseId, scope.puzzleId, undefined, { ...scope, actorKey }),
+    {
+      initialProps: { actorKey: scope.actorKey },
+      wrapper: wrapperFor(runtime),
+    },
+  );
+  await act(async () => {
+    void hook.result.current.submit(retraction);
+    await Promise.resolve();
   });
-  await act(async () => { void hook.result.current.submit(retraction); await Promise.resolve(); });
   const signal = vi.mocked(runtime.api.submitAttempt).mock.calls[0]?.[1];
   hook.rerender({ actorKey: "another-player" });
   expect(signal?.aborted).toBe(true);
   expect(hook.result.current.attempt.tag).toBe("idle");
-  await act(async () => { finish?.(incorrect); await Promise.resolve(); });
+  await act(async () => {
+    finish?.(incorrect);
+    await Promise.resolve();
+  });
   expect(hook.result.current.attempt.tag).toBe("idle");
   expect(readPendingAttempt({ ...scope, actorKey: "another-player" })).toBeNull();
 });
 
 it("does not reset an active attempt when the same scope is reconstructed on rerender", async () => {
   const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
-  runtime.api.submitAttempt = vi.fn().mockRejectedValue(new ApiTransportError(new TypeError("offline")));
-  const hook = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, { ...scope }), { wrapper: wrapperFor(runtime) });
+  runtime.api.submitAttempt = vi
+    .fn()
+    .mockRejectedValue(new ApiTransportError(new TypeError("offline")));
+  const hook = renderHook(() => useAttempt(scope.caseId, scope.puzzleId, undefined, { ...scope }), {
+    wrapper: wrapperFor(runtime),
+  });
   await act(() => hook.result.current.submit(retraction));
-  const request = hook.result.current.attempt.tag === "retry" ? hook.result.current.attempt.request : null;
+  const request =
+    hook.result.current.attempt.tag === "retry" ? hook.result.current.attempt.request : null;
   hook.rerender();
   expect(hook.result.current.attempt.tag).toBe("retry");
-  if (hook.result.current.attempt.tag === "retry") expect(hook.result.current.attempt.request).toBe(request);
+  if (hook.result.current.attempt.tag === "retry")
+    expect(hook.result.current.attempt.request).toBe(request);
 });

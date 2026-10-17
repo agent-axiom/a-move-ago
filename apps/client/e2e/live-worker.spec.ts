@@ -1,6 +1,6 @@
-import { selectCapturedPiece } from "./game-controls";
 import { DailyCaseResponseSchema, StatsResponseSchema } from "@a-move-ago/api-contract";
 import { expect, test } from "@playwright/test";
+import { selectCapturedPiece } from "./game-controls";
 
 test.skip(process.env.LIVE_API_E2E !== "true", "Requires the seeded local Worker on port 8787.");
 

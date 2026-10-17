@@ -2,7 +2,11 @@ import { parseFen } from "@a-move-ago/game-core";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
-import { clearGamePersistence, type GamePersistenceScope, readGameDraft } from "../model/persistence";
+import {
+  clearGamePersistence,
+  type GamePersistenceScope,
+  readGameDraft,
+} from "../model/persistence";
 import { RetractionComposer } from "./RetractionComposer";
 
 afterEach(() => {
@@ -131,14 +135,25 @@ it("restores partial selection and configured capture after remount, then clears
   const user = userEvent.setup();
   const submit = vi.fn();
   const tree = () => (
-    <RetractionComposer disabled={false} onSubmit={submit} post={parseFen(postFen)} retractingColor="w" persistenceScope={scope} />
+    <RetractionComposer
+      disabled={false}
+      onSubmit={submit}
+      post={parseFen(postFen)}
+      retractingColor="w"
+      persistenceScope={scope}
+    />
   );
   const first = render(tree());
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
   first.unmount();
   const second = render(tree());
-  expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toHaveAttribute("aria-selected", "true");
-  expect(screen.getByText("Choose the square it came from.", { selector: ".board-caption" })).toBeVisible();
+  expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(
+    screen.getByText("Choose the square it came from.", { selector: ".board-caption" }),
+  ).toBeVisible();
   await user.click(screen.getByRole("gridcell", { name: "e4, empty" }));
   await user.click(screen.getByText("Capture or special move", { selector: "summary" }));
   await user.selectOptions(screen.getByLabelText("Captured piece"), "p");
@@ -148,19 +163,34 @@ it("restores partial selection and configured capture after remount, then clears
   expect(screen.getByLabelText("Captured piece")).toHaveValue("p");
   expect(screen.getByText("Captured piece: Pawn")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Check move" }));
-  expect(submit).toHaveBeenCalledWith(expect.objectContaining({ currentSquare: "d5", previousSquare: "e4", restoredPiece: { color: "b", type: "p", square: "d5" } }));
+  expect(submit).toHaveBeenCalledWith(
+    expect.objectContaining({
+      currentSquare: "d5",
+      previousSquare: "e4",
+      restoredPiece: { color: "b", type: "p", square: "d5" },
+    }),
+  );
   await user.click(screen.getByRole("button", { name: "Reset" }));
   expect(readGameDraft(scope)).toBeNull();
   third.unmount();
   render(tree());
   expect(screen.getByRole("button", { name: "Check move" })).toBeDisabled();
-  expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toHaveAttribute("aria-selected", "false");
+  expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toHaveAttribute(
+    "aria-selected",
+    "false",
+  );
 });
 
 it("resets the visible draft on an account or version change even when the board is identical", async () => {
   const user = userEvent.setup();
   const tree = (persistenceScope: GamePersistenceScope) => (
-    <RetractionComposer disabled={false} onSubmit={vi.fn()} post={parseFen(postFen)} retractingColor="w" persistenceScope={persistenceScope} />
+    <RetractionComposer
+      disabled={false}
+      onSubmit={vi.fn()}
+      post={parseFen(postFen)}
+      retractingColor="w"
+      persistenceScope={persistenceScope}
+    />
   );
   const view = render(tree(scope));
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
@@ -174,7 +204,14 @@ it("resets the visible draft on an account or version change even when the board
 
 it("keeps selected capture information visible when its advanced controls are collapsed", async () => {
   const user = userEvent.setup();
-  render(<RetractionComposer disabled={false} onSubmit={vi.fn()} post={parseFen(postFen)} retractingColor="w" />);
+  render(
+    <RetractionComposer
+      disabled={false}
+      onSubmit={vi.fn()}
+      post={parseFen(postFen)}
+      retractingColor="w"
+    />,
+  );
   const disclosure = screen.getByText("Capture or special move", { selector: "summary" });
   expect(screen.getByLabelText("Captured piece")).not.toBeVisible();
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));

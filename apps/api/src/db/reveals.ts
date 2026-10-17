@@ -42,15 +42,6 @@ export async function readSolvedPuzzleReveal(
         ORDER BY a.submitted_at, a.id
         LIMIT 1`,
     )
-    .bind(
-      caseId,
-      puzzleId,
-      puzzleId,
-      today,
-      actor.sessionId,
-      now,
-      actor.kind,
-      actor.playerId,
-    )
+    .bind(caseId, puzzleId, puzzleId, today, actor.sessionId, now, actor.kind, actor.playerId)
     .first<SolvedPuzzleRevealRow>();
 }

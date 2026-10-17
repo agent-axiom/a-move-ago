@@ -2,8 +2,20 @@ import type { Color, Retraction } from "@a-move-ago/api-contract";
 import { type FenState, serializeFen } from "@a-move-ago/game-core";
 import { type ReactNode, useState } from "react";
 import { useI18n } from "../../../i18n";
-import { buildPreview, type CapturePieceType, type DraftEvent, type DraftState, draftReducer, initialDraft } from "../model/draft";
-import { type GamePersistenceScope, gamePersistenceKey, readGameDraft, writeGameDraft } from "../model/persistence";
+import {
+  buildPreview,
+  type CapturePieceType,
+  type DraftEvent,
+  type DraftState,
+  draftReducer,
+  initialDraft,
+} from "../model/draft";
+import {
+  type GamePersistenceScope,
+  gamePersistenceKey,
+  readGameDraft,
+  writeGameDraft,
+} from "../model/persistence";
 import { Chessboard } from "./Chessboard";
 
 const captureOptions: ReadonlyArray<CapturePieceType> = ["p", "n", "b", "r", "q"];
@@ -34,12 +46,24 @@ export function RetractionComposer(props: RetractionComposerProps) {
 function restoredDraft(props: RetractionComposerProps): DraftState {
   const saved = readGameDraft(props.persistenceScope);
   if (!saved || saved.tag === "select-current") return initialDraft;
-  let draft = draftReducer(props.post, props.retractingColor, initialDraft, { type: "select-square", square: saved.currentSquare });
+  let draft = draftReducer(props.post, props.retractingColor, initialDraft, {
+    type: "select-square",
+    square: saved.currentSquare,
+  });
   if (draft.tag !== "select-previous" || saved.tag === "select-previous") return draft;
-  draft = draftReducer(props.post, props.retractingColor, draft, { type: "select-square", square: saved.previousSquare });
+  draft = draftReducer(props.post, props.retractingColor, draft, {
+    type: "select-square",
+    square: saved.previousSquare,
+  });
   if (draft.tag !== "configure") return initialDraft;
-  draft = draftReducer(props.post, props.retractingColor, draft, { type: "set-special", special: saved.special });
-  return draftReducer(props.post, props.retractingColor, draft, { type: "set-capture", pieceType: saved.captureType });
+  draft = draftReducer(props.post, props.retractingColor, draft, {
+    type: "set-special",
+    special: saved.special,
+  });
+  return draftReducer(props.post, props.retractingColor, draft, {
+    type: "set-capture",
+    pieceType: saved.captureType,
+  });
 }
 
 function RetractionComposerForm(props: RetractionComposerProps) {
@@ -170,7 +194,9 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           <p className="advanced-move-summary">
             {draft.special !== "normal" ? t(specialLabels[draft.special]) : null}
             {draft.special !== "normal" && draft.captureType ? " · " : null}
-            {draft.captureType ? `${t("game.captured")}: ${t(`game.capture.${draft.captureType}`)}` : null}
+            {draft.captureType
+              ? `${t("game.captured")}: ${t(`game.capture.${draft.captureType}`)}`
+              : null}
           </p>
         ) : null}
         <details
@@ -179,65 +205,65 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
         >
           <summary>{t("game.advanced")}</summary>
-        <fieldset
-          className="retraction-details"
-          disabled={props.disabled || draft.tag !== "configure"}
-        >
-          <legend>{t("game.details")}</legend>
-          <label>
-            {t("game.special")}
-            <select
-              aria-label={t("game.special")}
-              onChange={(event) =>
-                dispatch({
-                  type: "set-special",
-                  special: event.currentTarget.value as Retraction["special"],
-                })
-              }
-              value={draft.tag === "configure" ? draft.special : "normal"}
-            >
-              <option value="normal">{t("game.special.normal")}</option>
-              <option value="castle-kingside">{t("game.special.kingside")}</option>
-              <option value="castle-queenside">{t("game.special.queenside")}</option>
-              <option value="en-passant">{t("game.special.enPassant")}</option>
-              <option value="unpromotion">{t("game.special.unpromotion")}</option>
-            </select>
-          </label>
-          <label>
-            {t("game.captured")}
-            <select
-              aria-label={t("game.captured")}
-              disabled={
-                props.disabled ||
-                draft.tag !== "configure" ||
-                draft.special.startsWith("castle") ||
-                draft.special === "en-passant"
-              }
-              onChange={(event) =>
-                dispatch({
-                  type: "set-capture",
-                  pieceType:
-                    event.currentTarget.value === ""
-                      ? null
-                      : (event.currentTarget.value as CapturePieceType),
-                })
-              }
-              value={draft.tag === "configure" ? (draft.captureType ?? "") : ""}
-            >
-              <option value="">{t("game.none")}</option>
-              {captureOptions.map((option) => (
-                <option key={option} value={option}>
-                  {t(`game.capture.${option}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </fieldset>
-        <p className="move-details-help">
-          {t("game.promotionHelp.before")}
-          <strong>{t("game.special.unpromotion")}</strong>
-          {t("game.promotionHelp.after")}
-        </p>
+          <fieldset
+            className="retraction-details"
+            disabled={props.disabled || draft.tag !== "configure"}
+          >
+            <legend>{t("game.details")}</legend>
+            <label>
+              {t("game.special")}
+              <select
+                aria-label={t("game.special")}
+                onChange={(event) =>
+                  dispatch({
+                    type: "set-special",
+                    special: event.currentTarget.value as Retraction["special"],
+                  })
+                }
+                value={draft.tag === "configure" ? draft.special : "normal"}
+              >
+                <option value="normal">{t("game.special.normal")}</option>
+                <option value="castle-kingside">{t("game.special.kingside")}</option>
+                <option value="castle-queenside">{t("game.special.queenside")}</option>
+                <option value="en-passant">{t("game.special.enPassant")}</option>
+                <option value="unpromotion">{t("game.special.unpromotion")}</option>
+              </select>
+            </label>
+            <label>
+              {t("game.captured")}
+              <select
+                aria-label={t("game.captured")}
+                disabled={
+                  props.disabled ||
+                  draft.tag !== "configure" ||
+                  draft.special.startsWith("castle") ||
+                  draft.special === "en-passant"
+                }
+                onChange={(event) =>
+                  dispatch({
+                    type: "set-capture",
+                    pieceType:
+                      event.currentTarget.value === ""
+                        ? null
+                        : (event.currentTarget.value as CapturePieceType),
+                  })
+                }
+                value={draft.tag === "configure" ? (draft.captureType ?? "") : ""}
+              >
+                <option value="">{t("game.none")}</option>
+                {captureOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {t(`game.capture.${option}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </fieldset>
+          <p className="move-details-help">
+            {t("game.promotionHelp.before")}
+            <strong>{t("game.special.unpromotion")}</strong>
+            {t("game.promotionHelp.after")}
+          </p>
         </details>
         {props.feedback}
         {props.support}

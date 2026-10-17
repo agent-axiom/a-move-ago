@@ -12,7 +12,10 @@ import { SessionProvider, useSession } from "./features/session/SessionProvider"
 import type { Me } from "./features/session/session-state";
 import { StatsPanel } from "./features/stats/StatsPanel";
 import { FirstMoveTutorial } from "./features/tutorial/FirstMoveTutorial";
-import { dismissTutorialInvitation, shouldOfferTutorial } from "./features/tutorial/tutorial-preference";
+import {
+  dismissTutorialInvitation,
+  shouldOfferTutorial,
+} from "./features/tutorial/tutorial-preference";
 import { I18nProvider, LanguageSwitcher, localizedSystemMessage, useI18n } from "./i18n";
 import { tutorialCopy } from "./i18n/messages/tutorial";
 import { BrandMark } from "./shared/BrandMark";
@@ -168,8 +171,12 @@ function AppContent() {
           key={`${identity}:${caseDate ?? "today"}`}
         >
           {(daily) => (
-            <CaseGame daily={daily} key={daily.id} onToday={showToday}
-              onNextUnsolved={() => openNextUnsolved(daily.date)} />
+            <CaseGame
+              daily={daily}
+              key={daily.id}
+              onToday={showToday}
+              onNextUnsolved={() => openNextUnsolved(daily.date)}
+            />
           )}
         </DailyCaseGate>
       </>
@@ -246,7 +253,9 @@ function AppContent() {
                 </li>
               </ol>
               <p className="help-note">{t("shell.helpNote")}</p>
-              <button type="button" onClick={openTutorial}>{tutorial.learnButton}</button>
+              <button type="button" onClick={openTutorial}>
+                {tutorial.learnButton}
+              </button>
             </div>
           </details>
         </nav>
@@ -259,11 +268,20 @@ function AppContent() {
               <p>{tutorial.invitationBody}</p>
             </div>
             <div className="tutorial-invitation-actions">
-              <button type="button" onClick={openTutorial}>{tutorial.invitationStart}</button>
-              <button type="button" className="button-quiet" onClick={() => {
-                dismissTutorialInvitation();
-                setTutorialOffered(false);
-              }}>{tutorial.invitationDismiss}</button>
+              <button type="button" onClick={openTutorial}>
+                {tutorial.invitationStart}
+              </button>
+              <button
+                type="button"
+                className="button-quiet tutorial-invitation-dismiss"
+                aria-label={tutorial.invitationDismiss}
+                onClick={() => {
+                  dismissTutorialInvitation();
+                  setTutorialOffered(false);
+                }}
+              >
+                <span aria-hidden="true">×</span>
+              </button>
             </div>
           </aside>
         ) : null}

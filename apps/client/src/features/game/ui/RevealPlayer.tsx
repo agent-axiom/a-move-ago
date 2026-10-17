@@ -116,12 +116,16 @@ export function RevealPlayer(props: {
         </p>
       </div>
       <div className="solution-panel">
-        <p className="game-eyebrow">{props.review ? continuationMessages[locale].review : t("game.reveal.eyebrow")}</p>
+        <p className="game-eyebrow">
+          {props.review ? continuationMessages[locale].review : t("game.reveal.eyebrow")}
+        </p>
         <div className="solved-heading">
           <span className="solved-mark" aria-hidden="true">
             ✓
           </span>
-          <h2 id={headingId}>{props.review ? continuationMessages[locale].reviewTitle : t("game.solved")}</h2>
+          <h2 id={headingId}>
+            {props.review ? continuationMessages[locale].reviewTitle : t("game.solved")}
+          </h2>
         </div>
         {!props.review && props.progress && props.progress.earnedPoints !== null ? (
           <aside className="solution-reward" aria-live="polite">

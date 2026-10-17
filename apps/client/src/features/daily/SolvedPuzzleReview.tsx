@@ -27,15 +27,20 @@ export function SolvedPuzzleReview(props: {
   useEffect(() => {
     const controller = new AbortController();
     setState({ tag: "loading" });
-    void runtime.api.getPuzzleReveal(props.caseId, props.puzzle.id, controller.signal)
+    void runtime.api
+      .getPuzzleReveal(props.caseId, props.puzzle.id, controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
-          clearCompletedGame(actorKey ? {
-            actorKey,
-            caseId: props.caseId,
-            puzzleId: props.puzzle.id,
-            puzzleVersion: props.puzzle.version,
-          } : undefined);
+          clearCompletedGame(
+            actorKey
+              ? {
+                  actorKey,
+                  caseId: props.caseId,
+                  puzzleId: props.puzzle.id,
+                  puzzleVersion: props.puzzle.version,
+                }
+              : undefined,
+          );
           setState({ tag: "ready", solution: result.reveal });
         }
       })
@@ -48,7 +53,8 @@ export function SolvedPuzzleReview(props: {
   return (
     <div className="solved-review">
       <button className="button-quiet review-back" type="button" onClick={props.onClose}>
-        <span aria-hidden="true">← </span>{copy.back}
+        <span aria-hidden="true">← </span>
+        {copy.back}
       </button>
       {state.tag === "ready" ? (
         <RevealPlayer
@@ -62,7 +68,11 @@ export function SolvedPuzzleReview(props: {
       ) : (
         <div className="state-panel">
           <p role="alert">{copy.reviewError}</p>
-          <button className="button-secondary" type="button" onClick={() => setRevision((value) => value + 1)}>
+          <button
+            className="button-secondary"
+            type="button"
+            onClick={() => setRevision((value) => value + 1)}
+          >
             {copy.retry}
           </button>
         </div>

@@ -216,7 +216,13 @@ export async function checkProductionPlay(
     }
     return { data, headers: response.headers };
   }
-  async function api(path, body, status = 200, includeLocalizations = localized) {
+  async function api(
+    path,
+    body,
+    status = 200,
+    includeLocalizations = localized,
+    includeGameProgress = false,
+  ) {
     return call(
       "API",
       `${env.API_ORIGIN}${path}`,
@@ -228,6 +234,7 @@ export async function checkProductionPlay(
           ...(body === undefined ? {} : { "content-type": "application/json" }),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(includeLocalizations ? { "x-content-locales": "1" } : {}),
+          ...(includeGameProgress ? { "x-game-progress": "1" } : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       },
@@ -258,16 +265,30 @@ export async function checkProductionPlay(
       daily.puzzles.every((puzzle) => neutralPrompt(puzzle, localized)),
     "PUBLIC_DAILY_FAILED",
   );
-  async function stats(expected) {
-    const { data } = await api("/v1/me/stats");
+  async function stats(expected, includePoints = false) {
+    const { data } = await api("/v1/me/stats", undefined, 200, localized, includePoints);
+    const { points, ...withoutPoints } = data ?? {};
     ensure(
-      keys(data, [...counters, "lastCompletedDate"]) && isDeepStrictEqual(data, expected),
+      keys(data, [...counters, "lastCompletedDate", ...(includePoints ? ["points"] : [])]) &&
+        (!includePoints || (Number.isSafeInteger(points) && points >= 0)) &&
+        isDeepStrictEqual(includePoints ? withoutPoints : data, expected),
       "GUEST_STATS_FAILED",
     );
     return data;
   }
   const empty = { ...Object.fromEntries(counters.map((key) => [key, 0])), lastCompletedDate: null };
   await stats(empty);
+  const reviewPath = `/v1/cases/${encodeURIComponent(daily.id)}/puzzles/${encodeURIComponent(daily.puzzles[0].id)}/reveal`;
+  const deniedReview = await api(reviewPath, undefined, 404);
+  ensure(
+    deniedReview.headers.get("cache-control") === "no-store" &&
+      keys(deniedReview.data, ["error"]) &&
+      keys(deniedReview.data.error, ["code", "message", "requestId"]) &&
+      deniedReview.data.error.code === "REVEAL_NOT_FOUND" &&
+      nonempty(deniedReview.data.error.message) &&
+      nonempty(deniedReview.data.error.requestId),
+    "UNSOLVED_REVIEW_FAILED",
+  );
   const { data: stored } = await call(
     "D1",
     `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/d1/database/${env.D1_DATABASE_ID}/query`,
@@ -392,7 +413,18 @@ export async function checkProductionPlay(
     bestStreak: completed,
     lastCompletedDate: completed ? date : null,
   };
-  await stats(expected);
+  const beforeReview = await stats(expected, true);
+  const earnedReview = await api(reviewPath);
+  ensure(
+    earnedReview.headers.get("cache-control") === "no-store" &&
+      keys(earnedReview.data, ["reveal"]) &&
+      isDeepStrictEqual(earnedReview.data.reveal, correct.reveal),
+    "EARNED_REVIEW_FAILED",
+  );
+  ensure(
+    isDeepStrictEqual(await stats(expected, true), beforeReview),
+    "EARNED_REVIEW_STATS_CHANGED",
+  );
   if (localized) {
     const englishReplay = await api("/v1/attempts", attempt, 200, false);
     ensure(
@@ -436,9 +468,17 @@ export async function checkProductionPlay(
       locales: ["ru", "zh"],
       englishCompatible: true,
       idempotencyVerified: true,
+      earnedReviewVerified: true,
     };
   }
-  return { ok: true, date, puzzlesSolved: 1, attempts: 1, idempotencyVerified: true };
+  return {
+    ok: true,
+    date,
+    puzzlesSolved: 1,
+    attempts: 1,
+    idempotencyVerified: true,
+    earnedReviewVerified: true,
+  };
 }
 
 export async function runCli(

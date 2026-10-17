@@ -1,6 +1,6 @@
-import { selectCapturedPiece } from "./game-controls";
 import { expect, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
+import { selectCapturedPiece } from "./game-controls";
 
 const storageKey = "amoveago.session.v1";
 const telegramToken = "t".repeat(43);

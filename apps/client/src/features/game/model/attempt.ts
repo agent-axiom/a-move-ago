@@ -179,7 +179,9 @@ export function useAttempt(
         return;
       const pending = readPendingAttempt(scope);
       if (pending) {
-        await sendAttempt(Object.freeze({ ...pending, retraction: frozenRetraction(pending.retraction) }));
+        await sendAttempt(
+          Object.freeze({ ...pending, retraction: frozenRetraction(pending.retraction) }),
+        );
         return;
       }
       const request = Object.freeze({
@@ -223,7 +225,11 @@ export function useAttempt(
           (items.some((item) => item.level === hint.level) ? items : [...items, hint]);
         setHints({ tag: "idle", items: next });
       } catch (error) {
-        if (!controller.signal.aborted && activeLifecycle.current.runtime === runtime && activeLifecycle.current.scope === scope) {
+        if (
+          !controller.signal.aborted &&
+          activeLifecycle.current.runtime === runtime &&
+          activeLifecycle.current.scope === scope
+        ) {
           setHints({ tag: "retry", items, request, failure: classifyFailure(error) });
         }
       } finally {
@@ -262,7 +268,11 @@ export function useAttempt(
       setHints({ tag: "idle", items: result.progress.earnedHints });
       setClue({ tag: "idle", content: result });
     } catch (error) {
-      if (!controller.signal.aborted && activeLifecycle.current.runtime === runtime && activeLifecycle.current.scope === scope) {
+      if (
+        !controller.signal.aborted &&
+        activeLifecycle.current.runtime === runtime &&
+        activeLifecycle.current.scope === scope
+      ) {
         setClue({ tag: "retry", content: null, failure: classifyFailure(error) });
       }
     } finally {

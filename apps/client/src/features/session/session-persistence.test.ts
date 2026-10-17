@@ -2,18 +2,28 @@ import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runtimeFixture } from "../../test/runtime-fixture";
 import { gamePersistenceKey, readGameDraft, writeGameDraft } from "../game/model/persistence";
-import { bootstrapSession, deleteProfile, saveProgress } from "./session-service";
 import { discardGamePersistence, prepareDraftActor } from "./session-persistence";
+import { bootstrapSession, deleteProfile, saveProgress } from "./session-service";
 
 const guest = { kind: "guest", profile: null } as const;
-const telegram = { kind: "telegram", profile: { telegramUserId: "42", displayName: "Ada", username: null, avatarUrl: null } } as const;
-const scope = (actorKey: string) => ({ actorKey, caseId: "case", puzzleId: "puzzle", puzzleVersion: 1 });
+const telegram = {
+  kind: "telegram",
+  profile: { telegramUserId: "42", displayName: "Ada", username: null, avatarUrl: null },
+} as const;
+const scope = (actorKey: string) => ({
+  actorKey,
+  caseId: "case",
+  puzzleId: "puzzle",
+  puzzleVersion: 1,
+});
 
 function fixture() {
   const runtime = runtimeFixture({ storedToken: "s".repeat(43), platformKind: "telegram" });
   let key: string | null = null;
   runtime.draftActorKey = () => key;
-  runtime.setDraftActorKey = (next) => { key = next; };
+  runtime.setDraftActorKey = (next) => {
+    key = next;
+  };
   return runtime;
 }
 
@@ -43,7 +53,10 @@ describe("session-scoped game drafts", () => {
     const oldKey = runtime.draftActorKey?.()!;
     writeGameDraft(scope(oldKey), { tag: "select-previous", currentSquare: "e4" });
     localStorage.setItem("a-move-ago.locale", "ru");
-    vi.mocked(runtime.platform.requestTelegramProof).mockResolvedValue({ kind: "telegram-mini-app", initData: "proof" });
+    vi.mocked(runtime.platform.requestTelegramProof).mockResolvedValue({
+      kind: "telegram-mini-app",
+      initData: "proof",
+    });
     await saveProgress(runtime);
     expect(runtime.draftActorKey?.()).not.toBe(oldKey);
     expect(localStorage.getItem(gamePersistenceKey(scope(oldKey))!)).toBeNull();
@@ -66,7 +79,14 @@ describe("session-scoped game drafts", () => {
   it("does not reinstall an old actor after an asynchronous ownership reset", async () => {
     const runtime = fixture();
     let finish!: (value: ArrayBuffer) => void;
-    vi.stubGlobal("crypto", { subtle: { digest: () => new Promise<ArrayBuffer>((resolve) => { finish = resolve; }) } });
+    vi.stubGlobal("crypto", {
+      subtle: {
+        digest: () =>
+          new Promise<ArrayBuffer>((resolve) => {
+            finish = resolve;
+          }),
+      },
+    });
     const pending = prepareDraftActor(runtime, telegram);
     discardGamePersistence(runtime);
     finish(new ArrayBuffer(32));

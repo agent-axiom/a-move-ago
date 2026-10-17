@@ -27,7 +27,9 @@ export async function prepareDraftActor<T extends Me>(runtime: AppRuntime, me: T
     const owner = me.kind === "telegram" ? `telegram:${me.profile.telegramUserId}` : "guest";
     const bytes = new TextEncoder().encode(`a-move-ago:draft:v1:${owner}:${token}`);
     const digest = await crypto.subtle.digest("SHA-256", bytes);
-    const key = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const key = Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
     if (runtime.token.get() === token && actorGenerations.get(runtime) === generation) {
       runtime.setDraftActorKey(key);
     }

@@ -31,6 +31,15 @@
   gap: 0.5rem;
 }
 
+.tutorial-invitation-dismiss {
+  flex: none;
+  inline-size: 44px;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  padding: 0;
+  font-size: 1.4rem;
+}
+
 @media (max-width: 800px) {
   .tutorial-invitation {
     flex-direction: column;
@@ -46,6 +55,32 @@
   .tutorial-invitation-actions button {
     white-space: normal;
     min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tutorial-invitation {
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .tutorial-invitation h2 {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+
+  .tutorial-invitation p {
+    display: none;
+  }
+
+  .tutorial-invitation-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .tutorial-invitation-actions > button:first-child {
+    padding-inline: 0.65rem;
+    font-size: 0.78rem;
   }
 }
 

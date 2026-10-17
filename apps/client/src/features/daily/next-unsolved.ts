@@ -15,7 +15,8 @@ export async function findNextUnsolvedCase(
       dailyCase.date === currentDate ||
       dailyCase.date > archive.today ||
       dailyCase.solvedPuzzles >= dailyCase.puzzleCount
-    ) continue;
+    )
+      continue;
     if (next === null || dailyCase.date > next) next = dailyCase.date;
   }
   return next;

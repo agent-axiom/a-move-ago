@@ -51,7 +51,8 @@ it("isolates saved work by actor, case, puzzle, and content version", () => {
     { ...scope, caseId: "another-case" },
     { ...scope, puzzleId: "another-puzzle" },
     { ...scope, puzzleVersion: 2 },
-  ]) expect(readGameDraft(other)).toBeNull();
+  ])
+    expect(readGameDraft(other)).toBeNull();
   expect(readGameDraft()).toBeNull();
   expect(readGameDraft({ ...scope, actorKey: "" })).toBeNull();
 });
@@ -85,7 +86,11 @@ it.each([
   JSON.stringify({ schema: 1, updatedAt: Date.now(), draft: { ...draft, currentSquare: "z9" } }),
   JSON.stringify({ schema: 1, updatedAt: Date.now(), draft: { ...draft, captureType: "k" } }),
   JSON.stringify({ schema: 1, updatedAt: 0, draft }),
-  JSON.stringify({ schema: 1, updatedAt: Date.now(), pending: { ...request, puzzleId: "another-puzzle" } }),
+  JSON.stringify({
+    schema: 1,
+    updatedAt: Date.now(),
+    pending: { ...request, puzzleId: "another-puzzle" },
+  }),
 ])("discards corrupt, expired, unsupported, or mismatched persisted data", (raw) => {
   const key = gamePersistenceKey(scope) ?? "";
   localStorage.setItem(key, raw);
@@ -116,9 +121,15 @@ it("keeps unresolved attempts when older editor drafts are pruned", () => {
 });
 
 it("continues safely when local storage access is denied or full", () => {
-  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("denied"); });
-  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
-  vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("denied"); });
+  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    throw new Error("denied");
+  });
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new Error("quota");
+  });
+  vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+    throw new Error("denied");
+  });
   expect(() => {
     writeGameDraft(scope, draft);
     writePendingAttempt(scope, request);

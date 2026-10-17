@@ -73,8 +73,9 @@ describe("read-only solved puzzle review", () => {
     await testEnv.DB.prepare("UPDATE sessions SET revoked_at = 1 WHERE id = ?")
       .bind(guest.sessionId)
       .run();
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status)
-      .toBe(401);
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status,
+    ).toBe(401);
   });
 
   it("reopens an earned explanation by canonical ID or public alias without attempts or point changes", async () => {
@@ -112,8 +113,9 @@ describe("read-only solved puzzle review", () => {
     const id = await completedAttempt(fixture, guest.sessionId);
     await testEnv.DB.prepare("DELETE FROM gameplay_events WHERE attempt_id = ?").bind(id).run();
     const before = await ledgerSnapshot();
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status)
-      .toBe(200);
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status,
+    ).toBe(200);
     expect(await ledgerSnapshot()).toEqual(before);
   });
 
@@ -123,14 +125,26 @@ describe("read-only solved puzzle review", () => {
     await completedAttempt(fixture, guest.sessionId);
     await testEnv.DB.prepare(
       "INSERT INTO content_imports (digest, case_id, source_name, imported_at) VALUES (?, ?, 'synthetic', 1)",
-    ).bind(contentDigest, fixture.caseId).run();
-    for (const [locale, explanation] of [["ru", "Разбор уже решённой задачи."], ["zh", "已解棋题的讲解。"]]) {
+    )
+      .bind(contentDigest, fixture.caseId)
+      .run();
+    for (const [locale, explanation] of [
+      ["ru", "Разбор уже решённой задачи."],
+      ["zh", "已解棋题的讲解。"],
+    ]) {
       await testEnv.DB.prepare(
         `INSERT INTO puzzle_localizations
           (puzzle_id, locale, public_json, private_json, source_digest, content_digest)
          VALUES (?, ?, '{}', ?, ?, ?)`,
-      ).bind(fixture.puzzle.rowId, locale,
-        JSON.stringify({ explanations: [explanation] }), contentDigest, contentDigest).run();
+      )
+        .bind(
+          fixture.puzzle.rowId,
+          locale,
+          JSON.stringify({ explanations: [explanation] }),
+          contentDigest,
+          contentDigest,
+        )
+        .run();
     }
     const plain = PuzzleRevealResponseSchema.parse(
       (await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).body,
@@ -150,47 +164,76 @@ describe("read-only solved puzzle review", () => {
     const guest = await issueGuest();
     await completedAttempt(fixture, guest.sessionId);
     await testEnv.DB.prepare("UPDATE daily_cases SET case_date = '2026-10-18' WHERE id = ?")
-      .bind(fixture.caseId).run();
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status)
-      .toBe(404);
-    await testEnv.DB.prepare("UPDATE daily_cases SET case_date = '2026-10-16', status = 'retired' WHERE id = ?")
-      .bind(fixture.caseId).run();
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status)
-      .toBe(404);
+      .bind(fixture.caseId)
+      .run();
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status,
+    ).toBe(404);
+    await testEnv.DB.prepare(
+      "UPDATE daily_cases SET case_date = '2026-10-16', status = 'retired' WHERE id = ?",
+    )
+      .bind(fixture.caseId)
+      .run();
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status,
+    ).toBe(404);
     await testEnv.DB.prepare("UPDATE daily_cases SET status = 'published' WHERE id = ?")
-      .bind(fixture.caseId).run();
+      .bind(fixture.caseId)
+      .run();
     await testEnv.DB.prepare("UPDATE puzzles SET status = 'draft' WHERE id = ?")
-      .bind(fixture.puzzle.rowId).run();
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status)
-      .toBe(404);
+      .bind(fixture.puzzle.rowId)
+      .run();
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, guest.token)).response.status,
+    ).toBe(404);
   });
 
   it("allows the same Telegram player across sessions, never a linked-away guest or other player", async () => {
     const fixture = await seedContentFixture(testEnv.DB);
     const oldGuest = await issueGuest();
-    for (const [id, telegramId] of [["owner", "1"], ["other", "2"]]) {
+    for (const [id, telegramId] of [
+      ["owner", "1"],
+      ["other", "2"],
+    ]) {
       await testEnv.DB.prepare(
         "INSERT INTO players (id, telegram_user_id, display_name, created_at, updated_at) VALUES (?, ?, 'Review player', 1, 1)",
-      ).bind(id, telegramId).run();
+      )
+        .bind(id, telegramId)
+        .run();
     }
     const linkedAttempt = await completedAttempt(fixture, oldGuest.sessionId);
     await testEnv.DB.prepare("UPDATE attempts SET player_id = 'owner' WHERE id = ?")
-      .bind(linkedAttempt).run();
+      .bind(linkedAttempt)
+      .run();
     const ownerToken = "A".repeat(43);
     const otherToken = "B".repeat(43);
-    for (const [playerId, token] of [["owner", ownerToken], ["other", otherToken]] as const) {
+    for (const [playerId, token] of [
+      ["owner", ownerToken],
+      ["other", otherToken],
+    ] as const) {
       await testEnv.DB.prepare(
         `INSERT INTO sessions (id, player_id, token_hash, kind, channel, created_at, expires_at, last_seen_at)
          VALUES (?, ?, ?, 'telegram', 'web', ?, ?, ?)`,
-      ).bind(`${playerId}-session`, playerId, await hashSessionToken(token, testEnv.SESSION_PEPPER),
-        timestamp, timestamp + 86_400, timestamp).run();
+      )
+        .bind(
+          `${playerId}-session`,
+          playerId,
+          await hashSessionToken(token, testEnv.SESSION_PEPPER),
+          timestamp,
+          timestamp + 86_400,
+          timestamp,
+        )
+        .run();
     }
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, oldGuest.token)).response.status)
-      .toBe(404);
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, oldGuest.token)).response.status,
+    ).toBe(404);
     await testEnv.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(oldGuest.sessionId).run();
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, ownerToken)).response.status)
-      .toBe(200);
-    expect((await review(fixture.caseId, fixture.puzzle.contentKey, otherToken)).response.status)
-      .toBe(404);
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, ownerToken)).response.status,
+    ).toBe(200);
+    expect(
+      (await review(fixture.caseId, fixture.puzzle.contentKey, otherToken)).response.status,
+    ).toBe(404);
   });
 });

@@ -13,13 +13,7 @@ const previousBoard = parseFen("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1").board;
 
 type Feedback = "selectPawn" | "chooseEmpty" | "tryAgain" | null;
 
-export function FirstMoveTutorial({
-  locale,
-  onClose,
-}: {
-  locale: Locale;
-  onClose(): void;
-}) {
+export function FirstMoveTutorial({ locale, onClose }: { locale: Locale; onClose(): void }) {
   const copy = tutorialCopy[locale];
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -143,8 +137,12 @@ export function FirstMoveTutorial({
           {solved ? (
             <>
               <div aria-live="polite" className="tutorial-success">
-                <span aria-hidden="true" className="tutorial-success-mark">✓</span>
-                <h3 ref={successRef} tabIndex={-1}>{copy.successTitle}</h3>
+                <span aria-hidden="true" className="tutorial-success-mark">
+                  ✓
+                </span>
+                <h3 ref={successRef} tabIndex={-1}>
+                  {copy.successTitle}
+                </h3>
                 <p>{copy.successBody}</p>
               </div>
               <p className="tutorial-daily-advice">{copy.dailyAdvice}</p>

@@ -17,20 +17,30 @@ const retentionMs = 30 * 24 * 60 * 60 * 1000;
 const DraftSchema = z.discriminatedUnion("tag", [
   z.object({ tag: z.literal("select-current") }).strict(),
   z.object({ tag: z.literal("select-previous"), currentSquare: SquareSchema }).strict(),
-  z.object({
-    tag: z.literal("configure"),
-    currentSquare: SquareSchema,
-    previousSquare: SquareSchema,
-    special: z.enum(["normal", "castle-kingside", "castle-queenside", "en-passant", "unpromotion"]),
-    captureType: z.enum(["p", "n", "b", "r", "q"]).nullable(),
-  }).strict(),
+  z
+    .object({
+      tag: z.literal("configure"),
+      currentSquare: SquareSchema,
+      previousSquare: SquareSchema,
+      special: z.enum([
+        "normal",
+        "castle-kingside",
+        "castle-queenside",
+        "en-passant",
+        "unpromotion",
+      ]),
+      captureType: z.enum(["p", "n", "b", "r", "q"]).nullable(),
+    })
+    .strict(),
 ]);
-const RecordSchema = z.object({
-  schema: z.literal(1),
-  updatedAt: z.number().int().nonnegative(),
-  draft: DraftSchema.optional(),
-  pending: AttemptRequestSchema.optional(),
-}).strict();
+const RecordSchema = z
+  .object({
+    schema: z.literal(1),
+    updatedAt: z.number().int().nonnegative(),
+    draft: DraftSchema.optional(),
+    pending: AttemptRequestSchema.optional(),
+  })
+  .strict();
 type GameRecord = z.infer<typeof RecordSchema>;
 
 function storage(): Storage | null {
@@ -42,7 +52,14 @@ function storage(): Storage | null {
 }
 
 export function gamePersistenceKey(scope?: GamePersistenceScope): string | null {
-  if (!scope?.actorKey || !scope.caseId || !scope.puzzleId || !Number.isInteger(scope.puzzleVersion) || scope.puzzleVersion < 1) return null;
+  if (
+    !scope?.actorKey ||
+    !scope.caseId ||
+    !scope.puzzleId ||
+    !Number.isInteger(scope.puzzleVersion) ||
+    scope.puzzleVersion < 1
+  )
+    return null;
   return `${prefix}v1:${JSON.stringify([scope.actorKey, scope.caseId, scope.puzzleId, scope.puzzleVersion])}`;
 }
 
@@ -50,7 +67,12 @@ function parseRecord(raw: string | null): GameRecord | null {
   if (!raw || raw.length > 8192) return null;
   try {
     const parsed = RecordSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success || parsed.data.updatedAt < Date.now() - retentionMs || parsed.data.updatedAt > Date.now() + 60_000) return null;
+    if (
+      !parsed.success ||
+      parsed.data.updatedAt < Date.now() - retentionMs ||
+      parsed.data.updatedAt > Date.now() + 60_000
+    )
+      return null;
     return parsed.data;
   } catch {
     return null;
@@ -64,7 +86,11 @@ function readRecord(scope?: GamePersistenceScope): GameRecord | null {
   try {
     const raw = store.getItem(key);
     const record = parseRecord(raw);
-    if (!record || (record.pending && (record.pending.caseId !== scope?.caseId || record.pending.puzzleId !== scope?.puzzleId))) {
+    if (
+      !record ||
+      (record.pending &&
+        (record.pending.caseId !== scope?.caseId || record.pending.puzzleId !== scope?.puzzleId))
+    ) {
       if (raw !== null) store.removeItem(key);
       return null;
     }
@@ -74,7 +100,10 @@ function readRecord(scope?: GamePersistenceScope): GameRecord | null {
   }
 }
 
-function writeRecord(scope: GamePersistenceScope | undefined, record: Omit<GameRecord, "schema" | "updatedAt">): void {
+function writeRecord(
+  scope: GamePersistenceScope | undefined,
+  record: Omit<GameRecord, "schema" | "updatedAt">,
+): void {
   const key = gamePersistenceKey(scope);
   const store = storage();
   if (!key || !store) return;
@@ -88,7 +117,11 @@ function writeRecord(scope: GamePersistenceScope | undefined, record: Omit<GameR
       const candidate = store.key(index);
       if (!candidate?.startsWith(prefix) || candidate === key) continue;
       const previous = parseRecord(store.getItem(candidate));
-      records.push({ key: candidate, updatedAt: previous?.updatedAt ?? 0, pending: previous?.pending !== undefined });
+      records.push({
+        key: candidate,
+        updatedAt: previous?.updatedAt ?? 0,
+        pending: previous?.pending !== undefined,
+      });
     }
     records.sort((left, right) => left.updatedAt - right.updatedAt);
     for (const item of records) {
@@ -132,7 +165,10 @@ export function readPendingAttempt(scope?: GamePersistenceScope): AttemptRequest
   return readRecord(scope)?.pending ?? null;
 }
 
-export function writePendingAttempt(scope: GamePersistenceScope | undefined, request: AttemptRequest): void {
+export function writePendingAttempt(
+  scope: GamePersistenceScope | undefined,
+  request: AttemptRequest,
+): void {
   if (request.caseId !== scope?.caseId || request.puzzleId !== scope?.puzzleId) return;
   const retraction = request.retraction;
   writeRecord(scope, {
@@ -147,7 +183,10 @@ export function writePendingAttempt(scope: GamePersistenceScope | undefined, req
   });
 }
 
-export function clearPendingAttempt(scope: GamePersistenceScope | undefined, attemptUuid: string): void {
+export function clearPendingAttempt(
+  scope: GamePersistenceScope | undefined,
+  attemptUuid: string,
+): void {
   const record = readRecord(scope);
   if (record?.pending?.attemptUuid !== attemptUuid) return;
   writeRecord(scope, record.draft ? { draft: record.draft } : {});

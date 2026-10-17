@@ -2,7 +2,11 @@ import { expect, type Page, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
 import { selectCapturedPiece } from "./game-controls";
 
-test.use({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+test.use({ viewport: { width: 390, height: 844 } });
+
+test.beforeEach(async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+});
 
 function language(page: Page) {
   return page
@@ -31,7 +35,9 @@ test("the guided first move is free, remembers completion and can be reopened fr
   await expect(lesson).toContainText("Select e2 and try again — practice is free.");
   await lesson.getByRole("gridcell", { name: "e2, empty", exact: true }).click();
   await lesson.getByRole("button", { name: "Check move", exact: true }).click();
-  await expect(lesson.getByRole("heading", { name: "You’ve gone one move back.", exact: true })).toBeVisible();
+  await expect(
+    lesson.getByRole("heading", { name: "You’ve gone one move back.", exact: true }),
+  ).toBeVisible();
   await lesson.getByRole("button", { name: "Start solving", exact: true }).click();
   await expect(lesson).toHaveCount(0);
   await expect(page.locator(".score-attempt")).toHaveText("Attempt 1");
@@ -40,7 +46,10 @@ test("the guided first move is free, remembers completion and can be reopened fr
   await expect(page.locator(".score-potential")).toHaveText("Available: 100 points");
   await expect(page.getByRole("button", { name: "Learn in one move", exact: true })).toHaveCount(0);
   await page.locator(".how-to-play > summary").click();
-  await page.locator(".help-panel").getByRole("button", { name: "How to play", exact: true }).click();
+  await page
+    .locator(".help-panel")
+    .getByRole("button", { name: "How to play", exact: true })
+    .click();
   await expect(lesson).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(lesson).toHaveCount(0);
@@ -128,7 +137,9 @@ test("a committed solve with a lost response is recovered on reload without send
   await expect(page.locator(".personal-rating-total strong")).toHaveText("100");
   await expect(page.getByRole("button", { name: "Retry attempt", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Review solution", exact: true }).click();
-  await expect(page.getByText("The white e-pawn captured the black pawn on d5.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("The white e-pawn captured the black pawn on d5.", { exact: true }),
+  ).toBeVisible();
   expect(observed.attemptBodies).toHaveLength(1);
   expect(observed.revealRequests).toHaveLength(1);
 });
@@ -164,7 +175,9 @@ test("a solved case can be reviewed after reload and translated without another 
   await page.reload();
   await page.getByRole("button", { name: "Review solution", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Solution review", exact: true })).toBeVisible();
-  await expect(page.getByText("The white e-pawn captured the black pawn on d5.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("The white e-pawn captured the black pawn on d5.", { exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".solution-reward")).toHaveCount(0);
   await language(page).selectOption("ru");
   await expect(

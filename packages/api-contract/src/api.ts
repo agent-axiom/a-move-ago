@@ -133,9 +133,7 @@ export const ClueResponseSchema = z
   .strict();
 export type ClueResponse = z.infer<typeof ClueResponseSchema>;
 
-export const PuzzleRevealResponseSchema = z
-  .object({ reveal: AcceptedSolutionSchema })
-  .strict();
+export const PuzzleRevealResponseSchema = z.object({ reveal: AcceptedSolutionSchema }).strict();
 export type PuzzleRevealResponse = z.infer<typeof PuzzleRevealResponseSchema>;
 
 export const DailyCaseResponseSchema = z

@@ -73,7 +73,10 @@ function harness({ override, count = 2 } = {}) {
       requests.push(request);
       let status = 200;
       let payload;
-      const headers = { "access-control-allow-origin": "https://agent-axiom.github.io" };
+      const headers = {
+        "access-control-allow-origin": "https://agent-axiom.github.io",
+        "cache-control": "no-store",
+      };
       if (isD1)
         payload = {
           success: true,
@@ -95,7 +98,15 @@ function harness({ override, count = 2 } = {}) {
         payload = { kind: "guest", token, expiresAt: "2027-01-01T00:00:00Z" };
       } else if (path === "/v1/me") payload = { kind: "guest", profile: null };
       else if (path === "/v1/daily") payload = daily(attempts > 0, count);
-      else if (path === "/v1/me/stats") payload = expectedStats(attempts, count);
+      else if (path === "/v1/me/stats") {
+        payload = expectedStats(attempts, count);
+        if (options.headers["x-game-progress"] === "1") payload.points = attempts ? 100 : 0;
+      } else if (path.endsWith("/reveal")) {
+        status = attempts ? 200 : 404;
+        payload = attempts
+          ? { reveal: solution() }
+          : { error: { code: "REVEAL_NOT_FOUND", message: "No solved puzzle review is available.", requestId: "review-check" } };
+      }
       else if (path === "/v1/attempts") {
         status = submissions++ === 0 ? 201 : 200;
         attempts = 1;
@@ -140,9 +151,10 @@ test("synthetic guest solve and replay preserve progress without private output"
     puzzlesSolved: 1,
     attempts: 1,
     idempotencyVerified: true,
+    earnedReviewVerified: true,
   });
   assertSafe(result);
-  assert.equal(check.requests.length, 10);
+  assert.equal(check.requests.length, 13);
   const d1 = check.requests.find((r) => r.isD1);
   const query = JSON.parse(d1.body);
   assert.match(query.sql, /^SELECT /);
@@ -160,6 +172,16 @@ test("synthetic guest solve and replay preserve progress without private output"
   assert.equal(posts[0].body, posts[1].body);
   assert.deepEqual(JSON.parse(posts[0].body).retraction, solution().retraction);
   assert.equal(JSON.parse(posts[0].body).puzzleId, "p-synthetic-case-1-v1");
+  const reviews = check.requests.filter((request) => request.path.endsWith("/reveal"));
+  assert.equal(reviews.length, 2);
+  assert.ok(check.requests.indexOf(reviews[0]) < check.requests.indexOf(d1));
+  assert.ok(check.requests.indexOf(reviews[1]) > check.requests.indexOf(posts[0]));
+  for (const review of reviews) {
+    assert.equal(review.method, "GET");
+    assert.equal(review.body, undefined);
+    assert.equal(review.path, "/v1/cases/synthetic-case/puzzles/p-synthetic-case-1-v1/reveal");
+  }
+  assert.equal(check.requests.filter((request) => request.path === "/v1/me/stats" && request.headers["x-game-progress"] === "1").length, 2);
   for (const request of check.requests) {
     assert.equal(request.redirect, "error");
     assert.ok(request.signal instanceof AbortSignal);
@@ -173,6 +195,111 @@ test("synthetic guest solve and replay preserve progress without private output"
 });
 test("a one-puzzle case also verifies completion and streak statistics", async () => {
   assert.equal((await harness({ count: 1 }).run()).ok, true);
+});
+
+test("earned-review proof rejects premature access, missing routes, private leakage and changed solutions", async (t) => {
+  const cases = [
+    [
+      "premature solution",
+      (request, payload, status) => {
+        if (request.path.endsWith("/reveal") && status === 404)
+          return { status: 200, payload: { reveal: solution() } };
+      },
+      "API_HTTP_FAILED",
+      true,
+    ],
+    [
+      "old deployment has no review route",
+      (request, payload, status) => {
+        if (request.path.endsWith("/reveal") && status === 404) payload.error.code = "NOT_FOUND";
+      },
+      "UNSOLVED_REVIEW_FAILED",
+      true,
+    ],
+    [
+      "private answer in denied response",
+      (request, payload, status) => {
+        if (request.path.endsWith("/reveal") && status === 404) payload.reveal = solution();
+      },
+      "UNSOLVED_REVIEW_FAILED",
+      true,
+    ],
+    [
+      "changed earned explanation",
+      (request, payload, status) => {
+        if (request.path.endsWith("/reveal") && status === 200) payload.reveal.explanation = "wrong";
+      },
+      "EARNED_REVIEW_FAILED",
+      false,
+    ],
+    [
+      "unearned extra solutions",
+      (request, payload, status) => {
+        if (request.path.endsWith("/reveal") && status === 200) payload.acceptedSolutions = [solution()];
+      },
+      "EARNED_REVIEW_FAILED",
+      false,
+    ],
+    [
+      "cacheable earned response",
+      (request, _payload, status, headers) => {
+        if (request.path.endsWith("/reveal") && status === 200) delete headers["cache-control"];
+      },
+      "EARNED_REVIEW_FAILED",
+      false,
+    ],
+    [
+      "missing rating snapshot",
+      (request, payload) => {
+        if (request.path === "/v1/me/stats") delete payload.points;
+      },
+      "GUEST_STATS_FAILED",
+      false,
+    ],
+  ];
+  for (const [name, mutate, code, failsBeforePrivateRead] of cases) {
+    await t.test(name, async () => {
+      const output = [];
+      const check = harness({
+        override: (request, payload, status, headers) => {
+          const changed = mutate(request, payload, status, headers);
+          return new Response(JSON.stringify(changed?.payload ?? payload), {
+            status: changed?.status ?? status, headers,
+          });
+        },
+      });
+      assert.equal(await runCli([], env, {
+        ...check.deps, log: (value) => output.push(value), errorLog: (value) => output.push(value),
+      }), 1);
+      assert.deepEqual(output.map((value) => JSON.parse(value)), [{ ok: false, code }]);
+      assertSafe(output);
+      if (failsBeforePrivateRead) {
+        assert.equal(check.requests.some((request) => request.isD1), false);
+        assert.equal(check.requests.some((request) => request.path === "/v1/attempts"), false);
+      }
+    });
+  }
+});
+
+test("earned-review proof detects attempts or points changing during a GET", async (t) => {
+  for (const [field, code] of [["attempts", "GUEST_STATS_FAILED"], ["points", "EARNED_REVIEW_STATS_CHANGED"]]) {
+    await t.test(field, async () => {
+      let reviewed = false;
+      const output = [];
+      const check = harness({
+        override: (request, payload, status, headers) => {
+          if (request.path.endsWith("/reveal") && status === 200) reviewed = true;
+          if (reviewed && request.path === "/v1/me/stats") payload[field] += 1;
+          return new Response(JSON.stringify(payload), { status, headers });
+        },
+      });
+      assert.equal(await runCli([], env, {
+        ...check.deps, log: (value) => output.push(value), errorLog: (value) => output.push(value),
+      }), 1);
+      assert.deepEqual(output.map((value) => JSON.parse(value)), [{ ok: false, code }]);
+      assertSafe(output);
+    });
+  }
 });
 test("bindings and destinations are rejected before creating a guest", async (t) => {
   for (const patch of [
@@ -293,7 +420,10 @@ function localizedHarness({ override } = {}) {
       const request = { url, path, isD1, ...options };
       requests.push(request);
       const localized = options.headers["x-content-locales"] === "1";
-      const headers = { "access-control-allow-origin": "https://agent-axiom.github.io" };
+      const headers = {
+        "access-control-allow-origin": "https://agent-axiom.github.io",
+        "cache-control": "no-store",
+      };
       let status = 200;
       let payload;
       if (isD1)
@@ -330,6 +460,13 @@ function localizedHarness({ override } = {}) {
         }
       } else if (path === "/v1/me/stats") {
         payload = { ...expectedStats(solved ? 1 : 0), attempts, hintsUsed: hints };
+        if (options.headers["x-game-progress"] === "1") payload.points = solved ? 35 : 0;
+      } else if (path.endsWith("/reveal")) {
+        status = solved ? 200 : 404;
+        payload = solved
+          ? { reveal: solution() }
+          : { error: { code: "REVEAL_NOT_FOUND", message: "No solved puzzle review is available.", requestId: "review-check" } };
+        if (solved && localized) payload.reveal.localizations = localizationMap(["explanation"]);
       } else if (path.endsWith("/hints")) {
         hints = 1;
         payload = {
@@ -391,6 +528,7 @@ test("localized production flow earns one hint and replays the same correct atte
     locales: ["ru", "zh"],
     englishCompatible: true,
     idempotencyVerified: true,
+    earnedReviewVerified: true,
   });
   assertSafe(result);
   const posts = check.requests.filter((request) => request.path === "/v1/attempts");
@@ -440,6 +578,20 @@ test("localized private flow rejects leaks, missing translations and replay drif
         if (p.correct === true && p.reveal.localizations) delete p.reveal.localizations.zh;
       },
       "CORRECT_ATTEMPT_FAILED",
+    ],
+    [
+      "earned review missing language",
+      (r, p, status) => {
+        if (r.path.endsWith("/reveal") && status === 200) delete p.reveal.localizations.zh;
+      },
+      "EARNED_REVIEW_FAILED",
+    ],
+    [
+      "earned review translation drift",
+      (r, p, status) => {
+        if (r.path.endsWith("/reveal") && status === 200) p.reveal.localizations.ru.explanation = "wrong";
+      },
+      "EARNED_REVIEW_FAILED",
     ],
     [
       "English replay changed",

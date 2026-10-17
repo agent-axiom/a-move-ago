@@ -6,7 +6,8 @@ const en = {
   invitationDismiss: "Dismiss introduction",
   eyebrow: "A little practice",
   title: "Your first move back",
-  introduction: "The white pawn has just moved from e2 to e4. Reconstruct the position before that move.",
+  introduction:
+    "The white pawn has just moved from e2 to e4. Reconstruct the position before that move.",
   close: "Close lesson",
   skip: "Skip lesson",
   freePractice: "Practice freely · your points stay the same",
@@ -27,7 +28,8 @@ const en = {
   reset: "Start again",
   successTitle: "You’ve gone one move back.",
   successBody: "The pawn is back on e2. You’ve reconstructed the position before e2–e4.",
-  dailyAdvice: "In daily puzzles, work out the move from the position. Clues are optional; their cost is shown before you open them.",
+  dailyAdvice:
+    "In daily puzzles, work out the move from the position. Clues are optional; their cost is shown before you open them.",
   play: "Start solving",
   replay: "Try once more",
   previousPosition: "One move ago",
@@ -53,7 +55,8 @@ const ru = {
   selectSquare: "Теперь выберите e2 — поле, на котором пешка стояла до хода.",
   ready: "Оба поля выбраны. Проверьте ход кнопкой ниже.",
   chooseEmpty: "Выберите свободное поле, чтобы вернуть на него пешку.",
-  tryAgain: "В этом примере пешка стояла на e2. Выберите e2 и попробуйте снова — обучение не отнимает очки.",
+  tryAgain:
+    "В этом примере пешка стояла на e2. Выберите e2 и попробуйте снова — обучение не отнимает очки.",
   board: "Учебная доска: выберите пешку на e4, затем e2",
   beforeBoard: "Учебная доска: пешка вернулась на e2",
   selectedMove: "Ваш ход назад",
@@ -62,7 +65,8 @@ const ru = {
   reset: "Начать заново",
   successTitle: "Вы вернулись на ход назад.",
   successBody: "Пешка снова на e2. Вы восстановили позицию перед ходом e2–e4.",
-  dailyAdvice: "В ежедневных задачах определите ход по позиции. Улику можно открыть по желанию; её стоимость видна заранее.",
+  dailyAdvice:
+    "В ежедневных задачах определите ход по позиции. Улику можно открыть по желанию; её стоимость видна заранее.",
   play: "Перейти к задачам",
   replay: "Попробовать ещё раз",
   previousPosition: "Ход назад",

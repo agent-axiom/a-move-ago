@@ -116,7 +116,9 @@ test("mobile and tablet daily stay usable at 390, 320 and 768 pixels", async ({ 
     expect(assistance).not.toBeNull();
     if (!status || !actions || !assistance) throw new Error("Game controls are unavailable");
     expect(status.y, "Board precedes score and help on phones").toBeGreaterThan(board.y);
-    expect(actions.y, "Check remains close to the board").toBeLessThan(board.y + board.height + 260);
+    expect(actions.y, "Check remains close to the board").toBeLessThan(
+      board.y + board.height + 260,
+    );
     expect(assistance.y, "Optional assistance follows the check controls").toBeGreaterThan(
       actions.y + actions.height,
     );
@@ -252,7 +254,9 @@ for (const locale of ["ru", "zh"] as const) {
   });
 }
 
-test("mobile tutorial and earned solution review remain usable on small phones", async ({ page }, info) => {
+test("mobile tutorial and earned solution review remain usable on small phones", async ({
+  page,
+}, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 844 });
   const observed = await installApiMock(page);
@@ -273,7 +277,9 @@ test("mobile tutorial and earned solution review remain usable on small phones",
   await lesson.getByRole("gridcell", { name: "e4, white pawn", exact: true }).click();
   await lesson.getByRole("gridcell", { name: "e2, empty", exact: true }).click();
   await lesson.getByRole("button", { name: "Check move", exact: true }).click();
-  await expect(lesson.getByRole("heading", { name: "You’ve gone one move back.", exact: true })).toBeVisible();
+  await expect(
+    lesson.getByRole("heading", { name: "You’ve gone one move back.", exact: true }),
+  ).toBeVisible();
   await checkLayout(page);
   await capture(page, info, "mobile-tutorial-complete");
   expect(observed.attemptBodies).toHaveLength(0);

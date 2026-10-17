@@ -253,3 +253,22 @@
     font-size: 0.62rem;
   }
 }
+
+@media (max-width: 480px) {
+  .app-header .brand {
+    min-block-size: 44px;
+    padding-inline-end: 3rem;
+  }
+
+  .app-header .how-to-play {
+    inline-size: 0;
+    flex: none;
+  }
+
+  .app-header .how-to-play > summary {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    inline-size: 44px;
+  }
+}
