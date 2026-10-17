@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { Chess } from "chess.js";
 import { describe, expect, it, vi } from "vitest";
 import type { runContentImport } from "./content-import";
 import { encryptContentEnvelope, runPrivateContentTransfer } from "./private-content";
@@ -9,6 +10,12 @@ const archiveRequest = {
   purpose: "archive",
   from: "2026-09-10",
   through: "2026-10-14",
+};
+const scheduleRequest = {
+  keyId: "schedule-2026-11-14-2027-01-31-v1",
+  purpose: "schedule",
+  from: "2026-11-14",
+  through: "2027-01-31",
 };
 const now = Date.parse("2026-10-15T12:00:00Z") / 1000;
 const canary = "PRIVATE_SOLUTION_CANARY_NEVER_PRINT";
@@ -44,6 +51,29 @@ async function corpus(from = "2026-10-15", count = 8) {
   };
 }
 
+async function scheduledCorpus(from = scheduleRequest.from, count = 79) {
+  // Public, reachable fixture also used by retro-audit.test.ts, never production.
+  const game = new Chess();
+  for (const move of ["c4", "d5", "a3", "d4", "a4", "Kd7", "h3", "Kd6"]) game.move(move);
+  const previousFen = game.fen();
+  game.move("c5+");
+  const payload = await corpus(from, count);
+  for (const content of payload.cases) {
+    const puzzle = content.puzzles[0];
+    puzzle.public.postFen = game.fen();
+    puzzle.public.maxHints = 0;
+    puzzle.hints = [];
+    puzzle.acceptedSolutions = [{
+      retraction: {
+        currentSquare: "c5", previousSquare: "c4", movedPiece: { color: "w", type: "p" },
+        restoredPiece: null, special: "normal",
+      },
+      previousFen, forwardSan: "c5+", explanation: canary, historyConstraints: [],
+    }];
+  }
+  return payload;
+}
+
 type MemoryKey = Record<string, string | number | null>;
 
 function harness() {
@@ -55,6 +85,9 @@ function harness() {
     writes: 0,
     failImportAt: 0,
     conflictAt: -1,
+    conflictCase: undefined as string | undefined,
+    coverageMissing: 0,
+    coverageChecks: 0,
     imports: [] as string[],
   };
   const fetchMock = vi.fn(async (_input: Parameters<typeof fetch>[0], init?: RequestInit) => {
@@ -65,8 +98,15 @@ function harness() {
       batch: { sql: string; params: string[] }[];
     };
     const result = batch.map(({ sql, params }, index) => {
+      if (sql.startsWith("SELECT COUNT(*) AS covered")) {
+        state.coverageChecks += 1;
+        const required = (Date.parse(params[1] ?? "") - Date.parse(params[0] ?? "")) / 86_400_000;
+        return { success: true, results: [{ covered: required - state.coverageMissing }] };
+      }
       if (sql.startsWith("SELECT (") && sql.endsWith("AS conflict")) {
-        return { success: true, results: [{ conflict: index === state.conflictAt ? 1 : 0 }] };
+        return { success: true, results: [{
+          conflict: index === state.conflictAt || params[0] === state.conflictCase ? 1 : 0,
+        }] };
       }
       if (sql.startsWith("SELECT")) {
         return { success: true, results: state.row ? [{ ...state.row }] : [] };
@@ -431,5 +471,168 @@ describe("historical archive content transfer", () => {
     await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("INVALID_CORPUS_SIZE");
     expect(h.importCase).not.toHaveBeenCalled();
     expect(h.state.writes).toBe(writes);
+  });
+});
+
+describe("future schedule content transfer", () => {
+  it("publishes all 79 future days in date order after verifying the existing bridge", async () => {
+    const h = harness();
+    h.state.request = { ...scheduleRequest };
+    const payload = await scheduledCorpus();
+    payload.cases.reverse();
+    await h.prepare(payload);
+    const result = await runPrivateContentTransfer(h.overrides);
+    expect(result).toMatchObject({ mode: "published", cases: 79, puzzles: 79 });
+    expect(result.mode === "published" && result.dates[0]).toBe("2026-11-14");
+    expect(result.mode === "published" && result.dates.at(-1)).toBe("2027-01-31");
+    expect(h.state.imports.map((source) => JSON.parse(source).case.date)).toEqual(
+      result.mode === "published" && result.dates,
+    );
+    expect(h.state.coverageChecks).toBe(1);
+    expect(h.state.row?.private_key).toBeNull();
+    expect(JSON.stringify(result)).not.toContain(canary);
+  }, 30_000);
+
+  it.each([1, 120])("accepts the %i-day schedule boundary and bounds D1 batches", async (count) => {
+    const h = harness();
+    const payload = await scheduledCorpus(scheduleRequest.from, count);
+    const through = payload.cases.at(-1).case.date;
+    h.state.request = {
+      ...scheduleRequest, through,
+      keyId: `schedule-${scheduleRequest.from}-${through}-v1`,
+    };
+    await h.prepare(payload);
+    expect(await runPrivateContentTransfer(h.overrides)).toMatchObject({ cases: count });
+    expect(h.state.imports).toHaveLength(count);
+    for (const [, init] of h.fetchMock.mock.calls) {
+      expect(JSON.parse(String(init?.body)).batch.length).toBeLessThanOrEqual(100);
+    }
+  }, 30_000);
+
+  it("rejects a gap before the scheduled range without binding or importing", async () => {
+    const h = harness();
+    h.state.request = { ...scheduleRequest };
+    await h.prepare(await scheduledCorpus());
+    h.state.coverageMissing = 1;
+    const writes = h.state.writes;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("SCHEDULE_PRECEDING_GAP");
+    expect(h.state.writes).toBe(writes);
+    expect(h.state.row?.envelope_digest).toBeNull();
+    expect(h.importCase).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("checks that the range is still future at the initial claim", async () => {
+    const h = harness();
+    h.state.now = Date.parse("2026-11-13T23:59:00Z") / 1000;
+    h.state.request = { ...scheduleRequest };
+    await h.prepare(await scheduledCorpus());
+    h.state.now += 120;
+    const writes = h.state.writes;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("SCHEDULE_MUST_BE_FUTURE");
+    expect(h.state.writes).toBe(writes);
+    expect(h.state.row?.envelope_digest).toBeNull();
+    expect(h.importCase).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("resumes identical bound ciphertext across the first midnight and later returns its receipt", async () => {
+    const h = harness();
+    h.state.now = Date.parse("2026-11-13T23:59:00Z") / 1000;
+    h.state.request = { ...scheduleRequest };
+    const payload = await scheduledCorpus();
+    const recipient = await h.prepare(payload);
+    h.state.failImportAt = 2;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("PRIVATE_CONTENT_TRANSFER_FAILED");
+    expect(h.state.coverageChecks).toBe(1);
+    const envelope = h.state.envelope;
+    h.state.now += 120;
+    h.state.envelope = encryptContentEnvelope(payload, recipient);
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("TRANSFER_ENVELOPE_MISMATCH");
+    h.state.envelope = envelope;
+    h.state.failImportAt = 0;
+    const published = await runPrivateContentTransfer(h.overrides);
+    expect(published).toMatchObject({ mode: "published", cases: 79 });
+    expect(h.state.coverageChecks).toBe(1);
+    h.state.now = Date.parse("2027-03-01T12:00:00Z") / 1000;
+    h.importCase.mockClear();
+    const writes = h.state.writes;
+    expect(await runPrivateContentTransfer(h.overrides)).toEqual({ ...published, alreadyCompleted: true });
+    expect(h.state.writes).toBe(writes);
+    expect(h.importCase).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it.each(["missing", "outside", "extra"])("rejects a %s date before writing", async (kind) => {
+    const h = harness();
+    h.state.request = { ...scheduleRequest };
+    const payload = await scheduledCorpus(scheduleRequest.from, kind === "extra" ? 80 : 79);
+    if (kind === "missing") payload.cases.splice(17, 1);
+    if (kind === "outside") payload.cases[0].case.date = "2026-11-13";
+    await h.prepare(payload);
+    const writes = h.state.writes;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("SCHEDULE_RANGE_MISMATCH");
+    expect(h.state.writes).toBe(writes);
+    expect(h.importCase).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("requires unique answers from visible board evidence before any writes", async () => {
+    const h = harness();
+    h.state.request = { ...scheduleRequest };
+    const payload = await scheduledCorpus();
+    const ambiguous = await corpus("2027-01-31", 1);
+    ambiguous.cases[0].puzzles[0].public.id = "ambiguous-original";
+    payload.cases[78] = ambiguous.cases[0];
+    await h.prepare(payload);
+    const writes = h.state.writes;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("SCHEDULE_RETRO_NOT_UNIQUE");
+    expect(h.state.writes).toBe(writes);
+    expect(h.state.row?.envelope_digest).toBeNull();
+    expect(h.importCase).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("preflights conflicts in the second D1 batch before publishing anything", async () => {
+    const h = harness();
+    const payload = await scheduledCorpus(scheduleRequest.from, 120);
+    const through = payload.cases.at(-1).case.date;
+    h.state.request = {
+      ...scheduleRequest, through,
+      keyId: `schedule-${scheduleRequest.from}-${through}-v1`,
+    };
+    await h.prepare(payload);
+    h.state.conflictCase = payload.cases[119].case.id;
+    const writes = h.state.writes;
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("EXISTING_CONTENT_CONFLICT");
+    expect(h.state.writes).toBe(writes);
+    expect(h.importCase).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("binds purpose and both schedule dates to the key before contacting D1", async () => {
+    const h = harness();
+    const changes: Record<string, string>[] = [
+      { keyId: scheduleRequest.keyId },
+      { keyId: scheduleRequest.keyId, purpose: "launch" },
+      { ...scheduleRequest, purpose: "archive" },
+      { ...scheduleRequest, from: "2026-11-15" },
+      { ...scheduleRequest, through: "2027-01-30" },
+      { ...scheduleRequest, keyId },
+      { ...scheduleRequest, keyId: "schedule-2026-11-14-2027-01-31-v01" },
+    ];
+    for (const request of changes) {
+      h.state.request = request;
+      await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow("REQUEST_KEY_MISMATCH");
+    }
+    expect(h.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["2026-10-15", "2026-10-15"],
+    ["2026-10-14", "2026-10-20"],
+    ["2026-11-15", "2026-11-14"],
+    ["2026-11-14", "2027-03-14"],
+    ["2026-11-31", "2027-01-31"],
+  ])("rejects invalid schedule %s through %s before D1", async (from, through) => {
+    const h = harness();
+    h.state.request = { purpose: "schedule", keyId: `schedule-${from}-${through}-v1`, from, through };
+    await expect(runPrivateContentTransfer(h.overrides)).rejects.toThrow();
+    expect(h.fetchMock).not.toHaveBeenCalled();
+    expect(h.importCase).not.toHaveBeenCalled();
   });
 });

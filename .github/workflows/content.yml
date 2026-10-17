@@ -11,6 +11,7 @@ on:
       - "tools/src/private-content.ts"
       - "tools/src/localization-import.ts"
       - "tools/scripts/check-localizations-production.mjs"
+      - "tools/scripts/check-content-coverage.mjs"
   pull_request:
     paths:
       - ".github/workflows/content.yml"
@@ -22,6 +23,8 @@ on:
       - "tools/src/localization-import.test.ts"
       - "tools/scripts/check-localizations-production.mjs"
       - "tools/test/check-localizations-production.test.mjs"
+      - "tools/scripts/check-content-coverage.mjs"
+      - "tools/test/check-content-coverage.test.mjs"
 
 permissions:
   contents: read
@@ -45,6 +48,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck -w @a-move-ago/tools
       - run: npm test -w @a-move-ago/tools
+      - run: node --test tools/test/check-content-coverage.test.mjs
   transfer:
     needs: verify
     if: github.ref == 'refs/heads/main'
@@ -66,6 +70,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: npm run content:private -w @a-move-ago/tools
+      - name: Verify scheduled coverage using only protected counts and dates
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+        run: node tools/scripts/check-content-coverage.mjs
       - name: Verify every published historical day through the public API
         env:
           API_ORIGIN: ${{ vars.API_ORIGIN }}
