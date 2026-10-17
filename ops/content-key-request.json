@@ -3,8 +3,5 @@
   "purpose": "localization",
   "from": "2026-11-14",
   "through": "2027-01-31",
-  "locales": [
-    "ru",
-    "zh"
-  ]
+  "locales": ["ru", "zh"]
 }
