@@ -65,6 +65,7 @@ function AppContent() {
   const me = "me" in state ? state.me : null;
   const identity = sessionIdentity(runtime, me);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: changing actor or screen invalidates an in-flight next-case lookup.
   useEffect(() => () => nextCaseRequest.current?.abort(), [identity, screen.name, caseDate]);
 
   function openTutorial() {
