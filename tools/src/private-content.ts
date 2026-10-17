@@ -24,6 +24,7 @@ import {
   localizationDates,
   prepareLocalizationImport,
 } from "./localization-import";
+import { auditRetroCompleteness } from "./retro-audit";
 import { type ContentCase, validateContentDocument } from "./validate-content";
 
 const requestPath = "ops/content-key-request.json";
@@ -51,7 +52,17 @@ type ArchiveRequest = {
   from: string;
   through: string;
 };
-type TransferRequest = { keyId: string; purpose: "launch" } | ArchiveRequest | LocalizationRequest;
+type ScheduleRequest = {
+  keyId: string;
+  purpose: "schedule";
+  from: string;
+  through: string;
+};
+type TransferRequest =
+  | { keyId: string; purpose: "launch" }
+  | ArchiveRequest
+  | ScheduleRequest
+  | LocalizationRequest;
 type Corpus = { cases: ContentCase[] };
 type ContentPublishedSummary = {
   mode: "published";
@@ -122,6 +133,14 @@ function parseRequest(text: string): TransferRequest {
       z
         .object({
           keyId: keyIdSchema,
+          purpose: z.literal("schedule"),
+          from: z.iso.date(),
+          through: z.iso.date(),
+        })
+        .strict(),
+      z
+        .object({
+          keyId: keyIdSchema,
           purpose: z.literal("localization"),
           from: z.iso.date(),
           through: z.iso.date(),
@@ -139,10 +158,10 @@ function parseRequest(text: string): TransferRequest {
     );
     return parsed;
   }
-  if (parsed.purpose === "archive") {
+  if (parsed.purpose === "archive" || parsed.purpose === "schedule") {
     // The key ID is authenticated by the envelope and fixed in D1. Encoding the
-    // exact archive range binds purpose and dates without altering legacy rows.
-    const prefix = `archive-${parsed.from}-${parsed.through}-`;
+    // exact date range binds purpose and dates without altering legacy rows.
+    const prefix = `${parsed.purpose}-${parsed.from}-${parsed.through}-`;
     ensure(
       parsed.keyId.startsWith(prefix) && /^v[1-9]\d*$/.test(parsed.keyId.slice(prefix.length)),
       "REQUEST_KEY_MISMATCH",
@@ -150,7 +169,7 @@ function parseRequest(text: string): TransferRequest {
     return parsed;
   }
   ensure(
-    !parsed.keyId.startsWith("archive-") && !parsed.keyId.startsWith("localize-"),
+    !["archive-", "schedule-", "localize-"].some((prefix) => parsed.keyId.startsWith(prefix)),
     "REQUEST_KEY_MISMATCH",
   );
   return { keyId: parsed.keyId, purpose: "launch" };
@@ -167,6 +186,31 @@ function archiveDates(request: ArchiveRequest, now: number): string[] {
     new Date(start + index * 86_400_000).toISOString().slice(0, 10),
   );
 }
+
+function scheduleDates(request: ScheduleRequest): string[] {
+  ensure(request.from <= request.through, "INVALID_SCHEDULE_RANGE");
+  const start = Date.parse(`${request.from}T00:00:00Z`);
+  const count = (Date.parse(`${request.through}T00:00:00Z`) - start) / 86_400_000 + 1;
+  ensure(Number.isInteger(count) && count >= 1 && count <= 120, "INVALID_SCHEDULE_RANGE");
+  return Array.from({ length: count }, (_, index) =>
+    new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+  );
+}
+
+function requireFutureSchedule(request: ScheduleRequest, now: number): string {
+  const today = new Date(now * 1000).toISOString().slice(0, 10);
+  ensure(request.from > today, "SCHEDULE_MUST_BE_FUTURE");
+  return today;
+}
+
+// Count only playable, completely published days. No content or solutions leave D1.
+const scheduleCoverageSql = `SELECT COUNT(*) AS covered FROM daily_cases c
+  WHERE c.case_date >= ? AND c.case_date < ? AND c.status = 'published'
+    AND EXISTS (SELECT 1 FROM daily_case_puzzles cp WHERE cp.case_id = c.id)
+    AND NOT EXISTS (
+      SELECT 1 FROM daily_case_puzzles cp LEFT JOIN puzzles p ON p.id = cp.puzzle_id
+      WHERE cp.case_id = c.id AND (p.id IS NULL OR p.status != 'published'
+        OR NOT EXISTS (SELECT 1 FROM puzzle_solutions s WHERE s.puzzle_id = p.id)))`;
 
 function aad(keyId: string): Buffer {
   return Buffer.from(JSON.stringify({ version: 1, keyId }));
@@ -272,10 +316,15 @@ function validateCorpus(
   );
   const record = payload as Record<string, unknown>;
   ensure(Object.keys(record).length === 1 && Array.isArray(record.cases), "INVALID_CORPUS");
-  const expectedDates = request.purpose === "archive" ? archiveDates(request, now) : undefined;
+  const expectedDates =
+    request.purpose === "archive"
+      ? archiveDates(request, now)
+      : request.purpose === "schedule"
+        ? scheduleDates(request)
+        : undefined;
   ensure(
     record.cases.length >= (expectedDates ? 1 : 8) &&
-      record.cases.length <= (expectedDates ? 60 : 31),
+      record.cases.length <= (request.purpose === "schedule" ? 120 : expectedDates ? 60 : 31),
     "INVALID_CORPUS_SIZE",
   );
   const caseIds = new Set<string>();
@@ -298,6 +347,9 @@ function validateCorpus(
       "NON_PRODUCTION_CONTENT",
     );
     for (const puzzle of content.puzzles) {
+      if (request.purpose === "schedule") {
+        ensure(auditRetroCompleteness(puzzle).unique, "SCHEDULE_RETRO_NOT_UNIQUE");
+      }
       ensure(!puzzleIds.has(puzzle.public.id), "DUPLICATE_PUZZLE_ID");
       puzzleIds.add(puzzle.public.id);
       ensure(
@@ -312,7 +364,7 @@ function validateCorpus(
   if (expectedDates) {
     ensure(
       dates.size === expectedDates.length && expectedDates.every((date) => dates.has(date)),
-      "ARCHIVE_RANGE_MISMATCH",
+      request.purpose === "schedule" ? "SCHEDULE_RANGE_MISMATCH" : "ARCHIVE_RANGE_MISMATCH",
     );
   } else if (requireCoverage) {
     // Coverage is checked before the initial launch claim. A bound retry may
@@ -324,7 +376,12 @@ function validateCorpus(
       ensure(dates.has(date.toISOString().slice(0, 10)), "INSUFFICIENT_DAILY_COVERAGE");
     }
   }
-  return { cases };
+  return {
+    cases:
+      request.purpose === "schedule"
+        ? cases.sort((left, right) => left.case.date.localeCompare(right.case.date))
+        : cases,
+  };
 }
 
 function conflictCheck(content: ContentCase): D1Statement {
@@ -430,6 +487,7 @@ async function runTransfer(
   const now = Math.floor(runtime.now());
   ensure(Number.isSafeInteger(now) && now >= 0, "INVALID_TIME");
   if (transferRequest.purpose === "archive") archiveDates(transferRequest, now);
+  if (transferRequest.purpose === "schedule") scheduleDates(transferRequest);
   if (transferRequest.purpose === "localization") localizationDates(transferRequest);
   let envelopeText: string | undefined;
   try {
@@ -498,6 +556,7 @@ async function runTransfer(
   }
 
   if (envelope === undefined) {
+    if (transferRequest.purpose === "schedule") requireFutureSchedule(transferRequest, now);
     await query([{ sql: createTable, params: [] }]);
     let row = await loadKey();
     if (row === undefined) {
@@ -578,6 +637,18 @@ async function runTransfer(
     localization = await prepareLocalizationImport(payload, transferRequest, query);
   } else {
     corpus = validateCorpus(payload, now, row.envelope_digest === null, transferRequest);
+    if (transferRequest.purpose === "schedule" && row.envelope_digest === null) {
+      // Validate time and continuity only at the first claim. An identical bound
+      // retry may cross the schedule's first midnight; completion receipts also
+      // remain readable after expiry without revalidating a new schedule.
+      const today = requireFutureSchedule(transferRequest, now);
+      const coverage = await query([
+        { sql: scheduleCoverageSql, params: [today, transferRequest.from] },
+      ]);
+      const covered = z.object({ covered: z.int().nonnegative() }).strict().parse(coverage[0]?.[0]);
+      const required = (Date.parse(transferRequest.from) - Date.parse(today)) / 86_400_000;
+      ensure(covered.covered === required, "SCHEDULE_PRECEDING_GAP");
+    }
     const conflicts = await query(corpus.cases.map(conflictCheck));
     for (const rows of conflicts) {
       ensure(rows.length === 1, "INVALID_D1_RESPONSE");

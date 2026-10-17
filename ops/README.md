@@ -47,8 +47,50 @@ without missing or extra dates. Archive transfers require a fresh key ID of the
 form `archive-FROM-THROUGH-vN`, where `N` is a positive integer without leading
 zeroes. This binds purpose and range to the authenticated envelope key ID;
 changing either requires a new key. Default launch requests cannot use the
-reserved `archive-` and `localize-` prefixes. Identical archive retries and completed receipts
+reserved `archive-`, `schedule-` and `localize-` prefixes. Identical archive retries and completed receipts
 remain safe across midnight and key expiry, respectively.
+
+Future additions require an explicit schedule request:
+
+```json
+{
+  "keyId": "schedule-2026-11-14-2027-01-31-v1",
+  "purpose": "schedule",
+  "from": "2026-11-14",
+  "through": "2027-01-31"
+}
+```
+
+Both boundaries are inclusive. A schedule contains exactly 1–120 consecutive
+dates; this example adds 79 days after the initial November 13 release horizon.
+The key must have the form `schedule-FROM-THROUGH-vN`, with a positive version
+number and no leading zeroes. The first date must be after the current UTC date
+when creating the key and when first claiming the envelope. Before the first
+claim, a read-only D1 preflight requires every intervening date from today to the
+day before the schedule to have a published case with published, solvable puzzles.
+A gap rejects the transfer before its envelope is bound or any content is written.
+
+The entire exact date range, all puzzles and all remote conflicts are validated
+before publication. Scheduled puzzles also pass the board-only predecessor audit:
+exactly one materially feasible, locally legal previous move must exist and match
+the accepted solution. Invisible FEN history and paid clues cannot establish this
+uniqueness. Authors must separately retain a legal game lineage and review the
+explanations, difficulty and variety; the audit does not prove historical reachability.
+Cases are imported in chronological order regardless of their input order. The
+immutable importer, private plaintext boundary and 48-hour pending key expiry
+apply as before. A retry of already bound identical ciphertext may cross the
+first scheduled midnight. Completed receipts remain usable after both the
+schedule and key expire, without re-importing or revalidating future-date eligibility.
+
+The protected workflow runs `tools/scripts/check-content-coverage.mjs` after a
+schedule import. It verifies every date from today through the requested horizon,
+including future cases intentionally hidden by the public API. It selects only
+dates and counts, checks that all linked puzzles are published and have solutions,
+and logs only aggregate coverage. After the matching localization import it also
+requires Russian and Chinese rows for every case and puzzle in that horizon.
+Bootstrap runs and elapsed schedules are explicitly skipped; neither is reported
+as successful current coverage. The exported checker also accepts
+`minimumFutureDays` for a release gate such as a 90-day reserve.
 
 Translations use a fresh explicit localization request:
 
