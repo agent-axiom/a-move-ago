@@ -27,18 +27,16 @@ const solution: AcceptedSolution = {
 
 async function fixture() {
   const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
-  runtime.api.getStats = vi
-    .fn()
-    .mockResolvedValue({
-      attempts: 1,
-      hintsUsed: 0,
-      solvedPuzzles: 1,
-      completedCases: 1,
-      currentStreak: 1,
-      bestStreak: 1,
-      lastCompletedDate: "2026-08-03",
-      points: 100,
-    });
+  runtime.api.getStats = vi.fn().mockResolvedValue({
+    attempts: 1,
+    hintsUsed: 0,
+    solvedPuzzles: 1,
+    completedCases: 1,
+    currentStreak: 1,
+    bestStreak: 1,
+    lastCompletedDate: "2026-08-03",
+    points: 100,
+  });
   runtime.api.getPuzzleReveal = vi.fn().mockResolvedValue({ reveal: solution });
   const daily = await runtime.api.getDaily();
   const puzzleId = daily.puzzles[0]?.id;

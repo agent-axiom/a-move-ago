@@ -105,9 +105,14 @@ function harness({ override, count = 2 } = {}) {
         status = attempts ? 200 : 404;
         payload = attempts
           ? { reveal: solution() }
-          : { error: { code: "REVEAL_NOT_FOUND", message: "No solved puzzle review is available.", requestId: "review-check" } };
-      }
-      else if (path === "/v1/attempts") {
+          : {
+              error: {
+                code: "REVEAL_NOT_FOUND",
+                message: "No solved puzzle review is available.",
+                requestId: "review-check",
+              },
+            };
+      } else if (path === "/v1/attempts") {
         status = submissions++ === 0 ? 201 : 200;
         attempts = 1;
         if (status === 200) headers["idempotency-replayed"] = "true";
@@ -181,7 +186,12 @@ test("synthetic guest solve and replay preserve progress without private output"
     assert.equal(review.body, undefined);
     assert.equal(review.path, "/v1/cases/synthetic-case/puzzles/p-synthetic-case-1-v1/reveal");
   }
-  assert.equal(check.requests.filter((request) => request.path === "/v1/me/stats" && request.headers["x-game-progress"] === "1").length, 2);
+  assert.equal(
+    check.requests.filter(
+      (request) => request.path === "/v1/me/stats" && request.headers["x-game-progress"] === "1",
+    ).length,
+    2,
+  );
   for (const request of check.requests) {
     assert.equal(request.redirect, "error");
     assert.ok(request.signal instanceof AbortSignal);
@@ -227,7 +237,8 @@ test("earned-review proof rejects premature access, missing routes, private leak
     [
       "changed earned explanation",
       (request, payload, status) => {
-        if (request.path.endsWith("/reveal") && status === 200) payload.reveal.explanation = "wrong";
+        if (request.path.endsWith("/reveal") && status === 200)
+          payload.reveal.explanation = "wrong";
       },
       "EARNED_REVIEW_FAILED",
       false,
@@ -235,7 +246,8 @@ test("earned-review proof rejects premature access, missing routes, private leak
     [
       "unearned extra solutions",
       (request, payload, status) => {
-        if (request.path.endsWith("/reveal") && status === 200) payload.acceptedSolutions = [solution()];
+        if (request.path.endsWith("/reveal") && status === 200)
+          payload.acceptedSolutions = [solution()];
       },
       "EARNED_REVIEW_FAILED",
       false,
@@ -264,25 +276,43 @@ test("earned-review proof rejects premature access, missing routes, private leak
         override: (request, payload, status, headers) => {
           const changed = mutate(request, payload, status, headers);
           return new Response(JSON.stringify(changed?.payload ?? payload), {
-            status: changed?.status ?? status, headers,
+            status: changed?.status ?? status,
+            headers,
           });
         },
       });
-      assert.equal(await runCli([], env, {
-        ...check.deps, log: (value) => output.push(value), errorLog: (value) => output.push(value),
-      }), 1);
-      assert.deepEqual(output.map((value) => JSON.parse(value)), [{ ok: false, code }]);
+      assert.equal(
+        await runCli([], env, {
+          ...check.deps,
+          log: (value) => output.push(value),
+          errorLog: (value) => output.push(value),
+        }),
+        1,
+      );
+      assert.deepEqual(
+        output.map((value) => JSON.parse(value)),
+        [{ ok: false, code }],
+      );
       assertSafe(output);
       if (failsBeforePrivateRead) {
-        assert.equal(check.requests.some((request) => request.isD1), false);
-        assert.equal(check.requests.some((request) => request.path === "/v1/attempts"), false);
+        assert.equal(
+          check.requests.some((request) => request.isD1),
+          false,
+        );
+        assert.equal(
+          check.requests.some((request) => request.path === "/v1/attempts"),
+          false,
+        );
       }
     });
   }
 });
 
 test("earned-review proof detects attempts or points changing during a GET", async (t) => {
-  for (const [field, code] of [["attempts", "GUEST_STATS_FAILED"], ["points", "EARNED_REVIEW_STATS_CHANGED"]]) {
+  for (const [field, code] of [
+    ["attempts", "GUEST_STATS_FAILED"],
+    ["points", "EARNED_REVIEW_STATS_CHANGED"],
+  ]) {
     await t.test(field, async () => {
       let reviewed = false;
       const output = [];
@@ -293,10 +323,18 @@ test("earned-review proof detects attempts or points changing during a GET", asy
           return new Response(JSON.stringify(payload), { status, headers });
         },
       });
-      assert.equal(await runCli([], env, {
-        ...check.deps, log: (value) => output.push(value), errorLog: (value) => output.push(value),
-      }), 1);
-      assert.deepEqual(output.map((value) => JSON.parse(value)), [{ ok: false, code }]);
+      assert.equal(
+        await runCli([], env, {
+          ...check.deps,
+          log: (value) => output.push(value),
+          errorLog: (value) => output.push(value),
+        }),
+        1,
+      );
+      assert.deepEqual(
+        output.map((value) => JSON.parse(value)),
+        [{ ok: false, code }],
+      );
       assertSafe(output);
     });
   }
@@ -465,7 +503,13 @@ function localizedHarness({ override } = {}) {
         status = solved ? 200 : 404;
         payload = solved
           ? { reveal: solution() }
-          : { error: { code: "REVEAL_NOT_FOUND", message: "No solved puzzle review is available.", requestId: "review-check" } };
+          : {
+              error: {
+                code: "REVEAL_NOT_FOUND",
+                message: "No solved puzzle review is available.",
+                requestId: "review-check",
+              },
+            };
         if (solved && localized) payload.reveal.localizations = localizationMap(["explanation"]);
       } else if (path.endsWith("/hints")) {
         hints = 1;
@@ -589,7 +633,8 @@ test("localized private flow rejects leaks, missing translations and replay drif
     [
       "earned review translation drift",
       (r, p, status) => {
-        if (r.path.endsWith("/reveal") && status === 200) p.reveal.localizations.ru.explanation = "wrong";
+        if (r.path.endsWith("/reveal") && status === 200)
+          p.reveal.localizations.ru.explanation = "wrong";
       },
       "EARNED_REVIEW_FAILED",
     ],
