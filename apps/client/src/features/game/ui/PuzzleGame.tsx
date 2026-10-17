@@ -5,6 +5,7 @@ import { useRuntime } from "../../../app/runtime";
 import { localizedText, type TranslationKey, useI18n } from "../../../i18n";
 import type { ClientFailure } from "../../../shared/failure";
 import { useAttempt } from "../model/attempt";
+import type { GamePersistenceScope } from "../model/persistence";
 import { RetractionComposer } from "./RetractionComposer";
 import { RevealPlayer } from "./RevealPlayer";
 
@@ -48,7 +49,20 @@ export function PuzzleGame(props: {
   const runtime = useRuntime();
   const { locale, t } = useI18n();
   const post = useMemo(() => parseFen(props.puzzle.postFen), [props.puzzle.postFen]);
-  const controller = useAttempt(props.caseId, props.puzzle.id, props.progress);
+  const actorKey = runtime.draftActorKey?.();
+  const persistenceScope = useMemo<GamePersistenceScope | undefined>(
+    () =>
+      actorKey
+        ? {
+            actorKey,
+            caseId: props.caseId,
+            puzzleId: props.puzzle.id,
+            puzzleVersion: props.puzzle.version,
+          }
+        : undefined,
+    [actorKey, props.caseId, props.puzzle.id, props.puzzle.version],
+  );
+  const controller = useAttempt(props.caseId, props.puzzle.id, props.progress, persistenceScope);
   const progress = controller.progress;
   const alreadyScored = progress !== undefined && progress.earnedPoints !== null;
 
@@ -160,6 +174,71 @@ export function PuzzleGame(props: {
   ) : null;
 
   const clueContent = controller.clue.content ?? props.puzzle;
+  const support = progress ? (
+    <div className="game-support">
+      <aside className="optional-clue">
+        {progress.clueUnlocked ? (
+          <>
+            <p className="game-eyebrow">{t("game.clue.unlocked")}</p>
+            <h2 className="clue-title unlocked-clue">
+              {localizedText(clueContent, "title", locale)}
+            </h2>
+            <p className="clue-prompt">{localizedText(clueContent, "prompt", locale)}</p>
+          </>
+        ) : (
+          <>
+            <p>{t("game.clue.hidden")}</p>
+            {controller.clue.tag !== "retry" ? (
+              <button
+                className="button-secondary clue-request"
+                type="button"
+                disabled={controller.blocked || alreadyScored}
+                onClick={() => {
+                  void controller.requestClue();
+                }}
+              >
+                {controller.clue.tag === "loading"
+                  ? t("game.clue.loading")
+                  : t("game.clue.reveal", {
+                      before: progress.nextAttemptPoints,
+                      after: afterAssistance(progress.nextAttemptPoints),
+                      count: afterAssistance(progress.nextAttemptPoints),
+                    })}
+              </button>
+            ) : (
+              <div>
+                <p role="alert">
+                  {t(
+                    needsReload(controller.clue.failure)
+                      ? retryKey(controller.clue.failure.kind)
+                      : "game.clue.error",
+                  )}
+                </p>
+                {needsReload(controller.clue.failure) ? (
+                  <ReloadButton failure={controller.clue.failure} />
+                ) : (
+                  <button
+                    className="button-secondary"
+                    type="button"
+                    disabled={controller.busy}
+                    onClick={() => {
+                      void controller.retryClue();
+                    }}
+                  >
+                    {t("game.clue.retry")}
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </aside>
+      <details className="score-rules">
+        <summary>{t("game.score.rules")}</summary>
+        <p>{t("game.score.rulesCopy")}</p>
+      </details>
+    </div>
+  ) : null;
   return (
     <article className="game-layout">
       <RetractionComposer
@@ -168,95 +247,34 @@ export function PuzzleGame(props: {
         onSubmit={(retraction) => {
           void controller.submit(retraction);
         }}
+        persistenceScope={persistenceScope}
         post={post}
         retractingColor={props.puzzle.retractingColor}
+        support={support}
       >
         <div className="game-copy">
           <p className="game-eyebrow">{t("game.evidence")}</p>
           <p className="puzzle-prompt">{t("game.objective")}</p>
           {progress ? (
-            <>
-              <div
-                className="puzzle-score"
-                role="status"
-                aria-label={t("game.score.label")}
-                aria-live="polite"
-              >
-                <span className="score-attempt">
-                  {t("game.score.attempt", { number: progress.attemptCount + 1 })}
-                </span>
-                <strong className="score-potential">
-                  {t("game.score.available", {
-                    points: progress.nextAttemptPoints,
-                    count: progress.nextAttemptPoints,
-                  })}
-                </strong>
-                {controller.busy ? (
-                  <small className="score-updating">{t("game.score.sync")}</small>
-                ) : null}
-              </div>
-              <details className="score-rules">
-                <summary>{t("game.score.rules")}</summary>
-                <p>{t("game.score.rulesCopy")}</p>
-              </details>
-              <aside className="optional-clue">
-                {progress.clueUnlocked ? (
-                  <>
-                    <p className="game-eyebrow">{t("game.clue.unlocked")}</p>
-                    <h2 className="clue-title unlocked-clue">
-                      {localizedText(clueContent, "title", locale)}
-                    </h2>
-                    <p className="clue-prompt">{localizedText(clueContent, "prompt", locale)}</p>
-                  </>
-                ) : (
-                  <>
-                    <p>{t("game.clue.hidden")}</p>
-                    {controller.clue.tag !== "retry" ? (
-                      <button
-                        className="button-secondary clue-request"
-                        type="button"
-                        disabled={controller.blocked || alreadyScored}
-                        onClick={() => {
-                          void controller.requestClue();
-                        }}
-                      >
-                        {controller.clue.tag === "loading"
-                          ? t("game.clue.loading")
-                          : t("game.clue.reveal", {
-                              before: progress.nextAttemptPoints,
-                              after: afterAssistance(progress.nextAttemptPoints),
-                              count: afterAssistance(progress.nextAttemptPoints),
-                            })}
-                      </button>
-                    ) : (
-                      <div>
-                        <p role="alert">
-                          {t(
-                            needsReload(controller.clue.failure)
-                              ? retryKey(controller.clue.failure.kind)
-                              : "game.clue.error",
-                          )}
-                        </p>
-                        {needsReload(controller.clue.failure) ? (
-                          <ReloadButton failure={controller.clue.failure} />
-                        ) : (
-                          <button
-                            className="button-secondary"
-                            type="button"
-                            disabled={controller.busy}
-                            onClick={() => {
-                              void controller.retryClue();
-                            }}
-                          >
-                            {t("game.clue.retry")}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </aside>
-            </>
+            <div
+              className="puzzle-score"
+              role="status"
+              aria-label={t("game.score.label")}
+              aria-live="polite"
+            >
+              <span className="score-attempt">
+                {t("game.score.attempt", { number: progress.attemptCount + 1 })}
+              </span>
+              <strong className="score-potential">
+                {t("game.score.available", {
+                  points: progress.nextAttemptPoints,
+                  count: progress.nextAttemptPoints,
+                })}
+              </strong>
+              {controller.busy ? (
+                <small className="score-updating">{t("game.score.sync")}</small>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </RetractionComposer>

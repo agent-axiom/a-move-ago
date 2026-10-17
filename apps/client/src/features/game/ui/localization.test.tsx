@@ -132,6 +132,7 @@ it("switches an earned hint and feedback without reposting or losing the configu
 
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
   await user.click(screen.getByRole("gridcell", { name: "e4, empty" }));
+  await user.click(screen.getByText("Capture or special move", { exact: true }));
   await user.selectOptions(screen.getByLabelText("Captured piece"), "p");
   await user.click(screen.getByRole("button", { name: "Check move" }));
   await screen.findByText("Try a different starting square.");
@@ -182,6 +183,7 @@ it("updates preview validation in place while retaining the selected special mov
   );
   await user.click(screen.getByRole("gridcell", { name: "c8, white knight" }));
   await user.click(screen.getByRole("gridcell", { name: "c7, empty" }));
+  await user.click(screen.getByText("Capture or special move", { exact: true }));
   await user.selectOptions(screen.getByLabelText("Special move"), "en-passant");
   expect(screen.getByRole("alert")).toHaveTextContent(
     "The retraction details do not match the selected squares.",

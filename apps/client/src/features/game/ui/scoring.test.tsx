@@ -125,6 +125,7 @@ it("hides the full clue until purchase and preserves the draft when the clue and
   expect(screen.getByText("Available: 100 points")).toBeInTheDocument();
   await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
   await user.click(screen.getByRole("gridcell", { name: "e4, empty" }));
+  await user.click(screen.getByText("Capture or special move", { exact: true }));
   await user.selectOptions(screen.getByLabelText("Captured piece"), "p");
   await user.click(screen.getByRole("button", { name: "Reveal clue · 100 → 50 points" }));
   expect(screen.getByRole("button", { name: "Revealing clue…" })).toBeDisabled();
@@ -275,6 +276,7 @@ it("restores purchased hints and server score without charging or revealing anot
   });
   await user.click(screen.getByRole("gridcell", { name: "d5, белая пешка" }));
   await user.click(screen.getByRole("gridcell", { name: "e4, пусто" }));
+  await user.click(screen.getByText("Взятие или особый ход", { exact: true }));
   await user.selectOptions(screen.getByLabelText("Взятая фигура"), "p");
   await user.click(screen.getByRole("button", { name: "Проверить ход" }));
   await screen.findByText("The puzzle was solved in another tab.");

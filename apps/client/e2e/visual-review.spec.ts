@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
+import { selectCapturedPiece } from "./game-controls";
 
 test.skip(process.env.UI_PREVIEW !== "true", "Screenshots run only in the UI review workflow.");
 
@@ -67,6 +68,7 @@ test("desktop daily, configured move and solution reveal", async ({ page }, info
 
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
+  await page.locator(".advanced-move-details > summary").click();
   await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
   await expect(page.getByRole("button", { name: "Check move", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Check move", exact: true }).hover();
@@ -106,8 +108,30 @@ test("mobile and tablet daily stay usable at 390, 320 and 768 pixels", async ({ 
     if (!board) throw new Error("Interactive board is unavailable");
     expect(board.width).toBeGreaterThanOrEqual(Math.min(width - 72, 550));
     expect(Math.abs(board.height - board.width)).toBeLessThanOrEqual(2);
+    const status = await page.locator(".game-copy").boundingBox();
+    const actions = await page.locator(".composer-actions").boundingBox();
+    const assistance = await page.locator(".game-support").boundingBox();
+    expect(status).not.toBeNull();
+    expect(actions).not.toBeNull();
+    expect(assistance).not.toBeNull();
+    if (!status || !actions || !assistance) throw new Error("Game controls are unavailable");
+    expect(status.y, "Board precedes score and help on phones").toBeGreaterThan(board.y);
+    expect(actions.y, "Check remains close to the board").toBeLessThan(board.y + board.height + 260);
+    expect(assistance.y, "Optional assistance follows the check controls").toBeGreaterThan(
+      actions.y + actions.height,
+    );
+    await expect(page.locator(".advanced-move-details")).not.toHaveAttribute("open", "");
   }
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
+  await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
+  await page.locator(".advanced-move-details > summary").click();
+  await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
+  await page.locator(".advanced-move-details > summary").click();
+  await expect(page.locator(".advanced-move-summary")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check move", exact: true })).toBeEnabled();
+  await capture(page, info, "mobile-configured");
+  await checkLayout(page);
   await page.getByRole("button", { name: "Reveal clue · 100 → 50 points", exact: true }).click();
   await expect(page.locator(".unlocked-clue")).toHaveText("A pawn vanished");
   await expect(page.locator(".clue-prompt")).toHaveText(
@@ -227,3 +251,53 @@ for (const locale of ["ru", "zh"] as const) {
     await checkLayout(page);
   });
 }
+
+test("mobile tutorial and earned solution review remain usable on small phones", async ({ page }, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const observed = await installApiMock(page);
+  await page.goto("./?case=2026-08-03");
+  await page.getByRole("button", { name: "Learn in one move", exact: true }).click();
+  const lesson = page.getByRole("dialog", { name: "Your first move back", exact: true });
+  await expect(lesson).toBeVisible();
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await checkLayout(page);
+    const dimensions = await lesson.evaluate((element) => ({
+      content: element.scrollWidth,
+      available: element.clientWidth,
+    }));
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.available + 1);
+    await capture(page, info, `mobile-tutorial-${width}`);
+  }
+  await lesson.getByRole("gridcell", { name: "e4, white pawn", exact: true }).click();
+  await lesson.getByRole("gridcell", { name: "e2, empty", exact: true }).click();
+  await lesson.getByRole("button", { name: "Check move", exact: true }).click();
+  await expect(lesson.getByRole("heading", { name: "You’ve gone one move back.", exact: true })).toBeVisible();
+  await checkLayout(page);
+  await capture(page, info, "mobile-tutorial-complete");
+  expect(observed.attemptBodies).toHaveLength(0);
+  expect(observed.clueRequests).toHaveLength(0);
+  expect(observed.hintRequests).toHaveLength(0);
+  await lesson.getByRole("button", { name: "Start solving", exact: true }).click();
+  await expect(lesson).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
+  await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
+  await selectCapturedPiece(page, "p");
+  await page.getByRole("button", { name: "Check move", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Solved", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Review solution", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Solution review", exact: true })).toBeVisible();
+  await expect(page.locator(".solved-review .solution-actions .button-primary")).toBeEnabled();
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await checkLayout(page);
+    await capture(page, info, `mobile-solution-review-${width}`);
+  }
+  expect(observed.attemptBodies).toHaveLength(1);
+  expect(observed.revealRequests).toHaveLength(1);
+  await expect(page.locator(".solved-review .solution-reward")).toHaveCount(0);
+});

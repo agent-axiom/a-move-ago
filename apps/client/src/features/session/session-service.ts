@@ -8,6 +8,7 @@ import type { z } from "zod";
 import { parseEntryQuery, stripAuthReturn } from "../../app/entry-query";
 import type { AppRuntime } from "../../app/runtime";
 import { retryGet } from "../../shared/retry-get";
+import { discardGamePersistence, prepareDraftActor } from "./session-persistence";
 
 type Me = z.infer<typeof MeResponseSchema>;
 
@@ -39,6 +40,7 @@ function throwIfAborted(signal: AbortSignal): void {
 async function installServerToken(runtime: AppRuntime, token: string): Promise<void> {
   // The server may already have revoked the prior token. Keep the newly issued
   // credential authoritative for this running app even when persistence is unavailable.
+  discardGamePersistence(runtime);
   runtime.token.set(token);
   try {
     await runtime.platform.tokenStore.write(token);
@@ -50,7 +52,7 @@ async function installServerToken(runtime: AppRuntime, token: string): Promise<v
 async function issueGuest(runtime: AppRuntime, signal: AbortSignal): Promise<Me> {
   const issued = await runtime.api.createGuest(runtime.platform.channel, signal);
   await installServerToken(runtime, issued.token);
-  return { kind: "guest", profile: null };
+  return prepareDraftActor(runtime, { kind: "guest", profile: null });
 }
 
 async function readMe(runtime: AppRuntime, signal: AbortSignal): Promise<Me> {
@@ -67,7 +69,9 @@ export async function deleteProfile(
   runtime: AppRuntime,
   signal = new AbortController().signal,
 ): Promise<GuestMeResponse> {
-  return runtime.api.deleteProfile(signal);
+  const me = await runtime.api.deleteProfile(signal);
+  discardGamePersistence(runtime);
+  return prepareDraftActor(runtime, me);
 }
 
 function retryableHandoffFailure(error: unknown): boolean {
@@ -133,6 +137,7 @@ export async function bootstrapSession(
     }
     throw error;
   }
+  await prepareDraftActor(runtime, me);
   if (me.kind === "telegram") return me;
   if (authError) throw new TelegramAuthDeniedError(me);
   return handoff ? retryHandoff(runtime, { handoffCode: handoff }, signal) : me;
@@ -147,7 +152,7 @@ export async function retryHandoff(
     await ensureHandoffSession(runtime, signal);
     const issued = await runtime.api.exchangeHandoff(pending.handoffCode, signal);
     await installServerToken(runtime, issued.token);
-    return { kind: "telegram", profile: issued.profile };
+    return prepareDraftActor(runtime, { kind: "telegram", profile: issued.profile });
   } catch (error) {
     if (retryableHandoffFailure(error)) {
       throw new RetryableHandoffError(pending, error);
@@ -193,7 +198,7 @@ export async function saveProgress(
     if (!proof) throw new Error("Telegram did not provide Mini App initData.");
     const issued = await runtime.api.loginMiniApp(proof.initData, signal);
     await installServerToken(runtime, issued.token);
-    return { kind: "telegram", profile: issued.profile };
+    return prepareDraftActor(runtime, { kind: "telegram", profile: issued.profile });
   }
 
   const channel = runtime.platform.authMode === "oidc-android" ? "android" : "web";

@@ -1,3 +1,4 @@
+import { selectCapturedPiece } from "./game-controls";
 import { DailyCaseResponseSchema, StatsResponseSchema } from "@a-move-ago/api-contract";
 import { expect, test } from "@playwright/test";
 
@@ -41,7 +42,7 @@ test("guest solves the seeded case through Worker and retains D1 progress after 
 
   await page.getByRole("gridcell", { name: "d5, white pawn" }).click();
   await page.getByRole("gridcell", { name: "e4, empty" }).click();
-  await page.getByLabel("Captured piece").selectOption("p");
+  await selectCapturedPiece(page, "p");
   const attemptResponsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === "/v1/attempts",

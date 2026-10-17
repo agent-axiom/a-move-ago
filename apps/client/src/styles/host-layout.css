@@ -210,7 +210,11 @@
 
   .app-header {
     gap: 0.5rem;
-    padding-bottom: 1rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .app-body {
+    padding-top: 1rem;
   }
 
   .brand-mark {

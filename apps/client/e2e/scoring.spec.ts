@@ -1,10 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
+import { selectCapturedPiece } from "./game-controls";
 
 async function chooseMove(page: Page, previous: "c4" | "e4") {
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: `${previous}, empty`, exact: true }).click();
-  await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
+  await selectCapturedPiece(page, "p");
   await page.getByRole("button", { name: "Check move", exact: true }).click();
 }
 function language(page: Page) {
@@ -127,7 +128,7 @@ test("wrong move and a retried clue grant yield 35, retaining assistance across 
   expect(observed.clueRequests).toHaveLength(2);
   await page.getByRole("gridcell", { name: "d5, 白兵", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, 空格", exact: true }).click();
-  await page.getByLabel("被吃的棋子", { exact: true }).selectOption("p");
+  await selectCapturedPiece(page, "p", "zh");
   await page.getByRole("button", { name: "检查走法", exact: true }).click();
   await expect(page.locator(".solution-reward strong")).toHaveText("已获得 +35 分");
   await page.getByRole("button", { name: "继续", exact: true }).click();

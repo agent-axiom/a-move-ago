@@ -34,6 +34,22 @@ described in [ops/README.md](ops/README.md).
 Telegram authentication is optional. Merely opening the app in Telegram does
 not create a profile.
 
+The optional **How to play** lesson uses a local practice position and unlimited
+free retries. It never submits attempts or changes the player's rating. On
+phones the board and move controls appear together; capture and special-move
+details expand when needed.
+
+An unfinished reconstruction and its unresolved attempt UUID are saved locally
+for the current session, case, puzzle and version. Reloading can restore the
+draft and safely retry the same request. Confirmed profile deletion, a fresh
+guest session or successful account linking clears these local drafts. Blocked
+storage leaves gameplay available without persistence.
+
+Completed cases offer **Review solution** and **Next unsolved puzzle**. Solution
+review is an authenticated read of an already solved puzzle, including legacy
+solves; it creates no attempts or awards. The API operation is
+`GET /v1/cases/:caseId/puzzles/:puzzleId/reveal`.
+
 ## Rating and clues
 
 The first successful solve earns 100 points on attempt one, 70 on attempt two,

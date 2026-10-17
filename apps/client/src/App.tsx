@@ -1,16 +1,20 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useRuntime } from "./app/runtime";
 import { useAppNavigation } from "./app/use-app-navigation";
 import { useHostBack } from "./app/use-host-back";
 import { ArchivePage, archiveDateLabel } from "./features/archive/ArchivePage";
 import { CaseGame } from "./features/daily/CaseGame";
 import { DailyCaseGate } from "./features/daily/DailyCaseGate";
+import { findNextUnsolvedCase } from "./features/daily/next-unsolved";
 import { ProfileDeletion } from "./features/session/ProfileDeletion";
 import { SaveProgressButton } from "./features/session/SaveProgressButton";
 import { SessionProvider, useSession } from "./features/session/SessionProvider";
 import type { Me } from "./features/session/session-state";
 import { StatsPanel } from "./features/stats/StatsPanel";
+import { FirstMoveTutorial } from "./features/tutorial/FirstMoveTutorial";
+import { dismissTutorialInvitation, shouldOfferTutorial } from "./features/tutorial/tutorial-preference";
 import { I18nProvider, LanguageSwitcher, localizedSystemMessage, useI18n } from "./i18n";
+import { tutorialCopy } from "./i18n/messages/tutorial";
 import { BrandMark } from "./shared/BrandMark";
 import "./i18n/language.css";
 import "./features/archive/archive.css";
@@ -38,7 +42,12 @@ function AppContent() {
   const runtime = useRuntime();
   const { state } = useSession();
   const { navigation, dispatch } = useAppNavigation();
-  useHostBack(navigation, dispatch);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialOffered, setTutorialOffered] = useState(shouldOfferTutorial);
+  const nextCaseRequest = useRef<AbortController | null>(null);
+  const tutorial = tutorialCopy[locale];
+  const closeTutorial = useCallback(() => setTutorialOpen(false), []);
+  useHostBack(navigation, dispatch, tutorialOpen ? closeTutorial : undefined);
 
   useEffect(() => {
     const disposeLayout = runtime.platform.installLayoutVars(document.documentElement);
@@ -52,6 +61,25 @@ function AppContent() {
   const sessionReady = state.tag !== "booting" && state.tag !== "fatal";
   const me = "me" in state ? state.me : null;
   const identity = sessionIdentity(runtime, me);
+
+  useEffect(() => () => nextCaseRequest.current?.abort(), [identity, screen.name, caseDate]);
+
+  function openTutorial() {
+    dismissTutorialInvitation();
+    setTutorialOffered(false);
+    setTutorialOpen(true);
+  }
+
+  async function openNextUnsolved(currentDate: string): Promise<boolean> {
+    nextCaseRequest.current?.abort();
+    const controller = new AbortController();
+    nextCaseRequest.current = controller;
+    const date = await findNextUnsolvedCase(runtime.api, currentDate, controller.signal);
+    controller.signal.throwIfAborted();
+    if (!date) return false;
+    dispatch({ type: "push", screen: { name: "case", caseDate: date } });
+    return true;
+  }
 
   let content: ReactNode;
   if (state.tag === "fatal") {
@@ -139,7 +167,10 @@ function AppContent() {
           caseDate={caseDate}
           key={`${identity}:${caseDate ?? "today"}`}
         >
-          {(daily) => <CaseGame daily={daily} key={daily.id} onToday={showToday} />}
+          {(daily) => (
+            <CaseGame daily={daily} key={daily.id} onToday={showToday}
+              onNextUnsolved={() => openNextUnsolved(daily.date)} />
+          )}
         </DailyCaseGate>
       </>
     );
@@ -215,13 +246,30 @@ function AppContent() {
                 </li>
               </ol>
               <p className="help-note">{t("shell.helpNote")}</p>
+              <button type="button" onClick={openTutorial}>{tutorial.learnButton}</button>
             </div>
           </details>
         </nav>
       </header>
       <main className="app-body" id="main-content" tabIndex={-1}>
+        {sessionReady && screen.name === "case" && tutorialOffered ? (
+          <aside className="tutorial-invitation" aria-labelledby="tutorial-invitation-title">
+            <div>
+              <h2 id="tutorial-invitation-title">{tutorial.invitationTitle}</h2>
+              <p>{tutorial.invitationBody}</p>
+            </div>
+            <div className="tutorial-invitation-actions">
+              <button type="button" onClick={openTutorial}>{tutorial.invitationStart}</button>
+              <button type="button" className="button-quiet" onClick={() => {
+                dismissTutorialInvitation();
+                setTutorialOffered(false);
+              }}>{tutorial.invitationDismiss}</button>
+            </div>
+          </aside>
+        ) : null}
         {content}
       </main>
+      {tutorialOpen ? <FirstMoveTutorial locale={locale} onClose={closeTutorial} /> : null}
       <footer className="app-footer">
         <span>{t("shell.footer")}</span>
         <div>

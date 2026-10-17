@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { type AppRuntime, RuntimeProvider } from "./app/runtime";
+import { tutorialPreferenceKey } from "./features/tutorial/tutorial-preference";
 import { runtimeFixture } from "./test/runtime-fixture";
 
 const postFen = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
@@ -82,6 +83,7 @@ function renderApp(runtime: AppRuntime) {
 async function composeCapture(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("gridcell", { name: "d5, white pawn" }));
   await user.click(screen.getByRole("gridcell", { name: "e4, empty" }));
+  await user.click(screen.getByText("Capture or special move", { exact: true }));
   await user.selectOptions(screen.getByLabelText("Captured piece"), "p");
 }
 
@@ -90,6 +92,43 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/");
+});
+
+it("closes the lesson with Android Back while keeping the current case and attempt untouched", async () => {
+  const originalShowModal = HTMLDialogElement.prototype.showModal;
+  const originalClose = HTMLDialogElement.prototype.close;
+  HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+    this.open = false;
+  };
+  window.localStorage.removeItem(tutorialPreferenceKey);
+  try {
+    const user = userEvent.setup();
+    const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "android" });
+    runtime.api.getDaily = vi.fn().mockResolvedValue(daily);
+    renderApp(runtime);
+    await user.click(await screen.findByRole("button", { name: "Learn in one move" }));
+    expect(screen.getByRole("dialog", { name: "Your first move back" })).toBeVisible();
+
+    const installedBack = vi.mocked(runtime.platform.setBackHandler).mock.calls.at(-1)?.[0];
+    expect(installedBack).toBeTypeOf("function");
+    act(() => installedBack?.());
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: daily.title })).toBeVisible();
+    expect(screen.getByRole("gridcell", { name: "d5, white pawn" })).toBeVisible();
+    expect(runtime.api.getDaily).toHaveBeenCalledOnce();
+    expect(runtime.api.submitAttempt).not.toHaveBeenCalled();
+    expect(runtime.api.requestHint).not.toHaveBeenCalled();
+    expect(vi.mocked(runtime.platform.setBackHandler).mock.calls.at(-1)?.[0]).toBeNull();
+  } finally {
+    cleanup();
+    HTMLDialogElement.prototype.showModal = originalShowModal;
+    HTMLDialogElement.prototype.close = originalClose;
+    window.localStorage.removeItem(tutorialPreferenceKey);
+  }
 });
 
 it("creates a guest before daily and requests no Telegram proof without consent", async () => {

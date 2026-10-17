@@ -14,6 +14,7 @@ import {
   MeResponseSchema,
   OidcStartRequestSchema,
   OidcStartResponseSchema,
+  PuzzleRevealResponseSchema,
   SessionIssuedSchema,
   StatsResponseSchema,
   TelegramMiniAppAuthRequestSchema,
@@ -170,6 +171,14 @@ export function createApiClient(options: ApiClientOptions) {
         path: `/v1/cases/${encodeURIComponent(caseId)}/puzzles/${encodeURIComponent(puzzleId)}/clue`,
         body: {},
         responseSchema: ClueResponseSchema,
+        signal,
+      });
+    },
+    getPuzzleReveal(caseId: string, puzzleId: string, signal?: AbortSignal) {
+      return request({
+        method: "GET",
+        path: `/v1/cases/${encodeURIComponent(caseId)}/puzzles/${encodeURIComponent(puzzleId)}/reveal`,
+        responseSchema: PuzzleRevealResponseSchema,
         signal,
       });
     },

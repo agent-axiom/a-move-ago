@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
+import { selectCapturedPiece } from "./game-controls";
 
 function language(page: Page) {
   return page
@@ -21,7 +22,7 @@ test("English is the default and language changes preserve the selected date and
   await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
-  await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
+  await selectCapturedPiece(page, "p");
   const requests = observed.dailyDates.length;
 
   await language(page).selectOption("ru");
@@ -68,7 +69,7 @@ test("authorized hints and solution explanations translate without restarting an
   await page.goto("./?case=2026-08-03");
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: "c4, empty", exact: true }).click();
-  await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
+  await selectCapturedPiece(page, "p");
   await page.getByRole("button", { name: "Check move", exact: true }).click();
   await expect(
     page.getByText("That does not explain the missing pawn.", { exact: true }),
@@ -94,7 +95,7 @@ test("authorized hints and solution explanations translate without restarting an
   await page.getByRole("button", { name: "重置", exact: true }).click();
   await page.getByRole("gridcell", { name: "d5, 白兵", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, 空格", exact: true }).click();
-  await page.getByLabel("被吃的棋子", { exact: true }).selectOption("p");
+  await selectCapturedPiece(page, "p", "zh");
   await page.getByRole("button", { name: "检查走法", exact: true }).click();
   await expect(page.getByRole("heading", { name: "已解答", exact: true })).toBeVisible();
   await expect(page.getByText("白方 e 线的兵吃掉了 d5 格的黑兵。", { exact: true })).toBeVisible();
@@ -155,7 +156,7 @@ test("a retried attempt keeps its idempotency key when the language changes offl
   await page.goto("./?case=2026-08-03");
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
-  await page.getByLabel("Captured piece", { exact: true }).selectOption("p");
+  await selectCapturedPiece(page, "p");
   await page.getByRole("button", { name: "Check move", exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry attempt", exact: true })).toBeVisible();
   await language(page).selectOption("ru");

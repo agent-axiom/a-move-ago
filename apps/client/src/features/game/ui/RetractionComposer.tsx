@@ -1,11 +1,19 @@
 import type { Color, Retraction } from "@a-move-ago/api-contract";
 import { type FenState, serializeFen } from "@a-move-ago/game-core";
-import { type ReactNode, useReducer, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useI18n } from "../../../i18n";
-import { buildPreview, type CapturePieceType, draftReducer, initialDraft } from "../model/draft";
+import { buildPreview, type CapturePieceType, type DraftEvent, type DraftState, draftReducer, initialDraft } from "../model/draft";
+import { type GamePersistenceScope, gamePersistenceKey, readGameDraft, writeGameDraft } from "../model/persistence";
 import { Chessboard } from "./Chessboard";
 
 const captureOptions: ReadonlyArray<CapturePieceType> = ["p", "n", "b", "r", "q"];
+const specialLabels = {
+  normal: "game.special.normal",
+  "castle-kingside": "game.special.kingside",
+  "castle-queenside": "game.special.queenside",
+  "en-passant": "game.special.enPassant",
+  unpromotion: "game.special.unpromotion",
+} as const;
 
 interface RetractionComposerProps {
   post: FenState;
@@ -13,23 +21,38 @@ interface RetractionComposerProps {
   disabled: boolean;
   children?: ReactNode;
   feedback?: ReactNode;
+  support?: ReactNode;
+  persistenceScope?: GamePersistenceScope | undefined;
   onSubmit(retraction: Retraction): void;
 }
 
 export function RetractionComposer(props: RetractionComposerProps) {
-  const positionKey = `${serializeFen(props.post)}:${props.retractingColor}`;
+  const positionKey = `${serializeFen(props.post)}:${props.retractingColor}:${gamePersistenceKey(props.persistenceScope) ?? "ephemeral"}`;
   return <RetractionComposerForm {...props} key={positionKey} />;
+}
+
+function restoredDraft(props: RetractionComposerProps): DraftState {
+  const saved = readGameDraft(props.persistenceScope);
+  if (!saved || saved.tag === "select-current") return initialDraft;
+  let draft = draftReducer(props.post, props.retractingColor, initialDraft, { type: "select-square", square: saved.currentSquare });
+  if (draft.tag !== "select-previous" || saved.tag === "select-previous") return draft;
+  draft = draftReducer(props.post, props.retractingColor, draft, { type: "select-square", square: saved.previousSquare });
+  if (draft.tag !== "configure") return initialDraft;
+  draft = draftReducer(props.post, props.retractingColor, draft, { type: "set-special", special: saved.special });
+  return draftReducer(props.post, props.retractingColor, draft, { type: "set-capture", pieceType: saved.captureType });
 }
 
 function RetractionComposerForm(props: RetractionComposerProps) {
   const { t } = useI18n();
-  const [draft, dispatch] = useReducer(
-    (
-      state: typeof initialDraft | ReturnType<typeof draftReducer>,
-      event: Parameters<typeof draftReducer>[3],
-    ) => draftReducer(props.post, props.retractingColor, state, event),
-    initialDraft,
+  const [draft, setDraft] = useState(() => restoredDraft(props));
+  const [advancedOpen, setAdvancedOpen] = useState(
+    () => draft.tag === "configure" && (draft.special !== "normal" || draft.captureType !== null),
   );
+  function dispatch(event: DraftEvent) {
+    const next = draftReducer(props.post, props.retractingColor, draft, event);
+    writeGameDraft(props.persistenceScope, next);
+    setDraft(next);
+  }
   const [view, setView] = useState<"now" | "before">("now");
   const preview = buildPreview(props.post, props.retractingColor, draft, (code) =>
     t(`game.preview.${code}`),
@@ -47,7 +70,6 @@ function RetractionComposerForm(props: RetractionComposerProps) {
 
   return (
     <section className="retraction-workspace" aria-labelledby="retraction-heading">
-      <div className="clue-panel">{props.children}</div>
       <div className="board-panel">
         <div className="board-toolbar">
           <span className="last-move-label">
@@ -81,6 +103,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           {showingPreview ? t("game.preview.caption") : instruction}
         </p>
       </div>
+      <div className="clue-panel">{props.children}</div>
       <div className="retraction-panel">
         <div className="composer-heading">
           <p className="game-eyebrow">{t("game.reverseEyebrow")}</p>
@@ -114,6 +137,48 @@ function RetractionComposerForm(props: RetractionComposerProps) {
             <small>{t("game.oneMoveAgo")}</small>
           </output>
         ) : null}
+        {!preview.ok && draft.tag === "configure" ? (
+          <p className="composer-error" role="alert">
+            {preview.reason}
+          </p>
+        ) : null}
+        <div className="composer-actions">
+          <button
+            className="button-primary primary-action"
+            type="button"
+            disabled={props.disabled || !preview.ok}
+            onClick={() => {
+              if (preview.ok) props.onSubmit(preview.retraction);
+            }}
+          >
+            {t("game.check")}
+          </button>
+          <button
+            className="button-quiet"
+            type="button"
+            disabled={props.disabled || draft.tag === "select-current"}
+            onClick={() => {
+              dispatch({ type: "reset" });
+              setView("now");
+              setAdvancedOpen(false);
+            }}
+          >
+            {t("game.reset")}
+          </button>
+        </div>
+        {draft.tag === "configure" && (draft.special !== "normal" || draft.captureType) ? (
+          <p className="advanced-move-summary">
+            {draft.special !== "normal" ? t(specialLabels[draft.special]) : null}
+            {draft.special !== "normal" && draft.captureType ? " · " : null}
+            {draft.captureType ? `${t("game.captured")}: ${t(`game.capture.${draft.captureType}`)}` : null}
+          </p>
+        ) : null}
+        <details
+          className="advanced-move-details"
+          open={advancedOpen}
+          onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+        >
+          <summary>{t("game.advanced")}</summary>
         <fieldset
           className="retraction-details"
           disabled={props.disabled || draft.tag !== "configure"}
@@ -173,35 +238,9 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           <strong>{t("game.special.unpromotion")}</strong>
           {t("game.promotionHelp.after")}
         </p>
-        {!preview.ok && draft.tag === "configure" ? (
-          <p className="composer-error" role="alert">
-            {preview.reason}
-          </p>
-        ) : null}
-        <div className="composer-actions">
-          <button
-            className="button-primary"
-            type="button"
-            disabled={props.disabled || !preview.ok}
-            onClick={() => {
-              if (preview.ok) props.onSubmit(preview.retraction);
-            }}
-          >
-            {t("game.check")}
-          </button>
-          <button
-            className="button-quiet"
-            type="button"
-            disabled={props.disabled || draft.tag === "select-current"}
-            onClick={() => {
-              dispatch({ type: "reset" });
-              setView("now");
-            }}
-          >
-            {t("game.reset")}
-          </button>
-        </div>
+        </details>
         {props.feedback}
+        {props.support}
       </div>
     </section>
   );
