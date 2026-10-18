@@ -192,6 +192,11 @@ Gradle property `A_MOVE_AGO_APP_LINK_HOST` to the API hostname for a deployable
 App Link; an unset property deliberately uses a non-production `.invalid`
 host.
 
+Signed Android releases and automatic RuStore updates use the
+[RuStore delivery workflow](ops/rustore/README.md). Release tags build a verified
+APK, submit it for moderation, and request publication after approval. A manual
+build-only run provides the APK for the first Console release.
+
 ## Guest-first Telegram authentication
 
 Every Web, Telegram, and Android client begins as a guest. The server stores

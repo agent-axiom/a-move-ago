@@ -57,3 +57,149 @@ jobs:
           path: |
             apps/client/android/app/build/outputs/apk/debug/app-debug.apk
             apps/client/android/app/build/outputs/bundle/debug/app-debug.aab
+
+  release-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VITE_API_BASE_URL: https://api.test
+      VITE_ANDROID_ALLOW_DEBUG_SCHEME: "false"
+      ORG_GRADLE_PROJECT_A_MOVE_AGO_APP_LINK_HOST: api.test
+      ORG_GRADLE_PROJECT_A_MOVE_AGO_VERSION_CODE: "1000000"
+      ORG_GRADLE_PROJECT_A_MOVE_AGO_VERSION_NAME: "1.0.0"
+      ANDROID_KEYSTORE_PASSWORD: synthetic-ci-password
+      ANDROID_KEY_ALIAS: synthetic-release
+      ANDROID_KEY_PASSWORD: synthetic-ci-password
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager "build-tools;36.0.0"
+      - run: npm ci
+      - name: Create an ephemeral synthetic signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/a-move-ago-synthetic-release.p12"
+          echo "ANDROID_KEYSTORE_PATH=$ANDROID_KEYSTORE_PATH" >> "$GITHUB_ENV"
+          keytool -genkeypair -noprompt -storetype PKCS12 -keyalg RSA -keysize 3072 \
+            -validity 2 -alias "$ANDROID_KEY_ALIAS" -keystore "$ANDROID_KEYSTORE_PATH" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD -keypass:env ANDROID_KEY_PASSWORD \
+            -dname "CN=A MOVE AGO Synthetic CI,OU=CI,O=Synthetic,C=ZZ"
+          keytool -exportcert -alias "$ANDROID_KEY_ALIAS" -keystore "$ANDROID_KEYSTORE_PATH" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD -file "$RUNNER_TEMP/a-move-ago-synthetic-cert.der"
+      - run: npm run build:android:web -w @a-move-ago/client
+      - run: npm run cap:sync:android -w @a-move-ago/client
+      - name: Reject release packaging with incomplete configuration
+        shell: bash
+        working-directory: apps/client
+        run: |
+          set -euo pipefail
+          release_gate_log="$RUNNER_TEMP/a-move-ago-release-gate.log"
+          expect_rejected() {
+            local expected="$1"
+            shift
+            if "$@" > "$release_gate_log" 2>&1; then
+              echo "Release configuration unexpectedly accepted: $expected"
+              exit 1
+            fi
+            if ! grep -Fq "$expected" "$release_gate_log"; then
+              echo "Release configuration failed without the expected gate: $expected"
+              exit 1
+            fi
+          }
+          expect_rejected ANDROID_RELEASE_SIGNING_REQUIRED \
+            env -u ANDROID_KEYSTORE_PATH ./android/gradlew -p android --no-daemon --console=plain :app:assembleRelease
+          test ! -e android/app/build/outputs/apk/release/app-release.apk
+          test ! -e android/app/build/outputs/apk/release/app-release-unsigned.apk
+          expect_rejected ANDROID_RELEASE_VERSION_REQUIRED \
+            env -u ORG_GRADLE_PROJECT_A_MOVE_AGO_VERSION_CODE ./android/gradlew -p android --no-daemon --console=plain :app:validateReleaseConfiguration
+          expect_rejected ANDROID_RELEASE_VERSION_REQUIRED \
+            env -u ORG_GRADLE_PROJECT_A_MOVE_AGO_VERSION_NAME ./android/gradlew -p android --no-daemon --console=plain :app:validateReleaseConfiguration
+          expect_rejected ANDROID_RELEASE_HOST_REQUIRED \
+            env ORG_GRADLE_PROJECT_A_MOVE_AGO_APP_LINK_HOST=app-link-not-configured.invalid \
+            ./android/gradlew -p android --no-daemon --console=plain :app:validateReleaseConfiguration
+      - name: Test, lint and build the signed synthetic release APK
+        working-directory: apps/client
+        run: ./android/gradlew -p android --no-daemon --console=plain testReleaseUnitTest lintRelease assembleRelease verifyAuthManifests
+      - name: Verify the final APK identity, certificate and release-only manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_apk="apps/client/android/app/build/outputs/apk/release/app-release.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$release_apk" \
+            > "$RUNNER_TEMP/a-move-ago-release-signature.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$release_apk" \
+            > "$RUNNER_TEMP/a-move-ago-release-badging.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$release_apk" AndroidManifest.xml \
+            > "$RUNNER_TEMP/a-move-ago-release-manifest.txt"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import zipfile
+
+          temp = pathlib.Path(os.environ["RUNNER_TEMP"])
+          certificate = (temp / "a-move-ago-synthetic-cert.der").read_bytes()
+          signature = (temp / "a-move-ago-release-signature.txt").read_text()
+          digests = re.findall(r"^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$", signature, re.M)
+          assert [value.lower() for value in digests] == [hashlib.sha256(certificate).hexdigest()], "Unexpected APK signer"
+          badging = (temp / "a-move-ago-release-badging.txt").read_text()
+          identity = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", badging, re.M)
+          assert identity and identity.groups() == ("com.agentaxiom.amoveago", "1000000", "1.0.0"), "Unexpected APK identity"
+          assert "application-debuggable" not in badging, "APK is debuggable"
+          manifest = (temp / "a-move-ago-release-manifest.txt").read_text()
+          assert "amoveago-debug" not in manifest, "Debug callback leaked into APK"
+          for name in ("debuggable", "testOnly"):
+              for line in manifest.splitlines():
+                  if f"android:{name}(" in line:
+                      assert re.search(r"=\(type 0x12\)0x0\s*$", line), "APK contains a debug or test flag"
+          for name, value in (("scheme", "https"), ("host", "api.test"), ("pathPrefix", "/auth/android")):
+              assert re.search(r"android:" + name + r"\([^)]*\)=\"" + re.escape(value) + r"\"", manifest), "App Link does not match release configuration"
+          assert re.search(r"android:autoVerify\([^)]*\)=\(type 0x12\)0xffffffff", manifest), "App Link verification is disabled"
+          with zipfile.ZipFile("apps/client/android/app/build/outputs/apk/release/app-release.apk") as apk:
+              html = apk.read("assets/public/index.html").decode()
+          assert "https://api.test" in html, "Incorrect Android web API origin"
+          assert "a-move-ago-android-debug-auth" not in html, "Debug web auth leaked into APK"
+          print(json.dumps({"synthetic": True, "signedRelease": True, "certificateMatches": True,
+                            "packageName": identity.group(1), "versionCode": 1000000,
+                            "versionName": "1.0.0", "appLinkHost": "api.test", "debuggable": False}))
+          PY
+      - name: Exercise the store release verifier against the real signed APK
+        shell: bash
+        env:
+          VERSION_NAME: "1.0.0"
+          VERSION_CODE: "1000000"
+          API_ORIGIN: https://api.test
+          ANDROID_WEB_DIR: apps/client/dist/android
+          ANDROID_APK_PATH: apps/client/android/app/build/outputs/apk/release/app-release.apk
+        run: |
+          ANDROID_SDK_ROOT="$ANDROID_HOME" \
+            RELEASE_METADATA_PATH="$RUNNER_TEMP/a-move-ago-synthetic-release-metadata.json" \
+            node tools/scripts/android-release.mjs verify-apk
+      - name: Destroy the synthetic signing key and release artifact
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/a-move-ago-synthetic-release.p12" \
+            "$RUNNER_TEMP/a-move-ago-synthetic-cert.der" \
+            "$RUNNER_TEMP/a-move-ago-release-gate.log" \
+            "$RUNNER_TEMP/a-move-ago-release-signature.txt" \
+            "$RUNNER_TEMP/a-move-ago-release-badging.txt" \
+            "$RUNNER_TEMP/a-move-ago-release-manifest.txt" \
+            "$RUNNER_TEMP/a-move-ago-synthetic-release-metadata.json" \
+            apps/client/android/app/build/outputs/apk/release/app-release.apk \
+            apps/client/android/app/build/outputs/apk/release/app-release.apk.idsig

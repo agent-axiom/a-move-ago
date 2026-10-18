@@ -1,5 +1,28 @@
 apply plugin: 'com.android.application'
 
+def releaseVersionCode = project.findProperty("A_MOVE_AGO_VERSION_CODE")?.toString()
+def releaseVersionName = project.findProperty("A_MOVE_AGO_VERSION_NAME")?.toString()
+def appLinkHost = project.findProperty("A_MOVE_AGO_APP_LINK_HOST")?.toString()
+def releaseSigning = [
+    keystorePath: System.getenv("ANDROID_KEYSTORE_PATH"),
+    storePassword: System.getenv("ANDROID_KEYSTORE_PASSWORD"),
+    keyAlias: System.getenv("ANDROID_KEY_ALIAS"),
+    keyPassword: System.getenv("ANDROID_KEY_PASSWORD")
+]
+def hasReleaseSigning = releaseSigning.values().every { it != null && !it.isEmpty() }
+def validVersionCode = { String value ->
+    value != null && value ==~ /[1-9][0-9]{0,9}/ && value.toLong() <= 2100000000L
+}
+def validVersionName = { String value ->
+    value != null && value ==~ /[0-9][0-9A-Za-z.+_-]{0,63}/
+}
+if (releaseVersionCode != null && !validVersionCode(releaseVersionCode)) {
+    throw new GradleException("ANDROID_RELEASE_VERSION_CODE_INVALID")
+}
+if (releaseVersionName != null && !validVersionName(releaseVersionName)) {
+    throw new GradleException("ANDROID_RELEASE_VERSION_NAME_INVALID")
+}
+
 android {
     namespace = "com.agentaxiom.amoveago"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,11 +30,11 @@ android {
         applicationId "com.agentaxiom.amoveago"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode (releaseVersionCode == null ? 1 : releaseVersionCode.toInteger())
+        versionName releaseVersionName ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders = [
-            appLinkHost: project.findProperty("A_MOVE_AGO_APP_LINK_HOST") ?: "app-link-not-configured.invalid"
+            appLinkHost: appLinkHost ?: "app-link-not-configured.invalid"
         ]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -19,11 +42,63 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseSigning.keystorePath)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+            debuggable false
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+// Keep manifest-only inspection usable in the credential-free debug gate. Actual
+// release packaging always requires explicit identity, version and signing inputs.
+def validateReleaseConfiguration = tasks.register("validateReleaseConfiguration") {
+    doLast {
+        if (!hasReleaseSigning) {
+            throw new GradleException("ANDROID_RELEASE_SIGNING_REQUIRED")
+        }
+        def keystore = file(releaseSigning.keystorePath)
+        if (!keystore.isFile() || !keystore.canRead()) {
+            throw new GradleException("ANDROID_RELEASE_KEYSTORE_UNREADABLE")
+        }
+        if (!validVersionCode(releaseVersionCode) || !validVersionName(releaseVersionName)) {
+            throw new GradleException("ANDROID_RELEASE_VERSION_REQUIRED")
+        }
+        def host = appLinkHost?.toLowerCase(Locale.ROOT)
+        if (host == null || host.length() > 253 ||
+            !(host ==~ /(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?/) ||
+            host.endsWith(".invalid") || host.endsWith(".localhost") || host ==~ /[0-9.]+/) {
+            throw new GradleException("ANDROID_RELEASE_HOST_REQUIRED")
+        }
+        def webIndex = file("src/main/assets/public/index.html")
+        if (!webIndex.isFile()) {
+            throw new GradleException("ANDROID_RELEASE_WEB_ASSETS_REQUIRED")
+        }
+        if (System.getenv("VITE_ANDROID_ALLOW_DEBUG_SCHEME") == "true" ||
+            webIndex.getText("UTF-8").contains("a-move-ago-android-debug-auth")) {
+            throw new GradleException("ANDROID_RELEASE_DEBUG_AUTH_FORBIDDEN")
+        }
+    }
+}
+
+tasks.configureEach { candidate ->
+    if (candidate.name in ["packageRelease", "packageReleaseBundle", "signReleaseBundle",
+                           "assembleRelease", "bundleRelease", "validateSigningRelease"]) {
+        candidate.dependsOn(validateReleaseConfiguration)
     }
 }
 
