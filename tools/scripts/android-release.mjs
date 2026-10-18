@@ -470,18 +470,21 @@ async function outputs(path, values) {
   if (!path) return;
   const lines = Object.entries(values)
     .map(([key, value]) => {
-      ensure(/^[a-z_]+$/.test(key) && !/[\r\n]/.test(String(value)), "INVALID_RELEASE_OUTPUT");
+      ensure(
+        /^[a-z_][a-z0-9_]*$/.test(key) && !/[\r\n]/.test(String(value)),
+        "INVALID_RELEASE_OUTPUT",
+      );
       return `${key}=${value}\n`;
     })
     .join("");
   await appendFile(path, lines);
 }
 
-export async function main(args = process.argv.slice(2), env = process.env) {
+export async function main(args = process.argv.slice(2), env = process.env, options = {}) {
   ensure(args.length === 1, "INVALID_ANDROID_RELEASE_COMMAND");
   switch (args[0]) {
     case "verify-input": {
-      const result = await verifyReleaseInput(env);
+      const result = await verifyReleaseInput(env, options);
       await outputs(env.GITHUB_OUTPUT, {
         commit_sha: result.commitSha,
         version_name: result.versionName,
@@ -503,15 +506,18 @@ export async function main(args = process.argv.slice(2), env = process.env) {
       return;
     }
     case "verify-apk": {
-      const result = await verifyApk({
-        apkPath: env.ANDROID_APK_PATH,
-        sdkRoot: env.ANDROID_SDK_ROOT,
-        versionName: env.VERSION_NAME,
-        versionCode: env.VERSION_CODE,
-        apiOrigin: env.API_ORIGIN,
-        webDir: env.ANDROID_WEB_DIR,
-        expectedCertificateSha256: env.ANDROID_EXPECTED_CERTIFICATE_SHA256,
-      });
+      const result = await verifyApk(
+        {
+          apkPath: env.ANDROID_APK_PATH,
+          sdkRoot: env.ANDROID_SDK_ROOT,
+          versionName: env.VERSION_NAME,
+          versionCode: env.VERSION_CODE,
+          apiOrigin: env.API_ORIGIN,
+          webDir: env.ANDROID_WEB_DIR,
+          expectedCertificateSha256: env.ANDROID_EXPECTED_CERTIFICATE_SHA256,
+        },
+        options,
+      );
       const metadataPath =
         env.RELEASE_METADATA_PATH ?? join(env.RUNNER_TEMP ?? ".", "android-release-metadata.json");
       await mkdir(dirname(metadataPath), { recursive: true });
@@ -530,10 +536,13 @@ export async function main(args = process.argv.slice(2), env = process.env) {
       return;
     }
     case "verify-links": {
-      await verifyAssetLinks({
-        apiOrigin: env.API_ORIGIN,
-        certificateSha256: env.ANDROID_CERTIFICATE_SHA256,
-      });
+      await verifyAssetLinks(
+        {
+          apiOrigin: env.API_ORIGIN,
+          certificateSha256: env.ANDROID_CERTIFICATE_SHA256,
+        },
+        options,
+      );
       console.log("Production Android App Link matches the signed APK.");
       return;
     }

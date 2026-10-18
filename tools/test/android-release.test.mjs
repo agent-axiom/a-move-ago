@@ -303,6 +303,41 @@ test("APK verification exercises SDK tools and compares the packaged web to the 
   assert(!JSON.stringify(metadata).includes("keystore"));
 });
 
+test("APK CLI publishes the verified certificate, hash and paths to GitHub outputs", async (t) => {
+  const fixture = await apkFixture(t);
+  const outputPath = join(fixture.directory, "github-output");
+  const metadataPath = join(fixture.directory, "release-metadata.json");
+  await main(
+    ["verify-apk"],
+    {
+      ANDROID_APK_PATH: fixture.input.apkPath,
+      ANDROID_SDK_ROOT: fixture.input.sdkRoot,
+      VERSION_NAME: fixture.input.versionName,
+      VERSION_CODE: String(fixture.input.versionCode),
+      API_ORIGIN: fixture.input.apiOrigin,
+      ANDROID_WEB_DIR: fixture.input.webDir,
+      RELEASE_METADATA_PATH: metadataPath,
+      GITHUB_OUTPUT: outputPath,
+    },
+    { run: fixture.run },
+  );
+  const outputs = Object.fromEntries(
+    (await readFile(outputPath, "utf8")).trim().split("\n").map((line) => {
+      const separator = line.indexOf("=");
+      return [line.slice(0, separator), line.slice(separator + 1)];
+    }),
+  );
+  const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+  assert.deepEqual(outputs, {
+    apk_path: fixture.input.apkPath,
+    metadata_path: metadataPath,
+    certificate_sha256: certificate,
+    apk_sha256: metadata.apkSha256,
+  });
+  assert.match(outputs.apk_sha256, /^[a-f0-9]{64}$/);
+  assert.equal(metadata.certificateSha256, outputs.certificate_sha256);
+});
+
 test("wrong package, version, debug/test-only flags and App Link host/path are rejected", async (t) => {
   const fixture = await apkFixture(t);
   const mutations = [
