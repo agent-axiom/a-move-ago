@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { constants, createHash, generateKeyPairSync, verify } from "node:crypto";
-import { mkdtemp, mkdir, rm, truncate, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -337,7 +337,10 @@ test("all pages are inspected, including alpha drafts on a later page", async ()
       code: "EXISTING_DRAFT_REQUIRES_CONSOLE",
       versionId: 103,
     });
-    assert.deepEqual(check.calls.map((call) => call.stage), ["auth", "list", "list"]);
+    assert.deepEqual(
+      check.calls.map((call) => call.stage),
+      ["auth", "list", "list"],
+    );
     assert.equal(check.calls[2].parsed.searchParams.get("page"), "1");
   });
 });
@@ -513,9 +516,7 @@ test("an unconfirmed create or submission is not treated as success", async (t) 
     [
       "still draft",
       (call) =>
-        call.stage === "verify"
-          ? ok(page([{ ...submitted, versionStatus: "DRAFT" }]))
-          : undefined,
+        call.stage === "verify" ? ok(page([{ ...submitted, versionStatus: "DRAFT" }])) : undefined,
       "SUBMISSION_UNCONFIRMED",
     ],
   ]) {
@@ -537,9 +538,12 @@ test("keeps CLI validation failures free of credentials and paths", async () => 
   };
   assert.equal(await runCli(["--api-origin", "https://evil.example"], {}, runtime), 1);
   assert.equal(await runCli([], {}, runtime), 1);
-  assert.deepEqual(output.map((value) => JSON.parse(value)), [
-    { ok: false, code: "UNEXPECTED_ARGUMENTS", stage: "validation" },
-    { ok: false, code: "INVALID_VERSION_CODE", stage: "validation" },
-  ]);
+  assert.deepEqual(
+    output.map((value) => JSON.parse(value)),
+    [
+      { ok: false, code: "UNEXPECTED_ARGUMENTS", stage: "validation" },
+      { ok: false, code: "INVALID_VERSION_CODE", stage: "validation" },
+    ],
+  );
   noSecret(output);
 });
