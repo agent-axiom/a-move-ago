@@ -1,0 +1,150 @@
+name: RuStore release
+
+on:
+  push:
+    tags: ["android-v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (major.minor.patch)
+        required: true
+        default: "1.0.0"
+        type: string
+      mode:
+        description: Build a signed APK or publish it to RuStore
+        required: true
+        default: build-only
+        type: choice
+        options:
+          - build-only
+          - publish
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rustore-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      commit_sha: ${{ steps.release.outputs.commit_sha }}
+      version_name: ${{ steps.release.outputs.version_name }}
+      version_code: ${{ steps.release.outputs.version_code }}
+      mode: ${{ steps.release.outputs.mode }}
+      api_host: ${{ steps.release.outputs.api_host }}
+      notes_path: ${{ steps.release.outputs.notes_path }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Verify the immutable release commit and CI results
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_MODE: ${{ inputs.mode }}
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: node tools/scripts/android-release.mjs verify-input
+
+  release:
+    needs: verify
+    environment: rustore
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VITE_API_BASE_URL: ${{ vars.API_ORIGIN }}
+      VITE_ANDROID_ALLOW_DEBUG_SCHEME: "false"
+      ORG_GRADLE_PROJECT_A_MOVE_AGO_VERSION_CODE: ${{ needs.verify.outputs.version_code }}
+      ORG_GRADLE_PROJECT_A_MOVE_AGO_VERSION_NAME: ${{ needs.verify.outputs.version_name }}
+      ORG_GRADLE_PROJECT_A_MOVE_AGO_APP_LINK_HOST: ${{ needs.verify.outputs.api_host }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.commit_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+      - name: Install release SDK and build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - run: npm ci
+      - run: npm run build:android:web -w @a-move-ago/client
+      - run: npm run cap:sync:android -w @a-move-ago/client
+      - name: Restore release signing key to temporary storage
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: node tools/scripts/android-release.mjs prepare-keystore
+      - name: Test, lint and build the signed release APK
+        working-directory: apps/client
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: >-
+          ./android/gradlew -p android --no-daemon --console=plain
+          testReleaseUnitTest lintRelease assembleRelease verifyAuthManifests
+      - name: Verify APK identity, signature and release configuration
+        id: apk
+        env:
+          ANDROID_APK_PATH: apps/client/android/app/build/outputs/apk/release/app-release.apk
+          VERSION_NAME: ${{ needs.verify.outputs.version_name }}
+          VERSION_CODE: ${{ needs.verify.outputs.version_code }}
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: |
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          node tools/scripts/android-release.mjs verify-apk
+      - name: Verify production App Links for the APK signing certificate
+        if: needs.verify.outputs.mode == 'publish'
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+          ANDROID_CERTIFICATE_SHA256: ${{ steps.apk.outputs.certificate_sha256 }}
+        run: node tools/scripts/android-release.mjs verify-links
+      - name: Publish the verified APK to RuStore
+        if: needs.verify.outputs.mode == 'publish'
+        env:
+          RUSTORE_APK_PATH: ${{ steps.apk.outputs.apk_path }}
+          RUSTORE_VERSION_NAME: ${{ needs.verify.outputs.version_name }}
+          RUSTORE_VERSION_CODE: ${{ needs.verify.outputs.version_code }}
+          RUSTORE_NOTES_PATH: ${{ needs.verify.outputs.notes_path }}
+          RUSTORE_KEY_ID: ${{ secrets.RUSTORE_KEY_ID }}
+          RUSTORE_PRIVATE_KEY_BASE64: ${{ secrets.RUSTORE_PRIVATE_KEY_BASE64 }}
+        run: node tools/scripts/publish-rustore.mjs
+      - name: Destroy ephemeral signing files
+        if: always()
+        run: node tools/scripts/android-release.mjs cleanup
+      - name: Retain the signed APK and safe verification metadata
+        if: ${{ always() && steps.apk.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: a-move-ago-rustore-${{ needs.verify.outputs.version_name }}-${{ needs.verify.outputs.version_code }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            apps/client/android/app/build/outputs/apk/release/app-release.apk
+            ${{ runner.temp }}/android-release-metadata.json
