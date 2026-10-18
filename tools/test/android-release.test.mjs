@@ -322,10 +322,13 @@ test("APK CLI publishes the verified certificate, hash and paths to GitHub outpu
     { run: fixture.run },
   );
   const outputs = Object.fromEntries(
-    (await readFile(outputPath, "utf8")).trim().split("\n").map((line) => {
-      const separator = line.indexOf("=");
-      return [line.slice(0, separator), line.slice(separator + 1)];
-    }),
+    (await readFile(outputPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const separator = line.indexOf("=");
+        return [line.slice(0, separator), line.slice(separator + 1)];
+      }),
   );
   const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
   assert.deepEqual(outputs, {
