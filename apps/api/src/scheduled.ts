@@ -2,6 +2,7 @@ import type { Env } from "./env";
 
 export async function cleanupExpired(env: Env, now: number): Promise<void> {
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM puzzle_feedback WHERE created_at < ?").bind(now - 2_592_000),
     env.DB.prepare(
       `DELETE FROM auth_flows
         WHERE expires_at < ?

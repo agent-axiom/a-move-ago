@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { runLocalizedCli } from "../scripts/check-localized-production-play.mjs";
 import { checkProductionPlay, runCli } from "../scripts/check-production-play.mjs";
@@ -63,6 +64,7 @@ function harness({ override, count = 2 } = {}) {
   const requests = [];
   let attempts = 0;
   let submissions = 0;
+  let feedbackSubmissions = 0;
   const deps = {
     now: () => new Date(`${date}T12:00:00Z`),
     uuid: () => attemptUuid,
@@ -112,6 +114,10 @@ function harness({ override, count = 2 } = {}) {
                 requestId: "review-check",
               },
             };
+      } else if (path === "/v1/feedback") {
+        status = feedbackSubmissions++ === 0 ? 201 : 200;
+        if (status === 200) headers["idempotency-replayed"] = "true";
+        payload = { reportUuid: JSON.parse(options.body).reportUuid, received: true };
       } else if (path === "/v1/attempts") {
         status = submissions++ === 0 ? 201 : 200;
         attempts = 1;
@@ -205,6 +211,128 @@ test("synthetic guest solve and replay preserve progress without private output"
 });
 test("a one-puzzle case also verifies completion and streak statistics", async () => {
   assert.equal((await harness({ count: 1 }).run()).ok, true);
+});
+
+function feedbackHarness(mutate = () => {}) {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE attempts (
+      id TEXT PRIMARY KEY, attempt_uuid TEXT, session_id TEXT, correct INTEGER, player_id TEXT
+    );
+    CREATE TABLE puzzle_feedback (
+      session_id TEXT, player_id TEXT, report_uuid TEXT, case_id TEXT, client_puzzle_id TEXT,
+      puzzle_version INTEGER, locale TEXT, reason TEXT, comment TEXT,
+      PRIMARY KEY (session_id, report_uuid)
+    );
+  `);
+  db.prepare("INSERT INTO attempts VALUES (?, ?, ?, 1, NULL)").run(
+    "33333333-3333-4333-8333-333333333333",
+    attemptUuid,
+    "own-guest",
+  );
+  let inserted = false;
+  const check = harness({
+    override(request, payload, status, headers) {
+      if (request.path === "/v1/feedback") {
+        const report = JSON.parse(request.body);
+        const insert = db.prepare(
+          "INSERT OR IGNORE INTO puzzle_feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        );
+        const fields = [
+          report.reportUuid,
+          report.caseId,
+          report.puzzleId,
+          report.puzzleVersion,
+          report.locale,
+          report.reason,
+          report.comment,
+        ];
+        insert.run("own-guest", null, ...fields);
+        // Even an unrelated guest or linked player with the same UUID/comment
+        // must survive this probe's privileged cleanup.
+        insert.run("other-guest", null, ...fields);
+        insert.run("other-player", "player-42", ...fields);
+        inserted = true;
+      }
+      if (request.isD1) {
+        const query = JSON.parse(request.body);
+        if (query.sql.includes("puzzle_feedback")) {
+          const statement = db.prepare(query.sql);
+          let results = [];
+          if (query.sql.startsWith("DELETE")) statement.run(...query.params);
+          else results = statement.all(...query.params);
+          payload = { success: true, result: [{ success: true, results }] };
+        }
+      }
+      mutate(request, payload, status, headers, inserted);
+      return new Response(JSON.stringify(payload), { status, headers });
+    },
+  });
+  return { ...check, db, bindings: { ...env, CHECK_FEEDBACK: "true" } };
+}
+
+test("feedback smoke verifies its stored receipt and replay, then removes only its own report", async () => {
+  const check = feedbackHarness();
+  try {
+    const result = await check.run(check.bindings);
+    assert.equal(result.feedbackVerified, true);
+    assertSafe(result);
+    const reports = check.requests.filter((request) => request.path === "/v1/feedback");
+    assert.equal(reports.length, 2);
+    assert.equal(reports[0].body, reports[1].body);
+    assert.deepEqual(
+      check.db
+        .prepare("SELECT session_id FROM puzzle_feedback ORDER BY session_id")
+        .all()
+        .map((row) => row.session_id),
+      ["other-guest", "other-player"],
+    );
+    const deletes = check.requests
+      .filter((request) => request.isD1)
+      .map((request) => JSON.parse(request.body))
+      .filter((query) => query.sql.startsWith("DELETE"));
+    assert.equal(deletes.length, 1);
+    assert.match(deletes[0].sql, /^DELETE FROM puzzle_feedback WHERE report_uuid = \?/);
+    assert.match(deletes[0].sql, /WHERE id = \? AND attempt_uuid = \? AND correct = 1/);
+  } finally {
+    check.db.close();
+  }
+});
+
+test("feedback smoke cleans its report on ambiguous delivery, invalid replay and changed points", async (t) => {
+  for (const fault of ["lost-response", "bad-replay", "changed-points"]) {
+    await t.test(fault, async () => {
+      const check = feedbackHarness((request, payload, status, headers, inserted) => {
+        if (fault === "lost-response" && request.path === "/v1/feedback" && status === 201)
+          throw new Error(secret);
+        if (fault === "bad-replay" && request.path === "/v1/feedback" && status === 200)
+          delete headers["idempotency-replayed"];
+        if (fault === "changed-points" && inserted && request.path === "/v1/me/stats")
+          payload.points += 1;
+      });
+      const output = [];
+      try {
+        assert.equal(
+          await runCli([], check.bindings, {
+            ...check.deps,
+            log: (value) => output.push(value),
+            errorLog: (value) => output.push(value),
+          }),
+          1,
+        );
+        assertSafe(output);
+        assert.equal(
+          check.db
+            .prepare("SELECT count(*) AS n FROM puzzle_feedback WHERE session_id = 'own-guest'")
+            .get().n,
+          0,
+        );
+        assert.equal(check.db.prepare("SELECT count(*) AS n FROM puzzle_feedback").get().n, 2);
+      } finally {
+        check.db.close();
+      }
+    });
+  }
 });
 
 test("earned-review proof rejects premature access, missing routes, private leakage and changed solutions", async (t) => {

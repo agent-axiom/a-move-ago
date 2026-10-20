@@ -80,6 +80,7 @@ export async function resetDatabase() {
   await testEnv.DB.prepare("DROP TRIGGER IF EXISTS test_fail_mini_app_revoke").run();
   await testEnv.DB.prepare("DROP TRIGGER IF EXISTS test_ignore_mini_app_revoke").run();
   await testEnv.DB.batch([
+    testEnv.DB.prepare("DELETE FROM puzzle_feedback"),
     testEnv.DB.prepare("DELETE FROM gameplay_events"),
     testEnv.DB.prepare("DELETE FROM auth_flows"),
     testEnv.DB.prepare("DELETE FROM hint_events"),
