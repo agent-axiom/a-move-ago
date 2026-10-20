@@ -39,7 +39,7 @@ it("changes language inside the menu without resetting a historical move, and na
   await user.click(await screen.findByRole("gridcell", { name: "d5, white pawn" }));
   await user.click(screen.getByRole("gridcell", { name: "e4, empty" }));
   expect(screen.queryByLabelText("Language")).not.toBeInTheDocument();
-  const opener = screen.getByRole("button", { name: "Menu", exact: true });
+  const opener = screen.getByRole("button", { name: "Menu" });
   await user.click(opener);
   await user.selectOptions(screen.getByLabelText("Language"), "ru");
   expect(screen.getByRole("dialog", { name: "Меню" })).toBeVisible();
@@ -78,7 +78,7 @@ it("keeps the three destinations available and restores native Back after closin
     "aria-current",
     "page",
   );
-  await user.click(screen.getByRole("button", { name: "Menu", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Menu" }));
   act(() => vi.mocked(runtime.platform.setBackHandler).mock.calls.at(-1)?.[0]?.());
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(window.location.search).toBe("?view=archive");
