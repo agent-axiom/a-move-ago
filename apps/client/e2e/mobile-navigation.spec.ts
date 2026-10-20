@@ -127,12 +127,26 @@ test("menu focus and locale changes preserve the current move", async ({ page })
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
   const menu = await openMenu(page);
+  expect(await menu.evaluate((element) => element.matches(":modal"))).toBe(true);
+  await expect(menu.locator(".app-menu-close")).toBeFocused();
   await languageSelect(page).selectOption("ru");
   await expect(languageSelect(page)).toHaveValue("ru");
+  await page.locator(".app-menu-trigger").evaluate((element) => {
+    if (element instanceof HTMLElement) element.focus();
+  });
+  expect(await menu.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  // Native modal dialogs allow Tab to visit browser chrome, but not the inert page.
+  // See https://github.com/whatwg/html/issues/8339.
   for (let index = 0; index < 8; index += 1) {
     await page.keyboard.press("Tab");
-    expect(await menu.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    expect(
+      await menu.evaluate(
+        (element) =>
+          element.contains(document.activeElement) || document.activeElement === document.body,
+      ),
+    ).toBe(true);
   }
+  expect(await menu.evaluate((element) => element.contains(document.activeElement))).toBe(true);
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(page.locator(".app-menu-trigger")).toBeFocused();

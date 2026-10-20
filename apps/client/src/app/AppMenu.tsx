@@ -92,7 +92,7 @@ function AppMenuDialog({ onClose, onTutorial }: { onClose(): void; onTutorial():
         </div>
       </details>
       <button className="button-primary app-menu-learn" onClick={onTutorial} type="button">
-        {tutorialCopy[locale].learnButton}
+        {tutorialCopy[locale].invitationStart}
         <span aria-hidden="true">↗</span>
       </button>
       <a
