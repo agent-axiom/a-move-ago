@@ -12,6 +12,8 @@ const en = {
   "shell.ratingHints":
     "Each revealed clue or hint halves the points, rounded down to a minimum of 1.",
   "shell.ratingUnit": { one: "point", other: "points" },
+  "shell.menu": "Menu",
+  "shell.closeMenu": "Close menu",
   "shell.language": "Language",
   "shell.startupEyebrow": "A moment before the next move",
   "shell.startupUnavailable": "Startup unavailable",
@@ -152,6 +154,8 @@ const ru = {
   "shell.ratingHints":
     "Каждая открытая улика или подсказка уменьшает количество очков вдвое, с округлением вниз, но не ниже 1.",
   "shell.ratingUnit": { one: "очко", few: "очка", many: "очков", other: "очка" },
+  "shell.menu": "Меню",
+  "shell.closeMenu": "Закрыть меню",
   "shell.language": "Язык",
   "shell.startupEyebrow": "Мгновение до следующего хода",
   "shell.startupUnavailable": "Не удалось запустить приложение",
@@ -313,6 +317,8 @@ const zh = {
   "shell.ratingTry4": "第 4 次及以后",
   "shell.ratingHints": "每揭示一条线索或提示，得分减半，向下取整，至少得 1 分。",
   "shell.ratingUnit": { other: "分" },
+  "shell.menu": "菜单",
+  "shell.closeMenu": "关闭菜单",
   "shell.language": "语言",
   "shell.startupEyebrow": "下一步之前的片刻",
   "shell.startupUnavailable": "暂时无法启动",

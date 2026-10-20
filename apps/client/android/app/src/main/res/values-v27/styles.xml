@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme control of navigation bar icon appearance starts at API 27. -->
+    <style name="AppTheme" parent="Base.AMoveTheme">
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Base.AMoveLaunch">
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

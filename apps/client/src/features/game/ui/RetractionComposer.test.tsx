@@ -131,6 +131,35 @@ const scope: GamePersistenceScope = {
 };
 const postFen = "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
 
+it("shows each selected square in the action dock without enabling an incomplete move", async () => {
+  const user = userEvent.setup();
+  const submit = vi.fn();
+  render(
+    <RetractionComposer
+      disabled={false}
+      onSubmit={submit}
+      post={parseFen(postFen)}
+      retractingColor="w"
+    />,
+  );
+  const selectedMove = screen.getByLabelText("Selected retraction");
+  const check = screen.getByRole("button", { name: "Check move" });
+  expect(selectedMove).toHaveTextContent("—");
+  expect(check).toBeDisabled();
+  await user.click(screen.getByRole("gridcell", { name: "d5, white pawn" }));
+  expect(selectedMove).toHaveTextContent("d5");
+  expect(selectedMove).toHaveTextContent("—");
+  expect(check).toBeDisabled();
+  await user.click(screen.getByRole("gridcell", { name: "e4, empty" }));
+  expect(selectedMove).toHaveTextContent("e4");
+  expect(check).toBeEnabled();
+  await user.click(screen.getByRole("button", { name: "Reset" }));
+  expect(selectedMove).not.toHaveTextContent("d5");
+  expect(selectedMove).not.toHaveTextContent("e4");
+  expect(check).toBeDisabled();
+  expect(submit).not.toHaveBeenCalled();
+});
+
 it("restores partial selection and configured capture after remount, then clears an explicit reset", async () => {
   const user = userEvent.setup();
   const submit = vi.fn();

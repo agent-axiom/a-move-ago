@@ -48,6 +48,7 @@ export interface ApiObservations {
   archiveRequests: number;
   statsIdentities: Array<"guest" | "telegram">;
   profileDeleteRequests: Array<{ authorization: string | null; body: string | null }>;
+  feedbackBodies: Array<Record<string, unknown>>;
   statsRequests: number;
 }
 
@@ -203,6 +204,7 @@ export async function installApiMock(
     loseFirstClue?: boolean;
     initialIdentity?: "guest" | "telegram";
     loseFirstProfileDeletionResponse?: boolean;
+    loseFirstFeedbackResponse?: boolean;
     archive?: boolean;
   } = {},
 ): Promise<ApiObservations> {
@@ -218,6 +220,7 @@ export async function installApiMock(
     archiveRequests: 0,
     statsIdentities: [],
     profileDeleteRequests: [],
+    feedbackBodies: [],
     statsRequests: 0,
   };
   let attemptLost = false;
@@ -225,6 +228,8 @@ export async function installApiMock(
   let clueLost = false;
   let identity: "guest" | "telegram" = options.initialIdentity ?? "guest";
   let profileDeletionResponseLost = false;
+  let feedbackResponseLost = false;
+  const reports = new Map<string, string>();
   let guest = actor();
   const telegram = actor();
   let wrongIds = 0;
@@ -357,6 +362,31 @@ export async function installApiMock(
         expiresAt: "2026-11-01T00:00:00.000Z",
         kind: "guest",
       });
+      return;
+    }
+    if (url.pathname === "/v1/feedback" && request.method() === "POST") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      observed.feedbackBodies.push(body);
+      const reportUuid = String(body.reportUuid);
+      const previous = reports.get(reportUuid);
+      const serialized = JSON.stringify(body);
+      if (previous !== undefined && previous !== serialized) {
+        await json(route, 409, {
+          error: {
+            code: "FEEDBACK_CONFLICT",
+            message: "The report identifier was already used.",
+            requestId: "synthetic-feedback-conflict",
+          },
+        });
+        return;
+      }
+      reports.set(reportUuid, serialized);
+      if (options.loseFirstFeedbackResponse && !feedbackResponseLost) {
+        feedbackResponseLost = true;
+        await route.abort("internetdisconnected");
+        return;
+      }
+      await json(route, previous === undefined ? 201 : 200, { reportUuid, received: true });
       return;
     }
     if (url.pathname === "/v1/me" && request.method() === "DELETE") {

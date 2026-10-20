@@ -1,22 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
+    <style name="Base.AMoveTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/amove_background</item>
+        <item name="colorPrimaryDark">@color/amove_background</item>
+        <item name="colorAccent">@color/amove_accent</item>
+        <item name="android:colorBackground">@color/amove_background</item>
+        <item name="android:windowBackground">@color/amove_background</item>
+        <item name="android:statusBarColor">@color/amove_background</item>
+        <item name="android:navigationBarColor">@color/amove_background</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <style name="AppTheme" parent="Base.AMoveTheme" />
+
+    <style name="AppTheme.NoActionBar" parent="AppTheme">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
     </style>
 
-
-    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+    <style name="Base.AMoveLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/amove_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:statusBarColor">@color/amove_background</item>
+        <item name="android:navigationBarColor">@color/amove_background</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Base.AMoveLaunch" />
 </resources>

@@ -1,0 +1,119 @@
+.app-menu-trigger {
+  flex: none;
+  inline-size: 44px;
+  block-size: 44px;
+  padding: 10px;
+  margin-inline-start: auto;
+}
+
+.app-menu-trigger svg {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+.app-menu-dialog {
+  inline-size: min(420px, calc(100% - 2rem));
+  max-block-size: calc(100dvh - 2rem);
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 24px 80px #0006;
+}
+
+.app-menu-dialog::backdrop {
+  background: #080a0bc9;
+}
+
+.app-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.app-menu-heading h2 {
+  font-size: 1.25rem;
+}
+
+.app-menu-close {
+  inline-size: 44px;
+  padding: 0;
+  font-size: 1.6rem;
+  font-weight: 400;
+}
+
+.app-menu-dialog .language-switcher {
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.5rem 1.5rem;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.app-menu-dialog .language-switcher select {
+  min-inline-size: 9rem;
+  font-size: 0.85rem;
+}
+
+.how-to-play {
+  border-block: 1px solid var(--color-border);
+}
+
+.how-to-play > summary {
+  padding-block: 1rem;
+  min-block-size: 48px;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.help-panel {
+  padding: 0.25rem 0 1.25rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.help-panel h3 {
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.help-panel ol {
+  display: grid;
+  gap: 0.75rem;
+  padding-inline-start: 1.25rem;
+}
+
+.help-panel strong {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.help-note {
+  font-size: 0.8rem;
+}
+
+.app-menu-learn {
+  justify-content: space-between;
+  inline-size: 100%;
+  margin-top: 1.5rem;
+}
+
+.app-menu-privacy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 44px;
+  margin-top: 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+@media (min-width: 801px) {
+  .app-menu-trigger {
+    margin-inline-start: 0;
+  }
+}

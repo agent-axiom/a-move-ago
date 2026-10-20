@@ -42,35 +42,21 @@
 
 @media (max-width: 800px) {
   .tutorial-invitation {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0.85rem;
-    margin-bottom: 1rem;
+    display: block;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
   }
 
-  .tutorial-invitation-actions {
-    flex-shrink: 1;
-  }
-
-  .tutorial-invitation-actions button {
-    white-space: normal;
-    min-height: 44px;
-  }
-}
-
-@media (max-width: 480px) {
-  .tutorial-invitation {
-    gap: 0.5rem;
-    padding: 0.75rem;
-  }
-
-  .tutorial-invitation h2 {
-    margin: 0;
-    font-size: 0.9rem;
-  }
-
-  .tutorial-invitation p {
-    display: none;
+  .tutorial-invitation > div:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .tutorial-invitation-actions {
@@ -78,9 +64,23 @@
     grid-template-columns: minmax(0, 1fr) 44px;
   }
 
+  .tutorial-invitation-actions button {
+    white-space: normal;
+    min-height: 44px;
+    font-size: 0.78rem;
+  }
+
   .tutorial-invitation-actions > button:first-child {
     padding-inline: 0.65rem;
-    font-size: 0.78rem;
+    border-color: rgb(217 173 120 / 25%);
+    background: rgb(217 173 120 / 5%);
+    color: var(--color-accent);
+  }
+}
+
+@media (max-width: 480px) {
+  .tutorial-invitation p {
+    display: none;
   }
 }
 

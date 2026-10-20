@@ -1,18 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
 import { selectCapturedPiece } from "./game-controls";
+import { openMenu, setLanguage } from "./menu-controls";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
-
-function language(page: Page) {
-  return page
-    .locator("select")
-    .filter({ has: page.getByRole("option", { name: "English", exact: true }) });
-}
 
 async function composeCapture(page: Page, previous: "c4" | "e4") {
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
@@ -45,11 +40,10 @@ test("the guided first move is free, remembers completion and can be reopened fr
   await page.reload();
   await expect(page.locator(".score-potential")).toHaveText("Available: 100 points");
   await expect(page.getByRole("button", { name: "Learn in one move", exact: true })).toHaveCount(0);
+  await openMenu(page);
   await page.locator(".how-to-play > summary").click();
-  await page
-    .locator(".help-panel")
-    .getByRole("button", { name: "How to play", exact: true })
-    .click();
+  await expect(page.locator(".help-panel")).toBeVisible();
+  await page.locator(".app-menu-learn").click();
   await expect(lesson).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(lesson).toHaveCount(0);
@@ -77,7 +71,7 @@ test("an unfinished capture survives navigation, reload and language changes wit
   await page.reload();
   await expect(page.getByLabel("Captured piece", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Captured piece", { exact: true })).toHaveValue("p");
-  await language(page).selectOption("ru");
+  await setLanguage(page, "ru");
   await expect(page.getByLabel("Взятая фигура", { exact: true })).toHaveValue("p");
   await expect(page.getByRole("button", { name: "Проверить ход", exact: true })).toBeEnabled();
   await expect(page.locator(".score-potential")).toHaveText("Доступно: 100 очков");
@@ -111,7 +105,7 @@ test("a lost attempt response survives a restart and retries its original move a
   await expect(page.getByRole("button", { name: "Retry attempt", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check move", exact: true })).toBeDisabled();
   expect(observed.attemptBodies).toHaveLength(1);
-  await language(page).selectOption("ru");
+  await setLanguage(page, "ru");
   await page.getByRole("button", { name: "Повторить проверку", exact: true }).click();
   await expect(
     page.getByText("Этот ход не объясняет исчезновение пешки.", { exact: true }),
@@ -179,16 +173,16 @@ test("a solved case can be reviewed after reload and translated without another 
     page.getByText("The white e-pawn captured the black pawn on d5.", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".solution-reward")).toHaveCount(0);
-  await language(page).selectOption("ru");
+  await setLanguage(page, "ru");
   await expect(
     page.getByText("Белая пешка с вертикали e взяла чёрную пешку на d5.", { exact: true }),
   ).toBeVisible();
-  await language(page).selectOption("zh");
+  await setLanguage(page, "zh");
   await expect(page.getByText("白方 e 线的兵吃掉了 d5 格的黑兵。", { exact: true })).toBeVisible();
   expect(observed.revealRequests).toEqual([
     { caseId: "case-2026-09-10", puzzleId: "p-case-2026-09-10-1-v1" },
   ]);
-  await language(page).selectOption("en");
+  await setLanguage(page, "en");
   await page.getByRole("button", { name: "Back to case", exact: true }).first().click();
   await expect(page.locator(".personal-rating-total strong")).toHaveText("100");
   await expect(page.getByRole("button", { name: "Review solution", exact: true })).toBeVisible();

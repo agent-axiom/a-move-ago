@@ -31,6 +31,7 @@ interface RetractionComposerProps {
   post: FenState;
   retractingColor: Color;
   disabled: boolean;
+  submitting?: boolean;
   children?: ReactNode;
   feedback?: ReactNode;
   support?: ReactNode;
@@ -94,6 +95,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
 
   return (
     <section className="retraction-workspace" aria-labelledby="retraction-heading">
+      <div className="clue-panel">{props.children}</div>
       <div className="board-panel">
         <div className="board-toolbar">
           <span className="last-move-label">
@@ -124,10 +126,12 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           selectedSquare={selectedSquare}
         />
         <p className="board-caption" aria-live="polite">
+          <span className="instruction-step" aria-hidden="true">
+            {step}/3
+          </span>
           {showingPreview ? t("game.preview.caption") : instruction}
         </p>
       </div>
-      <div className="clue-panel">{props.children}</div>
       <div className="retraction-panel">
         <div className="composer-heading">
           <p className="game-eyebrow">{t("game.reverseEyebrow")}</p>
@@ -150,46 +154,52 @@ function RetractionComposerForm(props: RetractionComposerProps) {
           )}
         </ol>
         <p className="composer-instruction">{instruction}</p>
-        {draft.tag === "configure" ? (
-          <output className="move-summary" aria-label={t("game.selected")}>
-            <span>{draft.currentSquare}</span>
+        <div className="composer-dock" data-ready={preview.ok}>
+          <output className="move-summary" aria-label={t("game.selected")} aria-atomic="true">
+            <span>{selectedSquare ?? "—"}</span>
             <span aria-hidden="true" className="move-arrow">
               →
             </span>
             <span className="sr-only">{t("game.backTo")}</span>
-            <span>{draft.previousSquare}</span>
+            <span>{previousSquare ?? "—"}</span>
             <small>{t("game.oneMoveAgo")}</small>
           </output>
-        ) : null}
+          <div className="composer-actions">
+            <button
+              className="button-primary primary-action"
+              type="button"
+              aria-busy={props.submitting || undefined}
+              disabled={props.disabled || !preview.ok}
+              onClick={() => {
+                if (preview.ok) props.onSubmit(preview.retraction);
+              }}
+            >
+              {t("game.check")}
+            </button>
+            <button
+              aria-label={t("game.reset")}
+              className="button-quiet composer-reset"
+              type="button"
+              disabled={props.disabled || draft.tag === "select-current"}
+              onClick={() => {
+                dispatch({ type: "reset" });
+                setView("now");
+                setAdvancedOpen(false);
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <title>{t("game.reset")}</title>
+                <path d="M4 10a8 8 0 1 1 2 8M4 4v6h6" />
+              </svg>
+            </button>
+          </div>
+        </div>
         {!preview.ok && draft.tag === "configure" ? (
           <p className="composer-error" role="alert">
             {preview.reason}
           </p>
         ) : null}
-        <div className="composer-actions">
-          <button
-            className="button-primary primary-action"
-            type="button"
-            disabled={props.disabled || !preview.ok}
-            onClick={() => {
-              if (preview.ok) props.onSubmit(preview.retraction);
-            }}
-          >
-            {t("game.check")}
-          </button>
-          <button
-            className="button-quiet"
-            type="button"
-            disabled={props.disabled || draft.tag === "select-current"}
-            onClick={() => {
-              dispatch({ type: "reset" });
-              setView("now");
-              setAdvancedOpen(false);
-            }}
-          >
-            {t("game.reset")}
-          </button>
-        </div>
+        {props.feedback}
         {draft.tag === "configure" && (draft.special !== "normal" || draft.captureType) ? (
           <p className="advanced-move-summary">
             {draft.special !== "normal" ? t(specialLabels[draft.special]) : null}
@@ -265,7 +275,6 @@ function RetractionComposerForm(props: RetractionComposerProps) {
             {t("game.promotionHelp.after")}
           </p>
         </details>
-        {props.feedback}
         {props.support}
       </div>
     </section>

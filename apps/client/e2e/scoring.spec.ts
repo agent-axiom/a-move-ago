@@ -1,17 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
 import { selectCapturedPiece } from "./game-controls";
+import { setLanguage } from "./menu-controls";
 
 async function chooseMove(page: Page, previous: "c4" | "e4") {
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: `${previous}, empty`, exact: true }).click();
   await selectCapturedPiece(page, "p");
   await page.getByRole("button", { name: "Check move", exact: true }).click();
-}
-function language(page: Page) {
-  return page
-    .locator("select")
-    .filter({ has: page.getByRole("option", { name: "English", exact: true }) });
 }
 async function postAttempt(page: Page, body: Record<string, unknown>) {
   return page.evaluate(async (input) => {
@@ -103,14 +99,14 @@ test("wrong move and a retried clue grant yield 35, retaining assistance across 
     { caseId: "case-2026-09-10", puzzleId: "p-case-2026-09-10-1-v1" },
     { caseId: "case-2026-09-10", puzzleId: "p-case-2026-09-10-1-v1" },
   ]);
-  await language(page).selectOption("ru");
+  await setLanguage(page, "ru");
   await expect(page.locator(".unlocked-clue")).toHaveText("Исчезнувшая пешка");
   await expect(page.locator(".clue-prompt")).toHaveText(
     "Последним ходом белых было взятие пешкой. Отмените его.",
   );
   await expect(page.locator(".puzzle-prompt")).toHaveText("Восстановите последний ход.");
   await expect(page.locator(".score-potential")).toHaveText("Доступно: 35 очков");
-  await language(page).selectOption("zh");
+  await setLanguage(page, "zh");
   await expect(page.locator(".unlocked-clue")).toHaveText("一枚兵消失了");
   await expect(page.locator(".clue-prompt")).toHaveText("白方上一步用兵吃子。请撤回这一步。");
   await expect(page.locator(".puzzle-prompt")).toHaveText("还原上一步棋。");
