@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-17-gameplay-ux",
-  "reason": "Allow authenticated read-only review of solved puzzles without submitting attempts or changing points"
+  "release": "2026-10-20-private-puzzle-feedback",
+  "reason": "Deploy authenticated puzzle feedback and migration 0005 before the mobile UX client"
 }

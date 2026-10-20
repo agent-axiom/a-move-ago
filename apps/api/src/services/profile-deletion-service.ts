@@ -14,6 +14,7 @@ type DeletionState = {
   linked_attempts_exist: number;
   linked_auth_flows_exist: number;
   linked_clues_exist: number;
+  linked_feedback_exist: number;
 };
 
 const guestResponse = (): GuestMeResponse =>
@@ -57,11 +58,13 @@ async function classifyDeletionOutcome(
               EXISTS (SELECT 1 FROM sessions WHERE player_id = ?) AS linked_sessions_exist,
               EXISTS (SELECT 1 FROM attempts WHERE player_id = ?) AS linked_attempts_exist,
               EXISTS (SELECT 1 FROM auth_flows WHERE player_id = ?) AS linked_auth_flows_exist,
-              EXISTS (SELECT 1 FROM gameplay_events WHERE clue_player_id = ?) AS linked_clues_exist
+              EXISTS (SELECT 1 FROM gameplay_events WHERE clue_player_id = ?) AS linked_clues_exist,
+              EXISTS (SELECT 1 FROM puzzle_feedback WHERE player_id = ?) AS linked_feedback_exist
          FROM sessions current
         WHERE current.id = ?`,
     )
       .bind(
+        actor.playerId,
         actor.playerId,
         actor.playerId,
         actor.playerId,
@@ -83,7 +86,8 @@ async function classifyDeletionOutcome(
     state.linked_sessions_exist === 0 &&
     state.linked_attempts_exist === 0 &&
     state.linked_auth_flows_exist === 0 &&
-    state.linked_clues_exist === 0
+    state.linked_clues_exist === 0 &&
+    state.linked_feedback_exist === 0
   )
     return guestResponse();
   throw failure;
@@ -170,6 +174,7 @@ export async function deleteProfileForActor(
             AND NOT EXISTS (SELECT 1 FROM attempts WHERE player_id = ?)
             AND NOT EXISTS (SELECT 1 FROM auth_flows WHERE player_id = ?)
             AND NOT EXISTS (SELECT 1 FROM gameplay_events WHERE clue_player_id = ?)
+            AND NOT EXISTS (SELECT 1 FROM puzzle_feedback WHERE player_id = ?)
           )`,
       ).bind(
         guardId,
@@ -181,6 +186,7 @@ export async function deleteProfileForActor(
         actor.sessionId,
         actor.channel,
         now,
+        actor.playerId,
         actor.playerId,
         actor.playerId,
         actor.playerId,

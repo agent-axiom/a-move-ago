@@ -458,6 +458,91 @@ export async function checkProductionPlay(
     "RELOADED_DAILY_FAILED",
   );
   await stats(expected);
+  const checkFeedback = env.CHECK_FEEDBACK === "true";
+  if (checkFeedback) {
+    const report = {
+      reportUuid: uuid(),
+      caseId: daily.id,
+      puzzleId: daily.puzzles[0].id,
+      puzzleVersion: daily.puzzles[0].version,
+      locale: "en",
+      reason: "other",
+      comment: "Automated deployment check. Removed immediately after verification.",
+    };
+    ensure(
+      /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(report.reportUuid),
+      "INVALID_REPORT_UUID",
+    );
+    // Scope every privileged query to this report and the exact successful
+    // attempt returned to our newly created guest. No player data is selected.
+    const scope = `report_uuid = ? AND player_id IS NULL AND comment = ?
+AND session_id = (
+  SELECT session_id FROM attempts
+  WHERE id = ? AND attempt_uuid = ? AND correct = 1 AND player_id IS NULL
+)`;
+    const params = [report.reportUuid, report.comment, correct.id, attempt.attemptUuid];
+    async function feedbackQuery(sql) {
+      const { data } = await call(
+        "D1",
+        `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/d1/database/${env.D1_DATABASE_ID}/query`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ sql, params }),
+        },
+      );
+      ensure(
+        data?.success === true &&
+          Array.isArray(data.result) &&
+          data.result.length === 1 &&
+          data.result[0]?.success === true &&
+          Array.isArray(data.result[0].results),
+        "FEEDBACK_STORAGE_FAILED",
+      );
+      return data.result[0].results;
+    }
+    const read = `SELECT case_id, client_puzzle_id, puzzle_version, locale, reason, comment
+FROM puzzle_feedback WHERE ${scope}`;
+    try {
+      const receipt = await api("/v1/feedback", report, 201);
+      ensure(
+        receipt.headers.get("cache-control") === "no-store" &&
+          isDeepStrictEqual(receipt.data, { reportUuid: report.reportUuid, received: true }),
+        "FEEDBACK_RECEIPT_FAILED",
+      );
+      const repeat = await api("/v1/feedback", report);
+      ensure(
+        repeat.headers.get("cache-control") === "no-store" &&
+          repeat.headers.get("idempotency-replayed") === "true" &&
+          isDeepStrictEqual(repeat.data, receipt.data),
+        "FEEDBACK_REPLAY_FAILED",
+      );
+      ensure(
+        isDeepStrictEqual(await feedbackQuery(read), [
+          {
+            case_id: report.caseId,
+            client_puzzle_id: report.puzzleId,
+            puzzle_version: report.puzzleVersion,
+            locale: report.locale,
+            reason: report.reason,
+            comment: report.comment,
+          },
+        ]),
+        "FEEDBACK_STORAGE_FAILED",
+      );
+      ensure(
+        isDeepStrictEqual(await stats(expected, true), beforeReview),
+        "FEEDBACK_STATS_CHANGED",
+      );
+    } finally {
+      // Also clean up an accepted report when its HTTP response was lost.
+      await feedbackQuery(`DELETE FROM puzzle_feedback WHERE ${scope}`);
+      ensure((await feedbackQuery(read)).length === 0, "FEEDBACK_CLEANUP_FAILED");
+    }
+  }
   if (localized) {
     return {
       ok: true,
@@ -469,6 +554,7 @@ export async function checkProductionPlay(
       englishCompatible: true,
       idempotencyVerified: true,
       earnedReviewVerified: true,
+      ...(checkFeedback ? { feedbackVerified: true } : {}),
     };
   }
   return {
@@ -478,6 +564,7 @@ export async function checkProductionPlay(
     attempts: 1,
     idempotencyVerified: true,
     earnedReviewVerified: true,
+    ...(checkFeedback ? { feedbackVerified: true } : {}),
   };
 }
 

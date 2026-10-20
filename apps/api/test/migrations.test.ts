@@ -17,6 +17,7 @@ const gameplayTables = [
   "case_localizations",
   "puzzle_localizations",
   "gameplay_events",
+  "puzzle_feedback",
 ];
 const digest = "a".repeat(64);
 const migrationNames = [
@@ -24,6 +25,7 @@ const migrationNames = [
   { name: "0002_telegram_auth.sql" },
   { name: "0003_content_localizations.sql" },
   { name: "0004_gameplay_progress.sql" },
+  { name: "0005_puzzle_feedback.sql" },
 ];
 const testEnv = env as Env & { TEST_MIGRATIONS: D1Migration[] };
 type SqlCase = [sql: string, values?: unknown[]];
@@ -135,6 +137,7 @@ async function fixture() {
 beforeEach(async () => {
   await execute("PRAGMA foreign_keys = ON");
   for (const table of [
+    "puzzle_feedback",
     "auth_flows",
     "hint_events",
     "attempts",

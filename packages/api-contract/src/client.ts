@@ -20,6 +20,11 @@ import {
   TelegramMiniAppAuthRequestSchema,
   TelegramSessionIssuedSchema,
 } from "./api";
+import {
+  FeedbackRequestSchema,
+  FeedbackResponseSchema,
+  type PuzzleFeedbackRequest,
+} from "./feedback";
 
 type AttemptRequest = z.infer<typeof AttemptRequestSchema>;
 type ClientChannel = z.infer<typeof GuestSessionRequestSchema>["channel"];
@@ -193,6 +198,21 @@ export function createApiClient(options: ApiClientOptions) {
       }).then((result) => {
         if (result.attemptUuid !== parsed.attemptUuid) {
           throw new ApiContractError("Attempt response UUID did not match the request.");
+        }
+        return result;
+      });
+    },
+    submitPuzzleFeedback(body: PuzzleFeedbackRequest, signal?: AbortSignal) {
+      const parsed = FeedbackRequestSchema.parse(body);
+      return request({
+        method: "POST",
+        path: "/v1/feedback",
+        body: parsed,
+        responseSchema: FeedbackResponseSchema,
+        signal,
+      }).then((result) => {
+        if (result.reportUuid !== parsed.reportUuid) {
+          throw new ApiContractError("Feedback response UUID did not match the request.");
         }
         return result;
       });

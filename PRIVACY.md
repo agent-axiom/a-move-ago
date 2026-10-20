@@ -96,6 +96,30 @@ Related hint events and derived statistics disappear with those attempts.
 Attempts accumulated independently by an unlinked guest after deletion remain
 guest data and can be attached only by a later explicit Telegram sign-in.
 
+## Optional puzzle feedback
+
+Choosing **Report a problem** lets a player send a private report about a puzzle.
+Opening or closing the form sends nothing. Submission stores the selected
+reason, any comment the player chooses to write, case and puzzle identifiers,
+puzzle version, interface language, a client-generated report UUID, submission
+time, and the current internal session reference. A report submitted while
+signed in also references the internal player record.
+
+The form does not automatically attach an answer, board draft, screenshot,
+Telegram profile fields, or authentication token to the report payload. Like
+other authenticated requests, its authorization header is used only to verify
+the session. Comments are optional; players should not include passwords,
+contact details, or other personal information.
+
+Reports are stored in private D1 records for the service operator to review.
+They are not posted to public GitHub issues or sent to other players. Guest
+reports remain attached to their original guest session when Telegram is
+linked; they are not transferred into the profile. Reports submitted while
+signed in are removed when that linked profile is deleted. All reports are
+eligible for scheduled deletion after 30 days, and deleting their owning
+session also removes them. Feedback does not change attempts, points, hints,
+or progress.
+
 ## Logs and network processing
 
 Application structured logs contain request ID, HTTP method, path, status, and
@@ -121,6 +145,8 @@ raw IP in its D1 application tables.
   one-day grace period.
 - Hint-event records older than 31,536,000 seconds (one year) are removed by
   the scheduled cleanup.
+- Puzzle feedback older than 2,592,000 seconds (30 days) is removed by the
+  scheduled cleanup; session or linked-profile deletion can remove it sooner.
 
 Profile deletion removes the active online D1 records immediately. It does not
 promise immediate physical erasure from Cloudflare platform logs, GitHub
@@ -140,8 +166,8 @@ review the permanent warning, and choose **Delete permanently**. The
 authenticated `DELETE /v1/me` immediately and irreversibly removes from active
 online D1 the Telegram profile fields, every other Telegram session linked to
 that player, player-linked attempts, their hint events, linked auth flows, and
-derived statistics. The current token survives only as an empty unlinked guest
-session. The operation does not delete the Telegram account, Telegram-hosted
+profile-linked puzzle feedback and derived statistics. The current token
+survives only as an empty unlinked guest session. The operation does not delete the Telegram account, Telegram-hosted
 content, chess content, or content-import history.
 
 The client reports success only after a guest-only Worker response. A network
