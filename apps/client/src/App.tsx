@@ -1,4 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { AppMenu } from "./app/AppMenu";
+import { OverlayProvider, useActiveOverlayDismiss } from "./app/overlays";
 import { useRuntime } from "./app/runtime";
 import { useAppNavigation } from "./app/use-app-navigation";
 import { useHostBack } from "./app/use-host-back";
@@ -16,9 +18,10 @@ import {
   dismissTutorialInvitation,
   shouldOfferTutorial,
 } from "./features/tutorial/tutorial-preference";
-import { I18nProvider, LanguageSwitcher, localizedSystemMessage, useI18n } from "./i18n";
+import { I18nProvider, localizedSystemMessage, useI18n } from "./i18n";
 import { tutorialCopy } from "./i18n/messages/tutorial";
 import { BrandMark } from "./shared/BrandMark";
+import { NavigationIcon } from "./shared/NavigationIcon";
 import "./i18n/language.css";
 import "./features/archive/archive.css";
 
@@ -50,7 +53,8 @@ function AppContent() {
   const nextCaseRequest = useRef<AbortController | null>(null);
   const tutorial = tutorialCopy[locale];
   const closeTutorial = useCallback(() => setTutorialOpen(false), []);
-  useHostBack(navigation, dispatch, tutorialOpen ? closeTutorial : undefined);
+  const dismissOverlay = useActiveOverlayDismiss();
+  useHostBack(navigation, dispatch, tutorialOpen ? closeTutorial : dismissOverlay);
 
   useEffect(() => {
     const disposeLayout = runtime.platform.installLayoutVars(document.documentElement);
@@ -105,6 +109,16 @@ function AppContent() {
   } else if (screen.name === "profile") {
     content = (
       <section className="profile-page" aria-labelledby="profile-heading">
+        <button
+          className="button-quiet profile-back"
+          type="button"
+          onClick={() => dispatch({ type: "back" })}
+        >
+          <span aria-hidden="true">←</span>
+          {navigation.stack.at(-2)?.name === "archive"
+            ? t("shell.backArchive")
+            : t("shell.backCase")}
+        </button>
         <header className="page-heading">
           <p className="eyebrow">{t("shell.journal")}</p>
           <h1 id="profile-heading">{t("shell.progress")}</h1>
@@ -198,68 +212,46 @@ function AppContent() {
           </div>
         </div>
         <nav className="app-nav" aria-label={t("shell.mainNavigation")}>
-          {screen.name === "profile" ? (
-            <button
-              className="button-quiet nav-button"
-              type="button"
-              onClick={() => dispatch({ type: "back" })}
-            >
-              {navigation.stack.at(-2)?.name === "archive"
-                ? t("shell.backArchive")
-                : t("shell.backCase")}
-            </button>
-          ) : (
-            <button
-              className="button-quiet nav-button"
-              type="button"
-              disabled={!sessionReady}
-              onClick={() => dispatch({ type: "push", screen: { name: "profile" } })}
-            >
-              {t("shell.progress")} <span aria-hidden="true">↗</span>
-            </button>
-          )}
           <button
             className="button-quiet nav-button"
             type="button"
             disabled={!sessionReady}
-            aria-current={screen.name === "archive" ? "page" : undefined}
+            aria-current={screen.name === "case" && !caseDate ? "page" : undefined}
+            onClick={() => {
+              if (screen.name !== "case" || caseDate) showToday();
+            }}
+          >
+            <NavigationIcon name="today" />
+            <span>{t("shell.today")}</span>
+          </button>
+          <button
+            className="button-quiet nav-button"
+            type="button"
+            disabled={!sessionReady}
+            aria-current={screen.name === "archive" || caseDate ? "page" : undefined}
             onClick={() => {
               if (screen.name !== "archive")
                 dispatch({ type: "push", screen: { name: "archive" } });
             }}
           >
-            {t("shell.archive")}
+            <NavigationIcon name="archive" />
+            <span>{t("shell.archive")}</span>
           </button>
-          <LanguageSwitcher />
-          <details className="how-to-play">
-            <summary aria-label={t("shell.howToPlay")}>
-              <span className="help-icon" aria-hidden="true">
-                ?
-              </span>
-              <span className="help-label">{t("shell.howToPlay")}</span>
-            </summary>
-            <div className="help-panel">
-              <p className="eyebrow">{t("shell.helpEyebrow")}</p>
-              <h2>{t("shell.helpTitle")}</h2>
-              <p>{t("shell.helpIntro")}</p>
-              <ol>
-                <li>
-                  <strong>{t("shell.helpChoose")}</strong> {t("shell.helpChooseText")}
-                </li>
-                <li>
-                  <strong>{t("shell.helpMove")}</strong> {t("shell.helpMoveText")}
-                </li>
-                <li>
-                  <strong>{t("shell.helpComplete")}</strong> {t("shell.helpCompleteText")}
-                </li>
-              </ol>
-              <p className="help-note">{t("shell.helpNote")}</p>
-              <button type="button" onClick={openTutorial}>
-                {tutorial.learnButton}
-              </button>
-            </div>
-          </details>
+          <button
+            className="button-quiet nav-button"
+            type="button"
+            disabled={!sessionReady}
+            aria-current={screen.name === "profile" ? "page" : undefined}
+            onClick={() => {
+              if (screen.name !== "profile")
+                dispatch({ type: "push", screen: { name: "profile" } });
+            }}
+          >
+            <NavigationIcon name="progress" />
+            <span>{t("shell.progress")}</span>
+          </button>
         </nav>
+        <AppMenu onTutorial={openTutorial} />
       </header>
       <main className="app-body" id="main-content" tabIndex={-1}>
         {sessionReady && screen.name === "case" && tutorialOffered ? (
@@ -311,7 +303,9 @@ export function App() {
   return (
     <I18nProvider>
       <SessionProvider key={runtimeId(runtime)}>
-        <AppContent />
+        <OverlayProvider>
+          <AppContent />
+        </OverlayProvider>
       </SessionProvider>
     </I18nProvider>
   );

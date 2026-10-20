@@ -1,6 +1,6 @@
 import type { PuzzleProgress, PuzzlePublic } from "@a-move-ago/api-contract";
 import { parseFen } from "@a-move-ago/game-core";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRuntime } from "../../../app/runtime";
 import { localizedText, type TranslationKey, useI18n } from "../../../i18n";
 import type { ClientFailure } from "../../../shared/failure";
@@ -48,6 +48,7 @@ export function PuzzleGame(props: {
 }) {
   const runtime = useRuntime();
   const { locale, t } = useI18n();
+  const feedbackRef = useRef<HTMLElement>(null);
   const post = useMemo(() => parseFen(props.puzzle.postFen), [props.puzzle.postFen]);
   const actorKey = runtime.draftActorKey?.();
   const persistenceScope = useMemo<GamePersistenceScope | undefined>(
@@ -71,6 +72,12 @@ export function PuzzleGame(props: {
     if (controller.attempt.tag === "incorrect") void runtime.platform.haptic("error");
   }, [controller.attempt.tag, runtime.platform]);
 
+  useEffect(() => {
+    if (controller.attempt.tag !== "incorrect" && controller.attempt.tag !== "retry") return;
+    feedbackRef.current?.focus({ preventScroll: true });
+    feedbackRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [controller.attempt.tag]);
+
   if (controller.attempt.tag === "solved") {
     return (
       <RevealPlayer
@@ -87,7 +94,12 @@ export function PuzzleGame(props: {
   const exhausted = hintItems.at(-1)?.exhausted ?? false;
   const hasFeedback = controller.attempt.tag !== "idle" || hintItems.length > 0;
   const feedback = hasFeedback ? (
-    <section className="feedback-panel" aria-label={t("game.feedback")}>
+    <section
+      className="feedback-panel"
+      aria-label={t("game.feedback")}
+      ref={feedbackRef}
+      tabIndex={-1}
+    >
       {controller.attempt.tag === "submitting" ? <p role="status">{t("game.checking")}</p> : null}
       {controller.attempt.tag === "retry" ? (
         <div>
@@ -243,6 +255,7 @@ export function PuzzleGame(props: {
     <article className="game-layout">
       <RetractionComposer
         disabled={controller.blocked}
+        submitting={controller.attempt.tag === "submitting"}
         feedback={feedback}
         onSubmit={(retraction) => {
           void controller.submit(retraction);

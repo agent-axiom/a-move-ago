@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
 import { selectCapturedPiece } from "./game-controls";
+import { setLanguage } from "./menu-controls";
 
 test.skip(process.env.UI_PREVIEW !== "true", "Screenshots run only in the UI review workflow.");
 
@@ -12,12 +13,12 @@ async function openSyntheticCase(page: Page) {
   await expect(page.getByRole("heading", { name: "Daily case", exact: true })).toBeVisible();
 }
 
-async function capture(page: Page, info: TestInfo, name: string) {
+async function capture(page: Page, info: TestInfo, name: string, fullPage = true) {
   await page.evaluate(async () => {
     await document.fonts.ready;
   });
   const path = info.outputPath(`review-${name}.png`);
-  const png = await page.screenshot({ path, fullPage: true, animations: "disabled" });
+  const png = await page.screenshot({ path, fullPage, animations: "disabled" });
   await info.attach(name, { path, contentType: "image/png" });
 
   // Synthetic fixtures only. Small log chunks allow review when artifact downloads are unavailable.
@@ -108,22 +109,24 @@ test("mobile and tablet daily stay usable at 390, 320 and 768 pixels", async ({ 
     if (!board) throw new Error("Interactive board is unavailable");
     expect(board.width).toBeGreaterThanOrEqual(Math.min(width - 72, 550));
     expect(Math.abs(board.height - board.width)).toBeLessThanOrEqual(2);
-    const status = await page.locator(".game-copy").boundingBox();
-    const actions = await page.locator(".composer-actions").boundingBox();
-    const assistance = await page.locator(".game-support").boundingBox();
-    expect(status).not.toBeNull();
+    const actions = await page.locator(".composer-dock").boundingBox();
+    const navigation = await page.locator(".app-nav").boundingBox();
     expect(actions).not.toBeNull();
-    expect(assistance).not.toBeNull();
-    if (!status || !actions || !assistance) throw new Error("Game controls are unavailable");
-    expect(status.y, "Board precedes score and help on phones").toBeGreaterThan(board.y);
-    expect(actions.y, "Check remains close to the board").toBeLessThan(
-      board.y + board.height + 260,
+    expect(navigation).not.toBeNull();
+    if (!actions || !navigation) throw new Error("Game controls are unavailable");
+    expect(actions.y, "Check stays within reach on phones").toBeGreaterThanOrEqual(0);
+    expect(actions.y + actions.height, "Check does not overlap navigation").toBeLessThanOrEqual(
+      navigation.y + 1,
     );
-    expect(assistance.y, "Optional assistance follows the check controls").toBeGreaterThan(
-      actions.y + actions.height,
-    );
+    expect(navigation.y + navigation.height).toBeLessThanOrEqual(845);
+    await expect(page.locator(".game-support")).toBeVisible();
     await expect(page.locator(".advanced-move-details")).not.toHaveAttribute("open", "");
   }
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.getByRole("button", { name: "Dismiss introduction", exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await capture(page, info, "mobile-360x640", false);
+  await checkLayout(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("gridcell", { name: "d5, white pawn", exact: true }).click();
   await page.getByRole("gridcell", { name: "e4, empty", exact: true }).click();
@@ -189,7 +192,7 @@ for (const locale of ["ru", "zh"] as const) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await installApiMock(page, { archive: true });
     await page.goto("./?case=2026-09-10");
-    await page.getByLabel("Language", { exact: true }).selectOption(locale);
+    await setLanguage(page, locale);
     await expect(
       page.getByRole("heading", {
         name: locale === "ru" ? "Задача дня" : "每日棋题",

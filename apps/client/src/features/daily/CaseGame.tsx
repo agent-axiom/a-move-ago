@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { localizedText, useI18n } from "../../i18n";
 import { continuationMessages } from "../../i18n/messages/continuation";
+import { PuzzleFeedback } from "../feedback/PuzzleFeedback";
 import { PuzzleGame } from "../game/ui/PuzzleGame";
 import { StatsPanel } from "../stats/StatsPanel";
 import { nextUnsolvedIndex } from "./case-progress";
@@ -102,6 +103,13 @@ export function CaseGame({
         key={reviewPuzzle.id}
         onClose={() => setReviewId(null)}
       />
+      <PuzzleFeedback
+        caseId={daily.id}
+        caseDate={daily.date}
+        puzzleId={reviewPuzzle.id}
+        puzzleVersion={reviewPuzzle.version}
+        key={`feedback-${reviewPuzzle.id}`}
+      />
     </section>
   ) : null;
   if (index === null) {
@@ -195,6 +203,13 @@ export function CaseGame({
           onSolved={() => setSolved((current) => new Set([...current, puzzle.id]))}
           puzzle={puzzle}
           progress={daily.progressStates?.[puzzle.id]}
+        />
+        <PuzzleFeedback
+          caseId={daily.id}
+          caseDate={daily.date}
+          puzzleId={puzzle.id}
+          puzzleVersion={puzzle.version}
+          key={`feedback-${puzzle.id}`}
         />
         {solvedReviews}
       </section>

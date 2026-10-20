@@ -34,9 +34,20 @@ try {
     if (request.method() === "POST" && path.endsWith("/clue")) clueRequests += 1;
   });
   function language() {
-    return page
-      .locator("select")
-      .filter({ has: page.getByRole("option", { name: "English", exact: true }) });
+    return page.locator(".app-menu-dialog .language-switcher select");
+  }
+  async function openMenu() {
+    await page.locator(".app-menu-trigger").click();
+    await page.locator(".app-menu-dialog").waitFor();
+  }
+  async function closeMenu() {
+    await page.locator(".app-menu-close").click();
+    await page.locator(".app-menu-dialog").waitFor({ state: "detached" });
+  }
+  async function setLanguage(locale) {
+    await openMenu();
+    await language().selectOption(locale);
+    await closeMenu();
   }
   async function layout() {
     for (const width of [320, 390, 1440]) {
@@ -90,12 +101,14 @@ try {
   await page.goto(pageUrl.href, { waitUntil: "domcontentloaded" });
   await page.getByRole("grid").waitFor();
   assert.equal(await page.locator("html").getAttribute("lang"), "en");
+  await openMenu();
   assert.equal(await language().inputValue(), "en");
   assert.deepEqual(await language().locator("option").allTextContents(), [
     "English",
     "Русский",
     "中文",
   ]);
+  await closeMenu();
   await page.getByRole("button", { name: "Check move", exact: true }).waitFor();
   const originalTitle = await page.locator("h1").innerText();
   await scoring("en");
@@ -110,7 +123,7 @@ try {
   const originalDailyRequests = dailyRequests;
 
   stage = "RUSSIAN_CASE";
-  await language().selectOption("ru");
+  await setLanguage("ru");
   await page.getByRole("button", { name: "Проверить ход", exact: true }).waitFor();
   assert.equal(await page.locator("html").getAttribute("lang"), "ru");
   assert.match(await page.locator("h1").innerText(), /\p{Script=Cyrillic}/u);
@@ -126,7 +139,7 @@ try {
   await layout();
 
   stage = "CHINESE_PROGRESS";
-  await language().selectOption("zh");
+  await setLanguage("zh");
   await page.getByRole("heading", { name: "统计", exact: true }).waitFor();
   await page.getByRole("heading", { name: "个人评分", exact: true }).waitFor();
   assert.equal(await page.locator(".personal-rating-total strong").innerText(), "0");
@@ -141,7 +154,9 @@ try {
   stage = "PERSISTED_CHINESE";
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "检查走法", exact: true }).waitFor();
+  await openMenu();
   assert.equal(await language().inputValue(), "zh");
+  await closeMenu();
   assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN");
 
   stage = "CHINESE_ARCHIVE";
@@ -152,13 +167,13 @@ try {
   assert.match(await page.locator(".archive-cases").innerText(), /\p{Script=Han}/u);
   await layout();
   stage = "RUSSIAN_ARCHIVE";
-  await language().selectOption("ru");
+  await setLanguage("ru");
   await page.getByRole("heading", { name: "Архив задач", exact: true }).waitFor();
   assert.equal(await page.getByLabel("Месяц архива", { exact: true }).inputValue(), "2026-09");
   assert.match(await page.locator(".archive-cases").innerText(), /\p{Script=Cyrillic}/u);
   await layout();
   stage = "ENGLISH_RESTORED";
-  await language().selectOption("en");
+  await setLanguage("en");
   await page.getByRole("heading", { name: "The archive", exact: true }).waitFor();
   await page
     .locator(".archive-cases li")
@@ -181,7 +196,7 @@ try {
     zh: ["还原上一步棋。", "可得：50 分"],
   };
   for (const locale of ["en", "ru", "zh"]) {
-    await language().selectOption(locale);
+    await setLanguage(locale);
     await page.locator(".clue-prompt").waitFor();
     unlockedPrompts[locale] = await page.locator(".clue-prompt").innerText();
     assert.ok(unlockedPrompts[locale].trim().length > 0);
@@ -190,7 +205,7 @@ try {
     await layout();
   }
   stage = "CLUE_CONDITIONS_RELOADED";
-  await language().selectOption("en");
+  await setLanguage("en");
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator(".clue-prompt").waitFor();
   assert.equal(await page.locator(".clue-prompt").innerText(), unlockedPrompts.en);

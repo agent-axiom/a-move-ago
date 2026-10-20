@@ -1,4 +1,4 @@
-import type { ApiClient } from "@a-move-ago/api-contract";
+import type { ApiClient, PuzzleFeedbackRequest } from "@a-move-ago/api-contract";
 import type { PlatformAdapter } from "@a-move-ago/platform";
 import { vi } from "vitest";
 import { type AppRuntime, createTokenHolder } from "../app/runtime";
@@ -54,6 +54,10 @@ export function runtimeFixture(options: {
       cases: [],
     })),
     submitAttempt: vi.fn(),
+    submitPuzzleFeedback: vi.fn(async (request: PuzzleFeedbackRequest) => ({
+      reportUuid: request.reportUuid,
+      received: true as const,
+    })),
     getPuzzleReveal: vi.fn(),
     requestHint: vi.fn(),
     getStats: vi.fn(),

@@ -136,6 +136,7 @@ it("switches an earned hint and feedback without reposting or losing the configu
   await user.selectOptions(screen.getByLabelText("Captured piece"), "p");
   await user.click(screen.getByRole("button", { name: "Check move" }));
   await screen.findByText("Try a different starting square.");
+  expect(screen.getByRole("region", { name: "Attempt feedback" })).toHaveFocus();
   await user.click(screen.getByRole("button", { name: "Get hint" }));
   await screen.findByText("Look at the pawn's file.");
 
