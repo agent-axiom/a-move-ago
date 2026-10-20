@@ -1,4 +1,8 @@
-import { ApiError, type FeedbackReason, type PuzzleFeedbackRequest } from "@a-move-ago/api-contract";
+import {
+  ApiError,
+  type FeedbackReason,
+  type PuzzleFeedbackRequest,
+} from "@a-move-ago/api-contract";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useOverlayDismiss } from "../../app/overlays";
 import { useRuntime } from "../../app/runtime";
@@ -139,77 +143,119 @@ export function PuzzleFeedback({
         </svg>
         {view === "received" ? copy.successTitle : copy.trigger}
       </button>
-      {open ? <dialog
-        aria-labelledby={titleId}
-        aria-describedby={introductionId}
-        className="feedback-dialog"
-        onCancel={(event) => {
-          event.preventDefault();
-          close();
-        }}
-        ref={dialogRef}
-      >
-        <header className="feedback-header">
-          <div>
-            <time className="eyebrow" dateTime={caseDate}>{dateLabel}</time>
-            <h2 id={titleId} ref={headingRef} tabIndex={-1}>{copy.title}</h2>
-          </div>
-          <button aria-label={copy.close} className="button-quiet feedback-close" onClick={close} type="button">
-            <span aria-hidden="true">×</span>
-          </button>
-        </header>
-        <p id={introductionId} className="feedback-introduction">{copy.introduction}</p>
-        {view === "received" ? (
-          <div className="feedback-success" role="status">
-            <span className="feedback-success-mark" aria-hidden="true">✓</span>
-            <h3 ref={successRef} tabIndex={-1}>{copy.successTitle}</h3>
-            <p>{copy.successBody}</p>
-            <p className="feedback-reference">{copy.reference}: <code>{requestRef.current?.reportUuid}</code></p>
-            <button className="button-primary" onClick={close} type="button">{copy.done}</button>
-          </div>
-        ) : (
-          <form onSubmit={(event) => { event.preventDefault(); void send(); }}>
-            <fieldset className="feedback-reasons" disabled={pending}>
-              <legend>{copy.reason}</legend>
-              {reasons.map((value) => (
-                <label key={value}>
-                  <input
-                    checked={reason === value}
-                    name={reasonName}
-                    onChange={() => { setReason(value); changed(); }}
-                    required
-                    type="radio"
-                    value={value}
-                  />
-                  <span>{copy[value]}</span>
-                </label>
-              ))}
-            </fieldset>
-            <div className="feedback-comment">
-              <label htmlFor={commentId}>{copy.comment}</label>
-              <textarea
-                aria-describedby={privacyId}
-                disabled={pending}
-                id={commentId}
-                maxLength={1000}
-                onChange={(event) => { setComment(event.target.value); changed(); }}
-                placeholder={copy.placeholder}
-                rows={3}
-                value={comment}
-              />
-              <span className="feedback-count" aria-hidden="true">{comment.length} / 1000</span>
+      {open ? (
+        <dialog
+          aria-labelledby={titleId}
+          aria-describedby={introductionId}
+          className="feedback-dialog"
+          onCancel={(event) => {
+            event.preventDefault();
+            close();
+          }}
+          ref={dialogRef}
+        >
+          <header className="feedback-header">
+            <div>
+              <time className="eyebrow" dateTime={caseDate}>
+                {dateLabel}
+              </time>
+              <h2 id={titleId} ref={headingRef} tabIndex={-1}>
+                {copy.title}
+              </h2>
             </div>
-            <p className="feedback-privacy" id={privacyId}>{copy.privacy}</p>
-            {failed ? <p className="feedback-error" role="alert">{copy[view]}</p> : null}
-            <div className="feedback-actions">
-              <button className="button-primary" disabled={!reason || pending} type="submit">
-                {pending ? copy.sending : failed ? copy.retry : copy.send}
+            <button
+              aria-label={copy.close}
+              className="button-quiet feedback-close"
+              onClick={close}
+              type="button"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </header>
+          <p id={introductionId} className="feedback-introduction">
+            {copy.introduction}
+          </p>
+          {view === "received" ? (
+            <div className="feedback-success" role="status">
+              <span className="feedback-success-mark" aria-hidden="true">
+                ✓
+              </span>
+              <h3 ref={successRef} tabIndex={-1}>
+                {copy.successTitle}
+              </h3>
+              <p>{copy.successBody}</p>
+              <p className="feedback-reference">
+                {copy.reference}: <code>{requestRef.current?.reportUuid}</code>
+              </p>
+              <button className="button-primary" onClick={close} type="button">
+                {copy.done}
               </button>
-              <button className="button-quiet" onClick={close} type="button">{copy.cancel}</button>
             </div>
-          </form>
-        )}
-      </dialog> : null}
+          ) : (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void send();
+              }}
+            >
+              <fieldset className="feedback-reasons" disabled={pending}>
+                <legend>{copy.reason}</legend>
+                {reasons.map((value) => (
+                  <label key={value}>
+                    <input
+                      checked={reason === value}
+                      name={reasonName}
+                      onChange={() => {
+                        setReason(value);
+                        changed();
+                      }}
+                      required
+                      type="radio"
+                      value={value}
+                    />
+                    <span>{copy[value]}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <div className="feedback-comment">
+                <label htmlFor={commentId}>{copy.comment}</label>
+                <textarea
+                  aria-describedby={privacyId}
+                  disabled={pending}
+                  id={commentId}
+                  maxLength={1000}
+                  onChange={(event) => {
+                    setComment(event.target.value);
+                    changed();
+                  }}
+                  placeholder={copy.placeholder}
+                  rows={3}
+                  value={comment}
+                />
+                <span className="feedback-count" aria-hidden="true">
+                  {comment.length} / 1000
+                </span>
+              </div>
+              <p className="feedback-privacy" id={privacyId}>
+                {copy.privacy}
+              </p>
+              {failed ? (
+                <p className="feedback-error" role="alert">
+                  {copy[view]}
+                </p>
+              ) : null}
+              <div className="feedback-actions">
+                <button className="button-primary" disabled={!reason || pending} type="submit">
+                  {pending ? copy.sending : failed ? copy.retry : copy.send}
+                </button>
+                <button className="button-quiet" onClick={close} type="button">
+                  {copy.cancel}
+                </button>
+              </div>
+            </form>
+          )}
+        </dialog>
+      ) : null}
     </div>
   );
 }

@@ -9,7 +9,8 @@ const en = {
   other: "Something else",
   comment: "Tell us more (optional)",
   placeholder: "What happened, and what did you expect?",
-  privacy: "Your report includes the puzzle reference, language, selected reason and anything you write here. Please leave out personal information.",
+  privacy:
+    "Your report includes the puzzle reference, language, selected reason and anything you write here. Please leave out personal information.",
   send: "Send report",
   sending: "Sending…",
   close: "Close report",
@@ -20,7 +21,8 @@ const en = {
   reference: "Report reference",
   failed: "Delivery could not be confirmed. Try again — retrying won’t send the same report twice.",
   rateLimited: "Too many reports were sent recently. Please try again later.",
-  unavailable: "This version of the puzzle is no longer available. Reopen the puzzle and try again.",
+  unavailable:
+    "This version of the puzzle is no longer available. Reopen the puzzle and try again.",
   expired: "Your session has expired. Reopen the game to send your report.",
   retry: "Try again",
 };
@@ -38,7 +40,8 @@ const ru: FeedbackMessages = {
   other: "Другая проблема",
   comment: "Расскажите подробнее (необязательно)",
   placeholder: "Что произошло и чего вы ожидали?",
-  privacy: "В отчёт войдут номер задачи, язык, выбранная причина и ваш комментарий. Пожалуйста, не указывайте персональные данные.",
+  privacy:
+    "В отчёт войдут номер задачи, язык, выбранная причина и ваш комментарий. Пожалуйста, не указывайте персональные данные.",
   send: "Отправить отчёт",
   sending: "Отправляем…",
   close: "Закрыть отчёт",
@@ -47,7 +50,8 @@ const ru: FeedbackMessages = {
   successBody: "Спасибо. Мы проверим задачу. Ваши очки и прогресс сохранены.",
   done: "Вернуться к задаче",
   reference: "Номер отчёта",
-  failed: "Не удалось подтвердить доставку. Попробуйте ещё раз — повторная отправка не создаст копию отчёта.",
+  failed:
+    "Не удалось подтвердить доставку. Попробуйте ещё раз — повторная отправка не создаст копию отчёта.",
   rateLimited: "За последнее время отправлено слишком много отчётов. Попробуйте позже.",
   unavailable: "Эта версия задачи больше недоступна. Откройте задачу заново и повторите попытку.",
   expired: "Сессия истекла. Откройте игру заново, чтобы отправить отчёт.",

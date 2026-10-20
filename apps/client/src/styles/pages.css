@@ -243,31 +243,49 @@
 
 @media (max-width: 700px) {
   .case-header {
-    margin-bottom: 1rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.15rem 0.75rem;
+    margin-bottom: 0.65rem;
   }
 
   .case-header .case-meta {
-    gap: 0.75rem;
-    margin-bottom: 0.45rem;
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: flex-end;
+    margin: 0;
+  }
+
+  .case-header .case-meta .eyebrow {
+    display: none;
   }
 
   .case-header h1 {
-    font-size: clamp(1.75rem, 6vw, 2.25rem);
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    font-size: clamp(1.3rem, 5vw, 1.65rem);
+    line-height: 1.2;
+    text-wrap: pretty;
   }
 
   .case-title-row {
-    align-items: flex-start;
-    gap: 0.8rem;
+    display: contents;
   }
 
   .case-progress {
-    margin-top: 0.25rem;
-    padding-inline: 0.6rem;
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+    padding: 0;
+    border: 0;
     font-size: 0.6rem;
+    line-height: 1.4;
+    text-align: end;
   }
 
   .case-meta time {
-    font-size: 0.65rem;
+    font-size: 0.625rem;
   }
 
   .case-tagline {

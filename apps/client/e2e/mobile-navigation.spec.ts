@@ -69,6 +69,18 @@ for (const locale of ["en", "ru", "zh"] as const) {
       if (locale !== "en") await setLanguage(page, locale);
       const copy = labels[locale];
       const board = page.getByRole("grid");
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect(board).toBeVisible();
+      if (viewport.width === 390) {
+        const boardBox = await board.boundingBox();
+        const composerBox = await page.locator(".composer-dock").boundingBox();
+        if (!boardBox || !composerBox) throw new Error("Today's board is unavailable");
+        expect(boardBox.y).toBeGreaterThanOrEqual(0);
+        expect(
+          boardBox.y + boardBox.height,
+          "The full daily board is visible above the move controls",
+        ).toBeLessThanOrEqual(composerBox.y + 1);
+      }
       await board.evaluate((element) => element.scrollIntoView({ block: "center" }));
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
@@ -107,9 +119,7 @@ for (const locale of ["en", "ru", "zh"] as const) {
   }
 }
 
-test("menu focus and locale changes preserve the current move", async ({
-  page,
-}) => {
+test("menu focus and locale changes preserve the current move", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 640 });
   const observed = await installApiMock(page);
   await page.goto("./?case=2026-08-03");

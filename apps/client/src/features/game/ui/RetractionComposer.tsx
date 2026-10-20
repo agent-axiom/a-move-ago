@@ -155,11 +155,7 @@ function RetractionComposerForm(props: RetractionComposerProps) {
         </ol>
         <p className="composer-instruction">{instruction}</p>
         <div className="composer-dock" data-ready={preview.ok}>
-          <output
-            className="move-summary"
-            aria-label={t("game.selected")}
-            aria-atomic="true"
-          >
+          <output className="move-summary" aria-label={t("game.selected")} aria-atomic="true">
             <span>{selectedSquare ?? "—"}</span>
             <span aria-hidden="true" className="move-arrow">
               →

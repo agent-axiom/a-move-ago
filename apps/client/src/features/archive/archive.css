@@ -175,6 +175,21 @@
   gap: 0.5rem;
 }
 
+@media (max-width: 800px) {
+  .archive-case-context {
+    display: block;
+    margin-bottom: 0.65rem;
+    padding: 0;
+    border: 0;
+    font-size: 0.68rem;
+    line-height: 1.5;
+  }
+
+  .archive-case-context > div {
+    display: none;
+  }
+}
+
 @media (max-width: 700px) {
   .archive-heading {
     align-items: flex-start;

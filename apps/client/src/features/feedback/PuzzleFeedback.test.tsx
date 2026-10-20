@@ -36,7 +36,11 @@ afterEach(() => {
 
 function HostBack() {
   const dismiss = useActiveOverlayDismiss();
-  return <button onClick={dismiss} type="button">Host back</button>;
+  return (
+    <button onClick={dismiss} type="button">
+      Host back
+    </button>
+  );
 }
 
 function setup(locale: "en" | "ru" | "zh" = "en") {
@@ -70,7 +74,10 @@ it("sends only explicitly entered feedback and the puzzle reference, without sco
   expect(screen.getByRole("button", { name: "Send report" })).toBeDisabled();
   expect(runtime.api.submitPuzzleFeedback).not.toHaveBeenCalled();
   await user.click(screen.getByRole("radio", { name: "Another answer may be valid" }));
-  await user.type(screen.getByRole("textbox", { name: "Tell us more (optional)" }), "  Please check this line.  ");
+  await user.type(
+    screen.getByRole("textbox", { name: "Tell us more (optional)" }),
+    "  Please check this line.  ",
+  );
   await user.click(screen.getByRole("button", { name: "Send report" }));
   await screen.findByRole("heading", { name: "Report received" });
   expect(runtime.api.submitPuzzleFeedback).toHaveBeenCalledWith(
@@ -134,10 +141,12 @@ it("uses a new report identity when the player changes an uncertain report", asy
 it("blocks double sends and lets native Back close an uncertain request without losing its retry identity", async () => {
   const { runtime, user } = setup();
   let signal: AbortSignal | undefined;
-  runtime.api.submitPuzzleFeedback = vi.fn<typeof runtime.api.submitPuzzleFeedback>((_request, observedSignal) => {
-    signal = observedSignal;
-    return new Promise(() => undefined);
-  });
+  runtime.api.submitPuzzleFeedback = vi.fn<typeof runtime.api.submitPuzzleFeedback>(
+    (_request, observedSignal) => {
+      signal = observedSignal;
+      return new Promise(() => undefined);
+    },
+  );
   await user.click(screen.getByRole("button", { name: "Report a problem" }));
   await user.click(screen.getByRole("radio", { name: "Something else" }));
   await user.click(screen.getByRole("button", { name: "Send report" }));
@@ -166,10 +175,12 @@ it("cancels with Escape and aborts requests on unmount", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(runtime.api.submitPuzzleFeedback).not.toHaveBeenCalled();
   let observedSignal: AbortSignal | undefined;
-  runtime.api.submitPuzzleFeedback = vi.fn<typeof runtime.api.submitPuzzleFeedback>((_request, signal) => {
-    observedSignal = signal;
-    return new Promise(() => undefined);
-  });
+  runtime.api.submitPuzzleFeedback = vi.fn<typeof runtime.api.submitPuzzleFeedback>(
+    (_request, signal) => {
+      observedSignal = signal;
+      return new Promise(() => undefined);
+    },
+  );
   await user.click(screen.getByRole("button", { name: "Report a problem" }));
   await user.click(screen.getByRole("radio", { name: "Something else" }));
   await user.click(screen.getByRole("button", { name: "Send report" }));
@@ -180,17 +191,20 @@ it("cancels with Escape and aborts requests on unmount", async () => {
 it.each([
   ["ru", "Сообщить о проблеме", "Ошибка в объяснении", "Отправить отчёт", "Отчёт получен"],
   ["zh", "报告问题", "讲解可能有误", "发送报告", "已收到报告"],
-] as const)("localizes the complete feedback flow in %s", async (locale, trigger, reason, send, received) => {
-  const { runtime, user } = setup(locale);
-  await user.click(screen.getByRole("button", { name: trigger }));
-  await user.click(screen.getByRole("radio", { name: reason }));
-  await user.click(screen.getByRole("button", { name: send }));
-  await screen.findByRole("heading", { name: received });
-  expect(runtime.api.submitPuzzleFeedback).toHaveBeenCalledWith(
-    expect.objectContaining({ locale, reason: "explanation_error" }),
-    expect.any(AbortSignal),
-  );
-});
+] as const)(
+  "localizes the complete feedback flow in %s",
+  async (locale, trigger, reason, send, received) => {
+    const { runtime, user } = setup(locale);
+    await user.click(screen.getByRole("button", { name: trigger }));
+    await user.click(screen.getByRole("radio", { name: reason }));
+    await user.click(screen.getByRole("button", { name: send }));
+    await screen.findByRole("heading", { name: received });
+    expect(runtime.api.submitPuzzleFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ locale, reason: "explanation_error" }),
+      expect.any(AbortSignal),
+    );
+  },
+);
 
 it.each([
   [401, "Your session has expired"],
@@ -198,7 +212,11 @@ it.each([
   [429, "Too many reports were sent recently"],
 ])("explains API failure %s without claiming delivery", async (status, message) => {
   const { runtime, user } = setup();
-  runtime.api.submitPuzzleFeedback = vi.fn().mockRejectedValue(new ApiError(Number(status), "ERROR", "Server error", "synthetic-request", null));
+  runtime.api.submitPuzzleFeedback = vi
+    .fn()
+    .mockRejectedValue(
+      new ApiError(Number(status), "ERROR", "Server error", "synthetic-request", null),
+    );
   await user.click(screen.getByRole("button", { name: "Report a problem" }));
   await user.click(screen.getByRole("radio", { name: "Something else" }));
   await user.click(screen.getByRole("button", { name: "Send report" }));

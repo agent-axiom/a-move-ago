@@ -34,9 +34,11 @@ describe("private puzzle feedback contract", () => {
   });
 
   it("sends the chosen report through an authenticated request with the same UUID", async () => {
-    const fetch = vi.fn().mockResolvedValue(
-      Response.json({ reportUuid: report.reportUuid, received: true }, { status: 201 }),
-    );
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ reportUuid: report.reportUuid, received: true }, { status: 201 }),
+      );
     const api = createApiClient({
       baseUrl: "https://api.test",
       fetch,
@@ -57,9 +59,11 @@ describe("private puzzle feedback contract", () => {
   });
 
   it("rejects mismatched receipts and never treats an unconfirmed report as received", async () => {
-    const fetch = vi.fn().mockResolvedValue(
-      Response.json({ reportUuid: "11111111-1111-4111-8111-111111111111", received: true }),
-    );
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ reportUuid: "11111111-1111-4111-8111-111111111111", received: true }),
+      );
     const api = createApiClient({
       baseUrl: "https://api.test",
       fetch,

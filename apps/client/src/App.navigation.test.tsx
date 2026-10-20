@@ -74,7 +74,10 @@ it("keeps the three destinations available and restores native Back after closin
   expect(navigation.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
   await user.click(navigation.getByRole("button", { name: "Archive" }));
   await screen.findByRole("heading", { name: "The archive" });
-  expect(navigation.getByRole("button", { name: "Archive" })).toHaveAttribute("aria-current", "page");
+  expect(navigation.getByRole("button", { name: "Archive" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await user.click(screen.getByRole("button", { name: "Menu", exact: true }));
   act(() => vi.mocked(runtime.platform.setBackHandler).mock.calls.at(-1)?.[0]?.());
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

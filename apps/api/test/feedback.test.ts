@@ -24,11 +24,7 @@ function input() {
   };
 }
 
-async function send(
-  body: unknown,
-  token?: string,
-  options: { origin?: string; env?: Env } = {},
-) {
+async function send(body: unknown, token?: string, options: { origin?: string; env?: Env } = {}) {
   const headers = new Headers({ "content-type": "application/json" });
   if (token) headers.set("authorization", `Bearer ${token}`);
   if (options.origin) headers.set("origin", options.origin);
@@ -44,8 +40,9 @@ async function send(
 }
 
 async function countReports() {
-  return await testEnv.DB.prepare("SELECT count(*) AS count FROM puzzle_feedback")
-    .first<number>("count");
+  return await testEnv.DB.prepare("SELECT count(*) AS count FROM puzzle_feedback").first<number>(
+    "count",
+  );
 }
 
 beforeEach(async () => {
@@ -174,11 +171,15 @@ describe("private puzzle feedback", () => {
   it("uses a separate limiter key and enforces the quota atomically", async () => {
     const guest = await issueGuest();
     const limit = vi.fn().mockResolvedValue({ success: false });
-    const envWithLimit = Object.assign(Object.create(testEnv) as Env, {
-      HINT_RATE_LIMITER: { limit },
-    });
+    const originalLimiter = testEnv.HINT_RATE_LIMITER;
+    // Define an own binding: assigning through the Workers env prototype can
+    // invoke an inherited setter and replace the shared test binding.
+    const envWithLimit = Object.create(testEnv, {
+      HINT_RATE_LIMITER: { value: { limit } },
+    }) as Env;
     expect((await send(input(), guest.token, { env: envWithLimit })).response.status).toBe(429);
     expect(limit).toHaveBeenCalledWith({ key: `feedback:${guest.sessionId}` });
+    expect(testEnv.HINT_RATE_LIMITER).toBe(originalLimiter);
     const report = input();
     const results = await Promise.all(
       Array.from({ length: 8 }, (_, index) => send(index === 0 ? report : input(), guest.token)),

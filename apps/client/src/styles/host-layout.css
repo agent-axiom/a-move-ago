@@ -136,7 +136,6 @@
   transform: translateY(0);
 }
 
-
 .nav-button svg {
   inline-size: 20px;
   block-size: 20px;
@@ -155,11 +154,14 @@
 
 @media (max-width: 800px) {
   :root {
-    --mobile-nav-height: calc(68px + max(8px, var(--host-safe-bottom), var(--host-content-safe-bottom)));
+    --mobile-nav-height: calc(
+      68px +
+      max(8px, var(--host-safe-bottom), var(--host-content-safe-bottom))
+    );
   }
 
   .app-shell {
-    padding-top: max(0.75rem, var(--host-safe-top), var(--host-content-safe-top));
+    padding-top: max(0.35rem, var(--host-safe-top), var(--host-content-safe-top));
     padding-bottom: calc(var(--mobile-nav-height) + 1rem);
   }
 
@@ -169,11 +171,11 @@
 
   .app-header {
     gap: 0.75rem;
-    padding-bottom: 0.75rem;
+    padding-bottom: 0.35rem;
   }
 
   .app-body {
-    padding-top: 1.25rem;
+    padding-top: 0.75rem;
     padding-bottom: 1.5rem;
   }
 

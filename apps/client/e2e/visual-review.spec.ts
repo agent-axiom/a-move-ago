@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
 import { installApiMock } from "./api-mock";
 import { selectCapturedPiece } from "./game-controls";
-import { setLanguage } from "./menu-controls";
+import { closeMenu, openMenu, setLanguage } from "./menu-controls";
 
 test.skip(process.env.UI_PREVIEW !== "true", "Screenshots run only in the UI review workflow.");
 
@@ -59,6 +59,62 @@ async function checkLayout(page: Page) {
       }),
     );
   expect(smallTargets, "Non-board controls need 44px touch targets").toEqual([]);
+}
+
+for (const locale of ["en", "ru", "zh"] as const) {
+  test(`${locale} today's game, menu and private report on phone viewports`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 360, height: 640 });
+    await installApiMock(page, { archive: true });
+    await page.goto("./");
+    await page.getByRole("button", { name: "Dismiss introduction", exact: true }).click();
+    if (locale !== "en") await setLanguage(page, locale);
+    await expect(page.locator(".archive-case-context")).toHaveCount(0);
+    await expect(page.locator(".app-menu-dialog")).toHaveCount(0);
+
+    for (const viewport of [
+      { width: 360, height: 640 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect(page.getByRole("grid")).toBeVisible();
+      await capture(page, info, `${locale}-today-${viewport.width}x${viewport.height}`, false);
+      await checkLayout(page);
+      if (viewport.width === 390) {
+        const board = await page.getByRole("grid").boundingBox();
+        const composer = await page.locator(".composer-dock").boundingBox();
+        if (!board || !composer) throw new Error("Today's game is unavailable");
+        expect(board.y, "The entire board begins inside the viewport").toBeGreaterThanOrEqual(0);
+        expect(board.y + board.height, "The board clears the fixed controls").toBeLessThanOrEqual(
+          composer.y + 1,
+        );
+      } else {
+        const menu = await openMenu(page);
+        await capture(page, info, `${locale}-menu-360x640`, false);
+        const menuSize = await menu.evaluate((element) => ({
+          content: element.scrollWidth,
+          available: element.clientWidth,
+        }));
+        expect(menuSize.content).toBeLessThanOrEqual(menuSize.available + 1);
+        await closeMenu(page);
+
+        await page.locator(".feedback-trigger").click();
+        const report = page.locator(".feedback-dialog");
+        await expect(report).toBeVisible();
+        await capture(page, info, `${locale}-feedback-360x640`, false);
+        const reportSize = await report.evaluate((element) => ({
+          content: element.scrollWidth,
+          available: element.clientWidth,
+        }));
+        expect(reportSize.content).toBeLessThanOrEqual(reportSize.available + 1);
+        await page.keyboard.press("Escape");
+        await expect(report).toHaveCount(0);
+      }
+    }
+  });
 }
 
 test("desktop daily, configured move and solution reveal", async ({ page }, info) => {
