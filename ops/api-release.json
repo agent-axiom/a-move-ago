@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-20-private-puzzle-feedback",
-  "reason": "Deploy authenticated puzzle feedback and migration 0005 before the mobile UX client"
+  "release": "2026-10-21-telegram-oidc-recovery",
+  "reason": "Diagnose Telegram token exchange and return failed web logins safely to the game"
 }

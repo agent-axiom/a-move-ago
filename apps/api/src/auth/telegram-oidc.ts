@@ -76,7 +76,17 @@ type WorkerdSubtleCrypto = SubtleCrypto & {
 };
 
 export class OidcProviderError extends Error {
-  constructor(readonly code: "OIDC_PROVIDER_ERROR" | "OIDC_TOKEN_INVALID") {
+  constructor(
+    readonly code: "OIDC_PROVIDER_ERROR" | "OIDC_TOKEN_INVALID",
+    readonly diagnostic: {
+      stage: "unknown" | "input" | "token_network" | "token_http" | "token_size" |
+        "token_content_type" | "token_read" | "token_json" | "token_schema" | "jwks";
+      status?: number;
+      oauthError?: "invalid_client" | "invalid_grant" | "invalid_request" |
+        "unauthorized_client" | "unsupported_grant_type" | "invalid_scope" |
+        "server_error" | "temporarily_unavailable";
+    } = { stage: "unknown" },
+  ) {
     super(code);
     this.name = "OidcProviderError";
   }
@@ -93,8 +103,11 @@ export interface TelegramOidcProvider {
   }): Promise<VerifiedTelegramIdentity>;
 }
 
-function providerError(): OidcProviderError {
-  return new OidcProviderError("OIDC_PROVIDER_ERROR");
+function providerError(
+  stage: OidcProviderError["diagnostic"]["stage"],
+  details: Omit<OidcProviderError["diagnostic"], "stage"> = {},
+): OidcProviderError {
+  return new OidcProviderError("OIDC_PROVIDER_ERROR", { stage, ...details });
 }
 
 function invalidToken(): OidcProviderError {
@@ -123,11 +136,11 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   const rawLength = response.headers.get("content-length");
   if (rawLength !== null) {
     if (!/^\d+$/.test(rawLength) || Number(rawLength) > maxProviderResponseBytes) {
-      throw providerError();
+      throw providerError("token_size");
     }
   }
   if (!isJsonContentType(response.headers.get("content-type")) || !response.body) {
-    throw providerError();
+    throw providerError("token_content_type");
   }
 
   const reader = response.body.getReader();
@@ -140,13 +153,13 @@ async function readBoundedJson(response: Response): Promise<unknown> {
       byteLength += value.byteLength;
       if (byteLength > maxProviderResponseBytes) {
         await reader.cancel();
-        throw providerError();
+        throw providerError("token_size");
       }
       chunks.push(value);
     }
   } catch (error) {
     if (error instanceof OidcProviderError) throw error;
-    throw providerError();
+    throw providerError("token_read");
   }
 
   const bytes = new Uint8Array(byteLength);
@@ -158,7 +171,7 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   try {
     return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
-    throw providerError();
+    throw providerError("token_json");
   }
 }
 
@@ -189,7 +202,7 @@ export async function exchangeAndVerifyTelegramCode(
   },
 ): Promise<VerifiedTelegramIdentity> {
   const parsedInput = ExchangeInputSchema.safeParse(input);
-  if (!parsedInput.success) throw providerError();
+  if (!parsedInput.success) throw providerError("input");
 
   const body = new URLSearchParams({
     grant_type: "authorization_code",
@@ -203,6 +216,7 @@ export async function exchangeAndVerifyTelegramCode(
     response = await dependencies.fetch(tokenEndpoint, {
       method: "POST",
       redirect: "error",
+      signal: AbortSignal.timeout(10_000),
       headers: {
         authorization: clientSecretBasic(parsedInput.data.clientId, parsedInput.data.clientSecret),
         "content-type": "application/x-www-form-urlencoded",
@@ -210,11 +224,29 @@ export async function exchangeAndVerifyTelegramCode(
       body,
     });
   } catch {
-    throw providerError();
+    throw providerError("token_network");
   }
-  if (!response.ok) throw providerError();
+  if (!response.ok) {
+    const oauthErrorSchema = z.object({
+      error: z.enum([
+        "invalid_client", "invalid_grant", "invalid_request", "unauthorized_client",
+        "unsupported_grant_type", "invalid_scope", "server_error", "temporarily_unavailable",
+      ]),
+    });
+    let oauthError: OidcProviderError["diagnostic"]["oauthError"];
+    try {
+      const parsed = oauthErrorSchema.safeParse(await readBoundedJson(response));
+      if (parsed.success) oauthError = parsed.data.error;
+    } catch {
+      // Never retain or log the provider's body, descriptions, tokens or headers.
+    }
+    throw providerError("token_http", {
+      status: response.status,
+      ...(oauthError ? { oauthError } : {}),
+    });
+  }
   const tokens = TokenResponseSchema.safeParse(await readBoundedJson(response));
-  if (!tokens.success) throw providerError();
+  if (!tokens.success) throw providerError("token_schema");
 
   let verified: Awaited<ReturnType<typeof jwtVerify>>;
   try {
@@ -225,7 +257,7 @@ export async function exchangeAndVerifyTelegramCode(
       requiredClaims: ["exp", "iat", "sub", "nonce"],
     });
   } catch (error) {
-    if (isRemoteKeyFailure(error)) throw providerError();
+    if (isRemoteKeyFailure(error)) throw providerError("jwks");
     throw invalidToken();
   }
 

@@ -33,6 +33,13 @@ export class TelegramAuthDeniedError extends Error {
   }
 }
 
+export class TelegramAuthFailedError extends Error {
+  constructor(readonly me: Me) {
+    super("Telegram sign-in did not finish.");
+    this.name = "TelegramAuthFailedError";
+  }
+}
+
 function throwIfAborted(signal: AbortSignal): void {
   signal.throwIfAborted();
 }
@@ -139,7 +146,8 @@ export async function bootstrapSession(
   }
   await prepareDraftActor(runtime, me);
   if (me.kind === "telegram") return me;
-  if (authError) throw new TelegramAuthDeniedError(me);
+  if (authError === "access_denied") throw new TelegramAuthDeniedError(me);
+  if (authError === "login_failed") throw new TelegramAuthFailedError(me);
   return handoff ? retryHandoff(runtime, { handoffCode: handoff }, signal) : me;
 }
 

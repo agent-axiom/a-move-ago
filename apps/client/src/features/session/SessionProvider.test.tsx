@@ -720,35 +720,63 @@ it("does not overwrite an early auth return with a later initial bootstrap", asy
   expect(screen.getByRole("button", { name: "Retry Telegram return" })).toBeEnabled();
 });
 
-it("handles a fresh denial after a new explicit save attempt", async () => {
-  const user = userEvent.setup();
-  const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
-  let listener: ((url: string) => void) | undefined;
-  runtime.platform.authReturn.subscribe = vi.fn(async (next) => {
-    listener = next;
-    return () => undefined;
-  });
-  runtime.platform.authReturn.initialUrl = vi.fn(
-    async () => `${window.location.origin}/?authError=access_denied`,
-  );
-  render(
-    <RuntimeProvider runtime={runtime}>
-      <SessionProvider>
-        <SaveProgressButton />
-      </SessionProvider>
-    </RuntimeProvider>,
-  );
+it.each([
+  { authError: "access_denied", message: "Telegram sign-in was cancelled" },
+  { authError: "login_failed", message: "Telegram sign-in did not finish." },
+])(
+  "handles fresh $authError returns only after explicit save attempts",
+  async ({ authError, message }) => {
+    const user = userEvent.setup();
+    const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+    let listener: ((url: string) => void) | undefined;
+    runtime.platform.authReturn.subscribe = vi.fn(async (next) => {
+      listener = next;
+      return () => undefined;
+    });
+    const returnUrl = `/?case=2026-08-03&authError=${authError}`;
+    runtime.platform.authReturn.initialUrl = vi.fn(
+      async () => `${window.location.origin}${returnUrl}`,
+    );
+    render(
+      <RuntimeProvider runtime={runtime}>
+        <SessionProvider>
+          <SaveProgressButton />
+        </SessionProvider>
+      </RuntimeProvider>,
+    );
 
-  const save = await screen.findByRole("button", { name: "Save progress with Telegram" });
-  await waitFor(() => expect(save).toBeEnabled());
-  expect(runtime.api.getMe).toHaveBeenCalledOnce();
-  await user.click(save);
-  await waitFor(() => expect(runtime.platform.openAuthorization).toHaveBeenCalledOnce());
-  act(() => {
-    listener?.(`/?authError=access_denied`);
-  });
-  await waitFor(() => expect(runtime.api.getMe).toHaveBeenCalledTimes(2));
-});
+    const save = await screen.findByRole("button", { name: "Save progress with Telegram" });
+    await waitFor(() => expect(save).toBeEnabled());
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(window.location.search).toBe("?case=2026-08-03");
+    expect(runtime.api.getMe).toHaveBeenCalledOnce();
+    await act(async () => {
+      listener?.(returnUrl);
+      listener?.(returnUrl);
+    });
+    expect(runtime.api.getMe).toHaveBeenCalledOnce();
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      await user.click(save);
+      await waitFor(() =>
+        expect(runtime.platform.openAuthorization).toHaveBeenCalledTimes(attempt),
+      );
+      await act(async () => {
+        listener?.(returnUrl);
+        listener?.(returnUrl);
+      });
+      await waitFor(() => expect(runtime.api.getMe).toHaveBeenCalledTimes(attempt + 1));
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(save).toBeEnabled();
+      expect(window.location.search).toBe("?case=2026-08-03");
+    }
+    expect(runtime.token.get()).toBe("guest-token");
+    expect(runtime.api.createGuest).not.toHaveBeenCalled();
+    expect(runtime.api.exchangeHandoff).not.toHaveBeenCalled();
+    expect(runtime.platform.tokenStore.write).not.toHaveBeenCalled();
+    expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
+  },
+);
 
 it("hides consent after restoring an authenticated Telegram session", async () => {
   const runtime = runtimeFixture({ storedToken: "telegram-token", platformKind: "web" });

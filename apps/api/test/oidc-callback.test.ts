@@ -450,23 +450,55 @@ describe("Telegram OIDC callback and handoff exchange", () => {
   it.each([
     { code: "OIDC_PROVIDER_ERROR" as const, status: 503 },
     { code: "OIDC_TOKEN_INVALID" as const, status: 401 },
-  ])("maps $code to a sanitized callback error and consumes state", async ({ code, status }) => {
+  ])("returns web $code failures to the game and consumes state", async ({ code }) => {
     const provider: TelegramOidcProvider = {
       exchangeAndVerify: vi.fn(async () => {
-        throw new OidcProviderError(code);
+        throw new OidcProviderError(code, { stage: "token_http", status: 401, oauthError: "invalid_client" });
       }),
     };
     const app = createApp({ oidcProvider: provider });
     const guest = await issueGuest("web");
+    await seedAttempt({ sessionId: guest.sessionId, attemptId: "before-failed-login" });
     const { state } = await startFlow(app, guest);
-    const failed = await appRequest(app, callbackPath(state));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const failed = await appRequest(app, callbackPath(state), {}, overrideEnv({
+      WEB_AUTH_RETURN_URL: "https://chess.kosarevsky.dev/",
+      ALLOWED_ORIGINS: "https://chess.kosarevsky.dev",
+    }));
 
-    await expectApiError(failed, status, code);
+    expect(failed.status).toBe(302);
+    expect(failed.headers.get("location")).toBe("https://chess.kosarevsky.dev/?authError=login_failed");
     expectCallbackHeaders(failed);
+    expect(await readAllPlayerMappings()).toEqual([]);
+    expect(await testEnv.DB.prepare("SELECT handoff_hash, player_id FROM auth_flows").first()).toEqual({ handoff_hash: null, player_id: null });
+    expect(await testEnv.DB.prepare("SELECT session_id, player_id FROM attempts WHERE id = ?").bind("before-failed-login").first()).toEqual({ session_id: guest.sessionId, player_id: null });
+    expect((await authenticatedJson("/v1/me", guest.token)).response.status).toBe(200);
+    const diagnostic = log.mock.calls.map(([message]) => JSON.parse(String(message))).find((entry) => entry.event === "telegram_oidc_failure");
+    expect(diagnostic).toEqual({ event: "telegram_oidc_failure", requestId: expect.any(String), code, stage: "token_http", status: 401, oauthError: "invalid_client" });
+    expect(JSON.stringify(log.mock.calls)).not.toContain(state);
+    expect(JSON.stringify(log.mock.calls)).not.toContain("provider-code");
     const replay = await appRequest(app, callbackPath(state));
     await expectApiError(replay, 400, "OIDC_STATE_INVALID");
     expectCallbackHeaders(replay);
     expect(provider.exchangeAndVerify).toHaveBeenCalledTimes(1);
+    // A new attempt with the same guest gets a fresh state after the consumed failure.
+    const retry = await startFlow(app, guest);
+    expect(retry.state).not.toBe(state);
+  });
+
+  it.each([
+    { code: "OIDC_PROVIDER_ERROR" as const, status: 503 },
+    { code: "OIDC_TOKEN_INVALID" as const, status: 401 },
+  ])("preserves Android $code behavior for the existing app", async ({ code, status }) => {
+    const provider: TelegramOidcProvider = { exchangeAndVerify: vi.fn(async () => { throw new OidcProviderError(code); }) };
+    const app = createApp({ oidcProvider: provider });
+    const guest = await issueGuest("android");
+    const { state } = await startFlow(app, guest, "android");
+    const failed = await appRequest(app, callbackPath(state));
+    await expectApiError(failed, status, code);
+    expectCallbackHeaders(failed);
+    expect(failed.headers.get("location")).toBeNull();
+    expect(await readAllPlayerMappings()).toEqual([]);
   });
 
   it("rejects a verified identity without OIDC claims", async () => {

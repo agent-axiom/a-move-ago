@@ -78,6 +78,12 @@ jobs:
         run: >-
           npm run write:worker-secrets -w @a-move-ago/tools --
           --target "$RUNNER_TEMP/worker-secrets.json"
+      - name: Verify Telegram provider and client authentication
+        env:
+          TELEGRAM_OIDC_CLIENT_ID: ${{ vars.TELEGRAM_OIDC_CLIENT_ID }}
+          TELEGRAM_OIDC_CLIENT_SECRET: ${{ secrets.TELEGRAM_OIDC_CLIENT_SECRET }}
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: node tools/scripts/check-telegram-oidc.mjs
       - name: Validate bundle with required secrets
         run: >-
           npx wrangler deploy --dry-run --config apps/api/wrangler.production.jsonc
