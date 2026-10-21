@@ -8,13 +8,14 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app";
 import { publicPuzzleId } from "../src/db/puzzle-identity";
+import { upsertOidcPlayer } from "../src/db/players";
 import type { SessionActor } from "../src/env";
 import { cleanupExpired } from "../src/scheduled";
 import {
   exchangeHandoffAndLinkGuest,
   linkGuestToPlayer,
 } from "../src/services/account-link-service";
-import { seedContentFixture } from "./fixtures/content";
+import { makePuzzleFixture, seedContentFixture } from "./fixtures/content";
 import { verifiedOidcIdentity } from "./fixtures/telegram";
 import { issueGuest, resetDatabase, testEnv } from "./helpers/http";
 
@@ -74,6 +75,42 @@ function actor(
   return { sessionId: guest.sessionId, playerId: null, kind: "guest", channel };
 }
 
+async function mergeLogin(
+  guest: Awaited<ReturnType<typeof issueGuest>>,
+  channel: "telegram" | "web",
+) {
+  if (channel === "telegram") {
+    return linkGuestToPlayer(testEnv, actor(guest, channel), verifiedOidcIdentity, seconds);
+  }
+  const player = await upsertOidcPlayer(testEnv.DB, verifiedOidcIdentity, seconds);
+  const handoffHash = crypto.randomUUID();
+  await testEnv.DB.prepare(`INSERT INTO auth_flows
+    (id,state_hash,guest_session_id,channel,nonce,pkce_verifier,expires_at,
+     callback_claimed_at,player_id,handoff_hash,handoff_expires_at,created_at)
+    VALUES (?, ?, ?, 'web', 'nonce', 'verifier', ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      crypto.randomUUID(), crypto.randomUUID(), guest.sessionId, seconds + 600,
+      seconds, player.id, handoffHash, seconds + 60, seconds,
+    )
+    .run();
+  return exchangeHandoffAndLinkGuest(
+    testEnv, actor(guest, channel), { handoffHash, channel }, seconds,
+  );
+}
+
+async function solveForPoints(
+  content: Awaited<ReturnType<typeof fixture>>,
+  token: string,
+  assisted: boolean,
+) {
+  if (assisted) {
+    await call(`/v1/cases/${content.caseId}/puzzles/${content.alias}/clue`, token, {});
+    await call("/v1/attempts", token, answer(content, false));
+  }
+  const solved = AttemptResultSchema.parse((await call("/v1/attempts", token, answer(content))).body);
+  expect(solved.progress?.earnedPoints).toBe(assisted ? 35 : 100);
+}
+
 beforeEach(async () => {
   vi.spyOn(Date, "now").mockReturnValue(now.getTime());
   await resetDatabase();
@@ -81,6 +118,76 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("server-authoritative clues and personal points", () => {
+  it.each([
+    ["telegram", false], ["telegram", true], ["web", false], ["web", true],
+  ] as const)("merges best results through %s when desktop is better: %s", async (channel, desktopBetter) => {
+    const content = await fixture();
+    const extra = await seedContentFixture(testEnv.DB, {
+      id: "case-extra", date: "2026-10-14",
+      puzzle: makePuzzleFixture({ contentKey: "extra-puzzle" }),
+    });
+    const extraContent = {
+      ...extra, alias: publicPuzzleId(extra.caseId, 1, extra.puzzle.public.version),
+    };
+    const desktop = await mergeLogin(await issueGuest("web"), "web");
+    await solveForPoints(content, desktop.token, !desktopBetter);
+    const phone = await issueGuest(channel);
+    await solveForPoints(content, phone.token, desktopBetter);
+    await solveForPoints(extraContent, phone.token, false);
+
+    const linked = await mergeLogin(phone, channel);
+    expect(linked.profile.telegramUserId).toBe(desktop.profile.telegramUserId);
+    for (const token of [linked.token, desktop.token]) {
+      const stats = StatsResponseSchema.parse((await call("/v1/me/stats", token)).body);
+      expect(stats).toMatchObject({ points: 200, solvedPuzzles: 2 });
+      const daily = DailyCaseResponseSchema.parse((await call("/v1/daily", token)).body);
+      expect(daily.progressStates?.[content.alias]).toMatchObject({
+        earnedPoints: 100, attemptCount: 1, assistanceCount: 0, clueUnlocked: true,
+      });
+    }
+    // A later lower-scoring device must neither lower the award nor add duplicate points.
+    const another = await issueGuest(channel);
+    await solveForPoints(content, another.token, true);
+    const repeated = await mergeLogin(another, channel);
+    await call("/v1/attempts", repeated.token, answer(content));
+    expect(StatsResponseSchema.parse((await call("/v1/me/stats", repeated.token)).body))
+      .toMatchObject({ points: 200, solvedPuzzles: 2 });
+    expect((await testEnv.DB.prepare("SELECT count(*) AS n FROM merged_puzzle_awards")
+      .first<{ n: number }>())?.n).toBe(2);
+    const outsider = await issueGuest();
+    expect(StatsResponseSchema.parse((await call("/v1/me/stats", outsider.token)).body).points).toBe(0);
+
+    // Old guest-session cleanup keeps linked attempts and their preserved awards.
+    await testEnv.DB.prepare("UPDATE sessions SET revoked_at = 1 WHERE id = ?")
+      .bind(phone.sessionId).run();
+    await cleanupExpired(testEnv, seconds);
+    expect(StatsResponseSchema.parse((await call("/v1/me/stats", repeated.token)).body).points).toBe(200);
+    const deleted = await app.fetch(new Request("https://api.test/v1/me", {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${repeated.token}`, origin: "https://chess.kosarevsky.dev" },
+    }), testEnv);
+    expect(deleted.status).toBe(200);
+    expect((await testEnv.DB.prepare("SELECT count(*) AS n FROM merged_puzzle_awards")
+      .first<{ n: number }>())?.n).toBe(0);
+  });
+
+  it("rolls back preserved awards together with a failed guest-account merge", async () => {
+    const content = await fixture();
+    const desktop = await mergeLogin(await issueGuest("web"), "web");
+    await solveForPoints(content, desktop.token, true);
+    const phone = await issueGuest("telegram");
+    await solveForPoints(content, phone.token, false);
+    await testEnv.DB.prepare(`CREATE TRIGGER test_fail_mini_app_revoke
+      BEFORE UPDATE OF revoked_at ON sessions
+      WHEN OLD.id = '${phone.sessionId}' AND NEW.revoked_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'synthetic merge rollback'); END`).run();
+    await expect(mergeLogin(phone, "telegram")).rejects.toThrow();
+    expect(StatsResponseSchema.parse((await call("/v1/me/stats", desktop.token)).body).points).toBe(35);
+    expect(StatsResponseSchema.parse((await call("/v1/me/stats", phone.token)).body).points).toBe(100);
+    expect((await testEnv.DB.prepare("SELECT count(*) AS n FROM merged_puzzle_awards")
+      .first<{ n: number }>())?.n).toBe(0);
+  });
+
   it("masks default titles, prompts and semantic IDs, then records a clue once before disclosure", async () => {
     const content = await fixture();
     await testEnv.DB.prepare("UPDATE puzzles SET public_json = ? WHERE id = ?")

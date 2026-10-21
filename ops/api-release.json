@@ -1,4 +1,4 @@
 {
   "release": "2026-10-21-telegram-mini-app-profile",
-  "reason": "Accept empty optional Telegram profile fields and diagnose Mini App proof failures"
+  "reason": "Fix Mini App profile validation and preserve the best puzzle awards when merging accounts"
 }
