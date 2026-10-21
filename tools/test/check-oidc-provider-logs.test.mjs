@@ -61,6 +61,9 @@ test("queries a bounded recent window without persisting and emits only safe fie
   assert.deepEqual(result, {
     ok: true,
     count: 1,
+    queriedEvents: 1,
+    matchedService: 1,
+    parsedDiagnostics: 1,
     failures: [{ requestId, stage: "token_http", status: 401, oauthError: "invalid_client" }],
   });
   assertSafe(result);
@@ -87,6 +90,7 @@ test("queries a bounded recent window without persisting and emits only safe fie
   });
   assert.equal(query.parameters.filters[0].key, "$metadata.service");
   assert.equal(query.parameters.filters[0].value, "a-move-ago-api");
+  assert.equal(query.parameters.filters.length, 1);
 });
 
 test("supports JSON strings, structured objects and JSON message wrappers", async () => {
@@ -101,12 +105,11 @@ test("supports JSON strings, structured objects and JSON message wrappers", asyn
   assertSafe(result);
 });
 
-test("rejects foreign workers, unknown fields, invalid enums and malformed source", async () => {
+test("rejects foreign workers, invalid enums and malformed source", async () => {
   const result = await harness({
     events: [
       event(diagnostic, "other-worker"),
       event({ ...diagnostic, event: "other_event" }),
-      event({ ...diagnostic, profile: sensitive }),
       event({ ...diagnostic, stage: sensitive }),
       event({ ...diagnostic, oauthError: sensitive }),
       event({ ...diagnostic, status: sensitive }),
@@ -119,8 +122,58 @@ test("rejects foreign workers, unknown fields, invalid enums and malformed sourc
       event(null),
     ],
   }).run();
-  assert.deepEqual(result, { ok: true, count: 0, failures: [] });
+  assert.deepEqual(result, {
+    ok: true,
+    count: 0,
+    queriedEvents: 12,
+    matchedService: 11,
+    parsedDiagnostics: 0,
+    failures: [],
+  });
   assertSafe(result);
+});
+
+test("projects safe diagnostic fields while discarding Cloudflare enrichment", async () => {
+  const result = await harness({
+    events: [
+      event({
+        ...diagnostic,
+        profile: { name: sensitive },
+        $metadata: { url: `https://api.test/callback?code=${sensitive}` },
+        message: sensitive,
+      }),
+      event(JSON.stringify({ ...diagnostic, [sensitive]: sensitive })),
+    ],
+  }).run();
+  assert.equal(result.count, 2);
+  assert.equal(result.queriedEvents, 2);
+  assert.equal(result.matchedService, 2);
+  assert.equal(result.parsedDiagnostics, 2);
+  for (const item of result.failures) {
+    assert.deepEqual(item, {
+      requestId,
+      stage: "token_http",
+      status: 401,
+      oauthError: "invalid_client",
+    });
+  }
+  assertSafe(result);
+});
+
+test("message metadata is not required to query structured diagnostics", async () => {
+  const check = harness({
+    override: (url) =>
+      url.endsWith("/keys")
+        ? Response.json({
+            success: true,
+            result: [{ key: "$metadata.service", type: "string" }],
+          })
+        : undefined,
+  });
+  const result = await check.run();
+  assert.equal(result.ok, true);
+  assert.equal(result.count, 1);
+  assert.equal(check.requests[1].payload.parameters.filters.length, 1);
 });
 
 test("optional request ID is used as exact query needle and checked again in memory", async () => {
@@ -129,6 +182,8 @@ test("optional request ID is used as exact query needle and checked again in mem
   });
   const result = await check.run({ ...config, requestId });
   assert.equal(result.count, 1);
+  assert.equal(result.queriedEvents, 2);
+  assert.equal(result.parsedDiagnostics, 2);
   assert.equal(result.failures[0].requestId, requestId);
   assert.deepEqual(check.requests[1].payload.parameters.needle, {
     value: requestId,
