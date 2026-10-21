@@ -74,9 +74,9 @@ test("credential probe uses synthetic code and the provider's Basic request shap
   assert.equal(options.method, "POST");
   assert.equal(
     options.headers.authorization,
-    `Basic ${Buffer.from(
-      `${credentials.clientId}:${credentials.clientSecret}`,
-    ).toString("base64")}`,
+    `Basic ${Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString(
+      "base64",
+    )}`,
   );
   const body = new URLSearchParams(options.body);
   assert.equal(body.get("client_id"), credentials.clientId);
