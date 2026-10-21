@@ -27,7 +27,6 @@ const oauthErrors = new Set([
   "server_error",
   "temporarily_unavailable",
 ]);
-const diagnosticKeys = new Set(["event", "code", "requestId", "stage", "status", "oauthError"]);
 const maxResponseBytes = 1_048_576;
 
 class LogCheckError extends Error {}
@@ -81,7 +80,6 @@ function parseSource(source) {
     }
     if (!source || Array.isArray(source) || typeof source !== "object") return null;
     if (
-      Object.keys(source).some((key) => !diagnosticKeys.has(key)) ||
       source.event !== eventName ||
       !["OIDC_PROVIDER_ERROR", "OIDC_TOKEN_INVALID"].includes(source.code) ||
       !stages.has(source.stage) ||
@@ -156,7 +154,7 @@ export async function checkOidcProviderLogs(
       return payload.result;
     }
 
-    // Discover field types before constructing filters; only retain the two required names.
+    // Discover the service field type before constructing its filter.
     const keys = await call("keys", {
       from,
       to,
@@ -165,8 +163,8 @@ export async function checkOidcProviderLogs(
     });
     ensure(
       Array.isArray(keys) &&
-        ["$metadata.service", "$metadata.message"].every((key) =>
-          keys.some((candidate) => candidate?.key === key && candidate.type === "string"),
+        keys.some(
+          (candidate) => candidate?.key === "$metadata.service" && candidate.type === "string",
         ),
       "QUERY_KEYS_UNAVAILABLE",
     );
@@ -178,24 +176,32 @@ export async function checkOidcProviderLogs(
       limit: 50,
       parameters: {
         filterCombination: "and",
-        filters: [
-          { key: "$metadata.service", operation: "eq", type: "string", value: worker },
-          { key: "$metadata.message", operation: "includes", type: "string", value: eventName },
-        ],
+        filters: [{ key: "$metadata.service", operation: "eq", type: "string", value: worker }],
         needle: { value: requestId ?? eventName, isRegex: false, matchCase: true },
       },
     });
     const events = result?.events?.events;
     ensure(Array.isArray(events) && events.length <= 50, "QUERY_RESPONSE_INVALID");
     const failures = [];
+    let matchedService = 0;
+    let parsedDiagnostics = 0;
     for (const event of events) {
       if (event?.$metadata?.service !== worker) continue;
+      matchedService += 1;
       const diagnostic = parseSource(event.source);
+      if (diagnostic) parsedDiagnostics += 1;
       if (diagnostic && (requestId === undefined || diagnostic.requestId === requestId)) {
         failures.push(diagnostic);
       }
     }
-    return { ok: true, count: failures.length, failures };
+    return {
+      ok: true,
+      count: failures.length,
+      queriedEvents: events.length,
+      matchedService,
+      parsedDiagnostics,
+      failures,
+    };
   } catch (error) {
     return { ok: false, code: error instanceof LogCheckError ? error.message : "CHECK_FAILED" };
   }
