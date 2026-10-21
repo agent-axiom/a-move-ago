@@ -241,7 +241,16 @@ export async function exchangeAndVerifyTelegramCode(
   } catch {
     throw providerError("token_network");
   }
-  if (!response.ok) {
+  let payload: unknown;
+  try {
+    payload = await readBoundedJson(response);
+  } catch (error) {
+    if (!response.ok) throw providerError("token_http", { status: response.status });
+    throw error;
+  }
+  // Telegram may return an OAuth error envelope with HTTP 200.
+  // HTTP success alone never establishes a successful token exchange.
+  if (!response.ok || (payload !== null && typeof payload === "object" && "error" in payload)) {
     const oauthErrorSchema = z.object({
       error: z.enum([
         "invalid_client",
@@ -254,19 +263,13 @@ export async function exchangeAndVerifyTelegramCode(
         "temporarily_unavailable",
       ]),
     });
-    let oauthError: OidcProviderError["diagnostic"]["oauthError"];
-    try {
-      const parsed = oauthErrorSchema.safeParse(await readBoundedJson(response));
-      if (parsed.success) oauthError = parsed.data.error;
-    } catch {
-      // Never retain or log the provider's body, descriptions, tokens or headers.
-    }
+    const parsed = oauthErrorSchema.safeParse(payload);
     throw providerError("token_http", {
       status: response.status,
-      ...(oauthError ? { oauthError } : {}),
+      ...(parsed.success ? { oauthError: parsed.data.error } : {}),
     });
   }
-  const tokens = TokenResponseSchema.safeParse(await readBoundedJson(response));
+  const tokens = TokenResponseSchema.safeParse(payload);
   if (!tokens.success) throw providerError("token_schema");
 
   let verified: Awaited<ReturnType<typeof jwtVerify>>;

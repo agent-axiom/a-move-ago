@@ -106,6 +106,14 @@ function clientSecretBasic(clientId, clientSecret) {
   return `Basic ${Buffer.from(`${encode(clientId)}:${encode(clientSecret)}`).toString("base64")}`;
 }
 
+function containsToken(payload) {
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    (Object.hasOwn(payload, "access_token") || Object.hasOwn(payload, "id_token"))
+  );
+}
+
 /** Public checks never use user proof. The optional probe submits a synthetic invalid code.
  * An invalid_grant reply is evidence about this request, not an end-to-end login guarantee.
  */
@@ -186,36 +194,72 @@ export async function checkTelegramOidc(
 
     let credentialProbe = "not_requested";
     let tokenDetails;
+    let controlDetails;
     if (probeRequested) {
       stage = "token_probe";
       // This code has no corresponding login flow and cannot identify or authenticate a user.
       const code = `invalid${randomBytes(15).toString("base64url")}`;
-      const response = await call(tokenUrl, {
-        method: "POST",
-        headers: {
-          authorization: clientSecretBasic(clientId, clientSecret),
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: `${apiOrigin}/v1/auth/telegram/oidc/callback`,
-          client_id: clientId,
-          code_verifier: randomBytes(32).toString("base64url"),
-        }),
+      const body = new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: `${apiOrigin}/v1/auth/telegram/oidc/callback`,
+        client_id: clientId,
+        code_verifier: randomBytes(32).toString("base64url"),
       });
+      const probe = (secret) =>
+        call(tokenUrl, {
+          method: "POST",
+          headers: {
+            authorization: clientSecretBasic(clientId, secret),
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams(body),
+        });
+      const response = await probe(clientSecret);
       tokenDetails = responseDetails(response);
       const payload = await boundedJson(response, stage);
       const oauthError = oauthErrors.has(payload?.error) ? payload.error : "unrecognized";
       const details = { ...tokenDetails, oauthError };
       ensure(oauthError !== "invalid_client", stage, "OIDC_CLIENT_REJECTED", details);
       ensure(
-        response.status === 400 && oauthError === "invalid_grant",
+        [200, 400].includes(response.status) &&
+          oauthError === "invalid_grant" &&
+          !containsToken(payload),
         stage,
         "TOKEN_PROBE_UNEXPECTED_RESPONSE",
         details,
       );
-      credentialProbe = "invalid_grant";
+      // Telegram can return OAuth errors with HTTP 200. A different response with a
+      // deliberately wrong secret distinguishes client validation from code-only rejection.
+      stage = "token_control";
+      let wrongSecret;
+      do {
+        wrongSecret = `preflight-invalid-${randomBytes(32).toString("base64url")}`;
+      } while (wrongSecret === clientSecret);
+      const control = await probe(wrongSecret);
+      const controlPayload = await boundedJson(control, stage);
+      const controlError = oauthErrors.has(controlPayload?.error)
+        ? controlPayload.error
+        : "unrecognized";
+      controlDetails = { ...responseDetails(control), oauthError: controlError };
+      ensure(
+        !containsToken(controlPayload),
+        stage,
+        "TOKEN_CLIENT_CONTROL_UNCONFIRMED",
+        controlDetails,
+      );
+      if ([200, 400].includes(control.status) && controlError === "invalid_grant") {
+        // Some providers validate codes before credentials; this cannot confirm the secret.
+        credentialProbe = "unconfirmed";
+      } else {
+        ensure(
+          [200, 400, 401].includes(control.status) && controlError === "invalid_client",
+          stage,
+          "TOKEN_CLIENT_CONTROL_UNCONFIRMED",
+          controlDetails,
+        );
+        credentialProbe = "confirmed";
+      }
     }
     return {
       ok: true,
@@ -223,6 +267,7 @@ export async function checkTelegramOidc(
       jwks: jwksDetails,
       credentialProbe,
       ...(tokenDetails ? { token: tokenDetails } : {}),
+      ...(controlDetails ? { clientControl: controlDetails } : {}),
     };
   } catch (error) {
     if (error instanceof PreflightError) return error.summary;
