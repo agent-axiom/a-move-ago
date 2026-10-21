@@ -6,9 +6,9 @@ const WebAppUserSchema = z
   .object({
     id: z.number().int().safe().positive(),
     first_name: z.string().min(1),
-    last_name: z.string().min(1).optional(),
-    username: z.string().min(1).optional(),
-    photo_url: z.httpUrl().optional(),
+    last_name: z.string().optional(),
+    username: z.string().optional(),
+    photo_url: z.union([z.httpUrl(), z.literal("")]).optional(),
   })
   .passthrough();
 
@@ -17,7 +17,17 @@ type WorkerdSubtleCrypto = SubtleCrypto & {
 };
 
 export class TelegramProofError extends Error {
-  constructor(readonly code: "TELEGRAM_PROOF_INVALID" | "TELEGRAM_PROOF_EXPIRED") {
+  constructor(
+    readonly code: "TELEGRAM_PROOF_INVALID" | "TELEGRAM_PROOF_EXPIRED",
+    readonly stage:
+      | "configuration"
+      | "input"
+      | "signature"
+      | "future"
+      | "expired"
+      | "profile"
+      | "unknown" = "unknown",
+  ) {
     super(code);
     this.name = "TelegramProofError";
   }
@@ -37,8 +47,8 @@ async function hmac(
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, utf8.encode(value)));
 }
 
-function invalid(): TelegramProofError {
-  return new TelegramProofError("TELEGRAM_PROOF_INVALID");
+function invalid(stage: TelegramProofError["stage"]): TelegramProofError {
+  return new TelegramProofError("TELEGRAM_PROOF_INVALID", stage);
 }
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
@@ -70,7 +80,7 @@ export async function verifyMiniAppInitData(
     !isNonNegativeSafeInteger(options.futureSkewSeconds) ||
     !Number.isSafeInteger(options.nowSeconds + options.futureSkewSeconds)
   ) {
-    throw invalid();
+    throw invalid("configuration");
   }
   if (
     typeof raw !== "string" ||
@@ -79,12 +89,12 @@ export async function verifyMiniAppInitData(
     utf8.encode(raw).byteLength > 8192 ||
     hasMalformedPercentEncoding(raw)
   ) {
-    throw invalid();
+    throw invalid("input");
   }
 
   const params = new URLSearchParams(raw);
   const keys = [...params.keys()];
-  if (keys.length !== new Set(keys).size) throw invalid();
+  if (keys.length !== new Set(keys).size) throw invalid("input");
 
   const received = hexToBytes(params.get("hash") ?? "");
   const rawAuthDate = params.get("auth_date");
@@ -98,7 +108,7 @@ export async function verifyMiniAppInitData(
     authDate <= 0 ||
     !rawUser
   ) {
-    throw invalid();
+    throw invalid("input");
   }
 
   const checkString = keys
@@ -112,26 +122,26 @@ export async function verifyMiniAppInitData(
     received.byteLength !== expected.byteLength ||
     !(crypto.subtle as WorkerdSubtleCrypto).timingSafeEqual(received, expected)
   ) {
-    throw invalid();
+    throw invalid("signature");
   }
-  if (authDate > options.nowSeconds + options.futureSkewSeconds) throw invalid();
+  if (authDate > options.nowSeconds + options.futureSkewSeconds) throw invalid("future");
   if (options.nowSeconds - authDate > options.maxAgeSeconds) {
-    throw new TelegramProofError("TELEGRAM_PROOF_EXPIRED");
+    throw new TelegramProofError("TELEGRAM_PROOF_EXPIRED", "expired");
   }
 
   let decoded: unknown;
   try {
     decoded = JSON.parse(rawUser);
   } catch {
-    throw invalid();
+    throw invalid("profile");
   }
   const parsed = WebAppUserSchema.safeParse(decoded);
-  if (!parsed.success) throw invalid();
+  if (!parsed.success) throw invalid("profile");
 
   return {
     telegramUserId: String(parsed.data.id),
     displayName: [parsed.data.first_name, parsed.data.last_name].filter(Boolean).join(" "),
-    username: parsed.data.username ?? null,
-    avatarUrl: parsed.data.photo_url ?? null,
+    username: parsed.data.username || null,
+    avatarUrl: parsed.data.photo_url || null,
   };
 }

@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-21-telegram-oidc-worker-fetch",
-  "reason": "Use the native Worker fetch receiver and reject redirects without unsupported options"
+  "release": "2026-10-21-telegram-mini-app-profile",
+  "reason": "Accept empty optional Telegram profile fields and diagnose Mini App proof failures"
 }

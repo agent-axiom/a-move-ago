@@ -818,6 +818,41 @@ it("renders an auth error and request id without losing the guest action", async
   expect(save).toBeEnabled();
 });
 
+it.each([
+  ["TELEGRAM_PROOF_EXPIRED", "Telegram sign-in expired."],
+  ["TELEGRAM_PROOF_INVALID", "Telegram sign-in could not be verified."],
+])("explains Mini App recovery for %s while retaining guest progress", async (code, message) => {
+  const user = userEvent.setup();
+  const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "telegram" });
+  runtime.platform.requestTelegramProof = vi.fn(async () => ({
+    kind: "telegram-mini-app" as const,
+    initData: "synthetic-proof",
+  }));
+  runtime.api.loginMiniApp = vi
+    .fn()
+    .mockRejectedValue(new ApiError(401, code, "Changed server wording.", "req-mini-app", null));
+  render(
+    <RuntimeProvider runtime={runtime}>
+      <SessionProvider>
+        <SaveProgressButton />
+      </SessionProvider>
+    </RuntimeProvider>,
+  );
+
+  const save = screen.getByRole("button", { name: "Save progress with Telegram" });
+  await waitFor(() => expect(save).toBeEnabled());
+  await user.click(save);
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(message);
+  expect(alert).toHaveTextContent("Close and reopen the game in Telegram, then try again.");
+  expect(alert).toHaveTextContent("Your guest progress is saved.");
+  expect(screen.getByText("req-mini-app")).toBeInTheDocument();
+  expect(save).toBeEnabled();
+  expect(runtime.token.get()).toBe("guest-token");
+  expect(runtime.platform.tokenStore.write).not.toHaveBeenCalled();
+  expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
+});
+
 it("blocks foreground auth while a replacement runtime bootstraps", async () => {
   const user = userEvent.setup();
   const first = runtimeFixture({ storedToken: "first-guest", platformKind: "web" });

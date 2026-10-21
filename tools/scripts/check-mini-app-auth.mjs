@@ -6,6 +6,15 @@ const worker = "a-move-ago-api";
 const route = "/v1/auth/telegram/mini-app";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sessionKinds = new Set(["none", "guest", "telegram"]);
+const proofStages = new Set([
+  "configuration",
+  "input",
+  "signature",
+  "future",
+  "expired",
+  "profile",
+  "unknown",
+]);
 const errorCodes = new Set([
   "TELEGRAM_PROOF_INVALID",
   "TELEGRAM_PROOF_EXPIRED",
@@ -86,6 +95,7 @@ function parseSource(source) {
       status: source.status,
       sessionKind: source.sessionKind,
       ...(errorCodes.has(code) ? { code } : {}),
+      ...(proofStages.has(source.stage) ? { stage: source.stage } : {}),
     };
   } catch {
     return null;

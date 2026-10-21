@@ -24,7 +24,14 @@ export function SaveProgressButton() {
             : t("shell.saveTelegram")}
       </button>
       {state.tag === "auth-error" || state.tag === "handoff-retry" ? (
-        <p role="alert">{localizedSystemMessage(state.message, locale, t)}</p>
+        <p role="alert">
+          {localizedSystemMessage(
+            state.message,
+            locale,
+            t,
+            state.tag === "auth-error" ? state.errorCode : undefined,
+          )}
+        </p>
       ) : null}
       {state.tag === "auth-error" && state.requestId ? (
         <p>

@@ -1,5 +1,5 @@
 import { ErrorEnvelopeSchema, TelegramSessionIssuedSchema } from "@a-move-ago/api-contract";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env, RateLimitBinding } from "../src/env";
 import { linkGuestToPlayer } from "../src/services/account-link-service";
 import { signedMiniAppData } from "./fixtures/telegram";
@@ -114,6 +114,76 @@ describe("POST /v1/auth/telegram/mini-app", () => {
       )?.count,
     ).toBe(1);
   });
+
+  it.each(["signature", "expired", "profile"] as const)(
+    "logs only safe diagnostics for a %s proof failure",
+    async (stage) => {
+      const guest = await issueGuest("telegram");
+      const sensitive = "PRIVATE_PROFILE_MUST_NOT_BE_LOGGED";
+      const now = Math.floor(Date.now() / 1000);
+      const raw = await signedMiniAppData({
+        botToken: testEnv.TELEGRAM_BOT_TOKEN,
+        authDate:
+          stage === "expired" ? now - Number(testEnv.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS) - 60 : now,
+        user: {
+          id: 987654321,
+          first_name: sensitive,
+          photo_url:
+            stage === "profile" ? `javascript:${sensitive}` : "https://cdn.example/avatar.jpg",
+        },
+      });
+      const params = new URLSearchParams(raw);
+      if (stage === "signature") params.set("hash", "0".repeat(64));
+      const initData = params.toString();
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        const login = await authenticatedJson("/v1/auth/telegram/mini-app", guest.token, {
+          method: "POST",
+          body: { initData },
+        });
+        const error = ErrorEnvelopeSchema.parse(login.body).error;
+        const code = stage === "expired" ? "TELEGRAM_PROOF_EXPIRED" : "TELEGRAM_PROOF_INVALID";
+        expect(login.response.status).toBe(401);
+        expect(error.code).toBe(code);
+        const events = log.mock.calls
+          .map(([value]) => {
+            try {
+              return JSON.parse(String(value));
+            } catch {
+              return null;
+            }
+          })
+          .filter((value) => value?.event === "telegram_mini_app_failure");
+        expect(events).toEqual([
+          {
+            event: "telegram_mini_app_failure",
+            requestId: error.requestId,
+            path: "/v1/auth/telegram/mini-app",
+            status: 401,
+            sessionKind: "guest",
+            code,
+            stage,
+          },
+        ]);
+        const output = JSON.stringify(log.mock.calls);
+        for (const forbidden of [
+          sensitive,
+          initData,
+          testEnv.TELEGRAM_BOT_TOKEN,
+          guest.token,
+          "987654321",
+        ]) {
+          expect(output).not.toContain(forbidden);
+        }
+        expect((await authenticatedJson("/v1/me", guest.token)).body).toEqual({
+          kind: "guest",
+          profile: null,
+        });
+      } finally {
+        log.mockRestore();
+      }
+    },
+  );
 
   it("rejects a non-Telegram guest channel before parsing or rate limiting", async () => {
     const guest = await issueGuest("web");
