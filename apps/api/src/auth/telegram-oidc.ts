@@ -79,12 +79,27 @@ export class OidcProviderError extends Error {
   constructor(
     readonly code: "OIDC_PROVIDER_ERROR" | "OIDC_TOKEN_INVALID",
     readonly diagnostic: {
-      stage: "unknown" | "input" | "token_network" | "token_http" | "token_size" |
-        "token_content_type" | "token_read" | "token_json" | "token_schema" | "jwks";
+      stage:
+        | "unknown"
+        | "input"
+        | "token_network"
+        | "token_http"
+        | "token_size"
+        | "token_content_type"
+        | "token_read"
+        | "token_json"
+        | "token_schema"
+        | "jwks";
       status?: number;
-      oauthError?: "invalid_client" | "invalid_grant" | "invalid_request" |
-        "unauthorized_client" | "unsupported_grant_type" | "invalid_scope" |
-        "server_error" | "temporarily_unavailable";
+      oauthError?:
+        | "invalid_client"
+        | "invalid_grant"
+        | "invalid_request"
+        | "unauthorized_client"
+        | "unsupported_grant_type"
+        | "invalid_scope"
+        | "server_error"
+        | "temporarily_unavailable";
     } = { stage: "unknown" },
   ) {
     super(code);
@@ -229,8 +244,14 @@ export async function exchangeAndVerifyTelegramCode(
   if (!response.ok) {
     const oauthErrorSchema = z.object({
       error: z.enum([
-        "invalid_client", "invalid_grant", "invalid_request", "unauthorized_client",
-        "unsupported_grant_type", "invalid_scope", "server_error", "temporarily_unavailable",
+        "invalid_client",
+        "invalid_grant",
+        "invalid_request",
+        "unauthorized_client",
+        "unsupported_grant_type",
+        "invalid_scope",
+        "server_error",
+        "temporarily_unavailable",
       ]),
     });
     let oauthError: OidcProviderError["diagnostic"]["oauthError"];

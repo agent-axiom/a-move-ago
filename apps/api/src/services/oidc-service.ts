@@ -193,12 +193,14 @@ export async function completeOidcCallback(input: {
   } catch (error) {
     if (error instanceof OidcProviderError) {
       try {
-        console.log(JSON.stringify({
-          event: "telegram_oidc_failure",
-          requestId: input.requestId,
-          code: error.code,
-          ...error.diagnostic,
-        }));
+        console.log(
+          JSON.stringify({
+            event: "telegram_oidc_failure",
+            requestId: input.requestId,
+            code: error.code,
+            ...error.diagnostic,
+          }),
+        );
       } catch {
         // Diagnostics must never interfere with the login response.
       }

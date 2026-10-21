@@ -117,6 +117,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: node tools/scripts/check-production-play.mjs
+      - name: Check web login recovery and single-use callback state
+        env:
+          API_ORIGIN: ${{ vars.API_ORIGIN }}
+        run: node tools/scripts/check-oidc-callback-production.mjs
       - name: Check full and assisted scoring without duplicate awards
         env:
           API_ORIGIN: ${{ vars.API_ORIGIN }}

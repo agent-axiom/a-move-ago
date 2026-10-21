@@ -30,7 +30,10 @@ function harness(override) {
     if (url.endsWith("openid-configuration")) return Response.json(discovery);
     if (url.endsWith("jwks.json")) return Response.json({ keys });
     if (url.endsWith("/token")) {
-      return Response.json({ error: "invalid_grant", error_description: sensitive }, { status: 400 });
+      return Response.json(
+        { error: "invalid_grant", error_description: sensitive },
+        { status: 400 },
+      );
     }
     throw new Error(sensitive);
   };
@@ -124,7 +127,9 @@ test("distinguishes rejected clients and unexpected OAuth errors without logging
 
 test("never treats a token response to an invalid code as successful authentication", async () => {
   const result = await harness((url) =>
-    url.endsWith("/token") ? Response.json({ access_token: sensitive, id_token: sensitive }) : undefined,
+    url.endsWith("/token")
+      ? Response.json({ access_token: sensitive, id_token: sensitive })
+      : undefined,
   ).run(credentials);
   assert.equal(result.code, "TOKEN_PROBE_UNEXPECTED_RESPONSE");
   assert.equal(JSON.stringify(result).includes(sensitive), false);
@@ -139,10 +144,7 @@ test("sanitizes network, HTTP, content type, invalid JSON and oversized response
       () => new Response(sensitive, { headers: { "content-type": "application/json" } }),
       "RESPONSE_INVALID_JSON",
     ],
-    [
-      () => Response.json({}, { headers: { "content-length": "65537" } }),
-      "RESPONSE_TOO_LARGE",
-    ],
+    [() => Response.json({}, { headers: { "content-length": "65537" } }), "RESPONSE_TOO_LARGE"],
     [() => Response.json({ data: "x".repeat(65_536) }), "RESPONSE_TOO_LARGE"],
   ];
   for (const [response, expected] of cases) {
