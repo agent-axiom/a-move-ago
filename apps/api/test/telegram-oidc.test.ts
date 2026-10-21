@@ -264,6 +264,23 @@ describe("Telegram OIDC provider", () => {
     }
   });
 
+  it("recognizes Telegram OAuth errors returned with HTTP 200 without accepting tokens", async () => {
+    const getKey = vi.fn(jwks);
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        error: "invalid_grant",
+        error_description: "private provider detail",
+        id_token: await token(),
+      }),
+    );
+    const failure = exchangeAndVerifyTelegramCode(validInput, { fetch: fetchMock, jwks: getKey });
+    await expect(failure).rejects.toMatchObject({
+      code: "OIDC_PROVIDER_ERROR",
+      diagnostic: { stage: "token_http", status: 200, oauthError: "invalid_grant" },
+    });
+    expect(getKey).not.toHaveBeenCalled();
+  });
+
   it("distinguishes transport, response parsing and JWKS failure stages", async () => {
     const cases: [typeof fetch, JWTVerifyGetKey, string][] = [
       [

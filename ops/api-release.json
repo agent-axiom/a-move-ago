@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-21-telegram-oidc-recovery",
-  "reason": "Diagnose Telegram token exchange and return failed web logins safely to the game"
+  "release": "2026-10-21-telegram-oidc-response-compatibility",
+  "reason": "Handle Telegram OAuth errors returned with HTTP 200 and verify callback recovery"
 }

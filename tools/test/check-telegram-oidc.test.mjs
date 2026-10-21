@@ -30,8 +30,15 @@ function harness(override) {
     if (url.endsWith("openid-configuration")) return Response.json(discovery);
     if (url.endsWith("jwks.json")) return Response.json({ keys });
     if (url.endsWith("/token")) {
+      const realAuthorization = `Basic ${Buffer.from(
+        `${credentials.clientId}:${credentials.clientSecret}`,
+      ).toString("base64")}`;
+      const validClient = options.headers.authorization === realAuthorization;
       return Response.json(
-        { error: "invalid_grant", error_description: sensitive },
+        {
+          error: validClient ? "invalid_grant" : "invalid_client",
+          error_description: sensitive,
+        },
         { status: 400 },
       );
     }
@@ -40,7 +47,7 @@ function harness(override) {
   return { requests, run: (input) => checkTelegramOidc(input, { fetch, timeoutMs: 500 }) };
 }
 
-test("public preflight checks fixed discovery and usable RS256 keys without credentials", async () => {
+test("public preflight checks fixed discovery and usable RS256 keys", async () => {
   const check = harness();
   const result = await check.run();
   assert.equal(result.ok, true);
@@ -56,18 +63,20 @@ test("public preflight checks fixed discovery and usable RS256 keys without cred
   }
 });
 
-test("credential probe uses only a synthetic invalid code and the provider's Basic request shape", async () => {
+test("credential probe uses synthetic code and the provider's Basic request shape", async () => {
   const check = harness();
   const result = await check.run(credentials);
   assert.equal(result.ok, true);
-  assert.equal(result.credentialProbe, "invalid_grant");
-  assert.equal(check.requests.length, 3);
+  assert.equal(result.credentialProbe, "confirmed");
+  assert.equal(check.requests.length, 4);
   const { url, options } = check.requests[2];
   assert.equal(url, `${issuer}/token`);
   assert.equal(options.method, "POST");
   assert.equal(
     options.headers.authorization,
-    `Basic ${Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString("base64")}`,
+    `Basic ${Buffer.from(
+      `${credentials.clientId}:${credentials.clientSecret}`,
+    ).toString("base64")}`,
   );
   const body = new URLSearchParams(options.body);
   assert.equal(body.get("client_id"), credentials.clientId);
@@ -78,6 +87,79 @@ test("credential probe uses only a synthetic invalid code and the provider's Bas
   assert.equal(body.has("client_secret"), false);
   assert.equal(JSON.stringify(result).includes(sensitive), false);
   assert.equal(JSON.stringify(result).includes(body.get("code")), false);
+  const control = check.requests[3];
+  assert.equal(control.url, url);
+  assert.notEqual(control.options.headers.authorization, options.headers.authorization);
+  assert.equal(String(control.options.body), String(options.body));
+  assert.equal(result.clientControl.oauthError, "invalid_client");
+  assert.equal(JSON.stringify(result).includes(control.options.headers.authorization), false);
+});
+
+test("accepts Telegram OAuth errors with HTTP 200 and a rejected client control", async () => {
+  let calls = 0;
+  const result = await harness((url) => {
+    if (!url.endsWith("/token")) return undefined;
+    return Response.json({
+      error: calls++ === 0 ? "invalid_grant" : "invalid_client",
+      error_description: sensitive,
+    });
+  }).run(credentials);
+  assert.equal(result.ok, true);
+  assert.equal(result.credentialProbe, "confirmed");
+  assert.equal(result.token.httpStatus, 200);
+  assert.equal(result.clientControl.httpStatus, 200);
+  assert.equal(result.clientControl.oauthError, "invalid_client");
+  assert.equal(JSON.stringify(result).includes(sensitive), false);
+});
+
+test("keeps credentials unconfirmed if wrong credentials also return invalid_grant", async () => {
+  for (const status of [200, 400]) {
+    const result = await harness((url) =>
+      url.endsWith("/token")
+        ? Response.json({ error: "invalid_grant", error_description: sensitive }, { status })
+        : undefined,
+    ).run(credentials);
+    assert.equal(result.ok, true);
+    assert.equal(result.credentialProbe, "unconfirmed");
+    assert.equal(result.clientControl.oauthError, "invalid_grant");
+    assert.equal(JSON.stringify(result).includes(sensitive), false);
+  }
+});
+
+test("rejects unexpected client-control responses", async (t) => {
+  for (const [error, status] of [
+    ["invalid_request", 200],
+    ["invalid_client", 500],
+    [sensitive, 200],
+  ]) {
+    await t.test(`${status} control`, async () => {
+      let calls = 0;
+      const result = await harness((url) => {
+        if (!url.endsWith("/token")) return undefined;
+        if (calls++ === 0) return Response.json({ error: "invalid_grant" });
+        return Response.json({ error, error_description: sensitive }, { status });
+      }).run(credentials);
+      assert.equal(result.ok, false);
+      assert.equal(result.stage, "token_control");
+      assert.equal(result.code, "TOKEN_CLIENT_CONTROL_UNCONFIRMED");
+      assert.equal(JSON.stringify(result).includes(sensitive), false);
+    });
+  }
+});
+
+test("never accepts token fields alongside an OAuth error in either probe", async () => {
+  for (const tokenCall of [0, 1]) {
+    let calls = 0;
+    const result = await harness((url) => {
+      if (!url.endsWith("/token")) return undefined;
+      return Response.json({
+        error: "invalid_grant",
+        ...(calls++ === tokenCall ? { id_token: sensitive } : {}),
+      });
+    }).run(credentials);
+    assert.equal(result.ok, false);
+    assert.equal(JSON.stringify(result).includes(sensitive), false);
+  }
 });
 
 test("never sends credentials to endpoints supplied by discovery", async () => {
@@ -104,9 +186,10 @@ test("rejects missing, malformed and unusable keys", async (t) => {
   }
 });
 
-test("distinguishes rejected clients and unexpected OAuth errors without logging descriptions", async (t) => {
+test("distinguishes rejected clients and unexpected OAuth errors", async (t) => {
   for (const [error, status, expected] of [
     ["invalid_client", 401, "OIDC_CLIENT_REJECTED"],
+    ["invalid_client", 200, "OIDC_CLIENT_REJECTED"],
     ["invalid_request", 400, "TOKEN_PROBE_UNEXPECTED_RESPONSE"],
     [sensitive, 400, "TOKEN_PROBE_UNEXPECTED_RESPONSE"],
   ]) {
@@ -157,7 +240,7 @@ test("sanitizes network, HTTP, content type, invalid JSON and oversized response
   }
 });
 
-test("rejects partial credentials and noncanonical callback origins before any request", async () => {
+test("rejects partial credentials and noncanonical callback origins", async () => {
   for (const input of [
     { clientId: "123" },
     { ...credentials, clientSecret: "" },
