@@ -155,7 +155,8 @@ export function preserveMergeAwardsStatement(
     clueSql: "e.clue_player_id = (SELECT player_id FROM sessions WHERE id = ?)",
     bindings: [replacementSessionId, replacementSessionId],
   };
-  return db.prepare(`WITH candidates AS MATERIALIZED (
+  return db
+    .prepare(`WITH candidates AS MATERIALIZED (
       SELECT * FROM (${progressQuery(playerScope, "1 = 1")})
       UNION ALL
       SELECT * FROM (${progressQuery(guestScope, "1 = 1")})
@@ -180,12 +181,7 @@ export function preserveMergeAwardsStatement(
       assistance_count = excluded.assistance_count,
       legacy_solved = excluded.legacy_solved
     WHERE excluded.earned_points > merged_puzzle_awards.earned_points`)
-    .bind(
-      ...playerScope.bindings,
-      ...guestScope.bindings,
-      replacementSessionId,
-      guestSessionId,
-    );
+    .bind(...playerScope.bindings, ...guestScope.bindings, replacementSessionId, guestSessionId);
 }
 
 function toProgress(row: ProgressQueryRow): GameProgressRow {
