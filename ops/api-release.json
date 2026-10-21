@@ -1,4 +1,4 @@
 {
-  "release": "2026-10-21-telegram-oidc-response-compatibility",
-  "reason": "Handle Telegram OAuth errors returned with HTTP 200 and verify callback recovery"
+  "release": "2026-10-21-telegram-oidc-worker-fetch",
+  "reason": "Use the native Worker fetch receiver and reject redirects without unsupported options"
 }

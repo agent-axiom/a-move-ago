@@ -76,11 +76,34 @@ function jsonTokens(idToken: string, init: ResponseInit = {}): Response {
 }
 
 describe("Telegram OIDC provider", () => {
+  it("reaches Telegram through native Workers fetch with the default dependencies", async () => {
+    // vitest.config.ts intercepts outbound I/O, without replacing globalThis.fetch.
+    await expect(
+      exchangeAndVerifyTelegramCode({ ...validInput, code: "native-fetch-invalid-grant" }),
+    ).rejects.toMatchObject({
+      code: "OIDC_PROVIDER_ERROR",
+      diagnostic: { stage: "token_http", status: 200, oauthError: "invalid_grant" },
+    });
+  });
+
+  it.each([301, 302, 303, 307, 308])(
+    "rejects an HTTP %i token redirect without following it in native Workers fetch",
+    async (status) => {
+      // Following Location hits the rejecting outbound fixture and becomes token_network.
+      await expect(
+        exchangeAndVerifyTelegramCode({ ...validInput, code: `native-fetch-redirect-${status}` }),
+      ).rejects.toMatchObject({
+        code: "OIDC_PROVIDER_ERROR",
+        diagnostic: { stage: "token_http", status },
+      });
+    },
+  );
+
   it("uses the fixed token endpoint and client_secret_basic, then discards the access token", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (url, init) => {
       expect(url).toBe("https://oauth.telegram.org/token");
       expect(init?.method).toBe("POST");
-      expect(init?.redirect).toBe("error");
+      expect(init?.redirect).toBe("manual");
       expect(init?.headers).toMatchObject({
         authorization: `Basic ${btoa(`${clientId}:test-client-secret`)}`,
         "content-type": "application/x-www-form-urlencoded",

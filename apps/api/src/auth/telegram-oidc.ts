@@ -226,11 +226,14 @@ export async function exchangeAndVerifyTelegramCode(
     client_id: parsedInput.data.clientId,
     code_verifier: parsedInput.data.verifier,
   });
+  // Native Workers fetch rejects an unrelated receiver such as the dependencies object.
+  const request = dependencies.fetch;
   let response: Response;
   try {
-    response = await dependencies.fetch(tokenEndpoint, {
+    response = await request(tokenEndpoint, {
       method: "POST",
-      redirect: "error",
+      // Workers supports manual/follow only; never forward client credentials to a redirect.
+      redirect: "manual",
       signal: AbortSignal.timeout(10_000),
       headers: {
         authorization: clientSecretBasic(parsedInput.data.clientId, parsedInput.data.clientSecret),
@@ -240,6 +243,9 @@ export async function exchangeAndVerifyTelegramCode(
     });
   } catch {
     throw providerError("token_network");
+  }
+  if (response.status >= 300 && response.status < 400) {
+    throw providerError("token_http", { status: response.status });
   }
   let payload: unknown;
   try {
