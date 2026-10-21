@@ -35,6 +35,8 @@ const migrations = await Promise.all(
     "0002_telegram_auth",
     "0003_content_localizations",
     "0004_gameplay_progress",
+    "0005_puzzle_feedback",
+    "0006_merged_puzzle_awards",
   ].map((name) =>
     readFile(new URL(`../../apps/api/migrations/${name}.sql`, import.meta.url), "utf8"),
   ),
@@ -113,7 +115,7 @@ function fixture({ legacy } = {}) {
       .run(attemptId, level, now);
   }
   legacy?.({ sql, attempt, hint });
-  sql.exec(migrations[3]);
+  for (const migration of migrations.slice(3)) sql.exec(migration);
   const db = {
     async batch(statements) {
       sql.exec("BEGIN");
@@ -322,7 +324,7 @@ test("legacy solved puzzles remain unrated and old failed attempts preserve clue
   }
 });
 
-test("guest link merges chronology and duplicate clue events without double awards or lost penalty", async () => {
+test("guest link preserves the best earned award while merging chronology and duplicate clues", async () => {
   const f = fixture();
   try {
     await f.clue();
@@ -339,14 +341,15 @@ test("guest link merges chronology and duplicate clue events without double awar
       )
       .run(now + 3600);
     f.sql.exec("BEGIN");
+    await gameplay.preserveMergeAwardsStatement(f.db, "g1", "replacement").run();
     f.sql.exec("UPDATE attempts SET player_id='p1' WHERE session_id='g1' AND player_id IS NULL");
     await gameplay.transferClueStatement(f.db, "g1", "replacement", null).run();
     f.sql.exec("UPDATE sessions SET revoked_at=1 WHERE id='g1'; COMMIT");
     const state = await f.progress(player());
-    assert.equal(state.earnedPoints, 50);
-    assert.equal(state.assistanceCount, 1);
+    assert.equal(state.earnedPoints, 100);
+    assert.equal(state.assistanceCount, 0);
     assert.equal(state.attemptCount, 1);
-    assert.equal(await gameplay.readTotalPoints(f.db, player()), 50);
+    assert.equal(await gameplay.readTotalPoints(f.db, player()), 100);
     assert.equal(
       f.sql
         .prepare(
@@ -357,7 +360,7 @@ test("guest link merges chronology and duplicate clue events without double awar
     );
     assert.equal((await f.progress()).earnedPoints, null);
     f.sql.exec("DELETE FROM sessions WHERE id='g1'");
-    assert.equal((await f.progress(player())).earnedPoints, 50);
+    assert.equal((await f.progress(player())).earnedPoints, 100);
     f.sql.exec("DELETE FROM players WHERE id='p1'");
     assert.equal(await gameplay.readTotalPoints(f.db, player()), 0);
     assert.equal(f.sql.prepare("SELECT count(*) AS n FROM gameplay_events").get().n, 0);

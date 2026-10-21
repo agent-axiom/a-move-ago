@@ -32,6 +32,7 @@ function reordered(raw: string): string {
 async function expectProofCode(
   promise: Promise<unknown>,
   code: "TELEGRAM_PROOF_INVALID" | "TELEGRAM_PROOF_EXPIRED",
+  stage?: TelegramProofError["stage"],
 ): Promise<void> {
   try {
     await promise;
@@ -39,6 +40,7 @@ async function expectProofCode(
   } catch (error) {
     expect(error).toBeInstanceOf(TelegramProofError);
     expect(error).toMatchObject({ code, message: code, name: "TelegramProofError" });
+    if (stage !== undefined) expect(error).toMatchObject({ stage });
   }
 }
 
@@ -83,6 +85,50 @@ describe("Telegram Mini App proof", () => {
       verifyMiniAppInitData(params.toString(), options),
       "TELEGRAM_PROOF_INVALID",
     );
+  });
+
+  it.each([
+    { id: 987654321, first_name: "Ada" },
+    { id: 987654321, first_name: "Ada", last_name: "" },
+    { id: 987654321, first_name: "Ada", last_name: "", username: "", photo_url: "" },
+  ])("normalizes absent or empty optional Telegram profile fields", async (user) => {
+    const raw = await signedMiniAppData({ botToken, authDate: now, user });
+
+    await expect(verifyMiniAppInitData(raw, options)).resolves.toEqual({
+      telegramUserId: "987654321",
+      displayName: "Ada",
+      username: null,
+      avatarUrl: null,
+    });
+  });
+
+  it("still authenticates empty optional fields as part of the original signed user", async () => {
+    const raw = await signedMiniAppData({ botToken, authDate: now });
+    const params = new URLSearchParams(raw);
+    params.set("user", JSON.stringify({ ...defaultWebAppUser, last_name: "" }));
+
+    await expectProofCode(
+      verifyMiniAppInitData(params.toString(), options),
+      "TELEGRAM_PROOF_INVALID",
+    );
+  });
+
+  it.each([
+    { first_name: "" },
+    { last_name: null },
+    { last_name: 123 },
+    { username: null },
+    { username: false },
+    { photo_url: null },
+    { photo_url: 123 },
+  ])("rejects missing required names and invalid optional field types", async (overrides) => {
+    const raw = await signedMiniAppData({
+      botToken,
+      authDate: now,
+      user: { ...defaultWebAppUser, ...overrides },
+    });
+
+    await expectProofCode(verifyMiniAppInitData(raw, options), "TELEGRAM_PROOF_INVALID", "profile");
   });
 
   const invalidRawCases: RawCase[] = [
@@ -159,17 +205,20 @@ describe("Telegram Mini App proof", () => {
     await expectProofCode(verifyMiniAppInitData(raw, options), "TELEGRAM_PROOF_INVALID");
   });
 
-  it.each(["javascript:alert(1)", "data:image/png;base64,AAAA", "ftp://example.test/a"])(
-    "rejects a non-HTTP profile URL: %s",
-    async (photoUrl) => {
-      const raw = await signedMiniAppData({
-        botToken,
-        authDate: now,
-        user: { ...defaultWebAppUser, photo_url: photoUrl },
-      });
-      await expectProofCode(verifyMiniAppInitData(raw, options), "TELEGRAM_PROOF_INVALID");
-    },
-  );
+  it.each([
+    "javascript:alert(1)",
+    "data:image/png;base64,AAAA",
+    "ftp://example.test/a",
+    "not-a-url",
+    " ",
+  ])("rejects a non-HTTP profile URL: %s", async (photoUrl) => {
+    const raw = await signedMiniAppData({
+      botToken,
+      authDate: now,
+      user: { ...defaultWebAppUser, photo_url: photoUrl },
+    });
+    await expectProofCode(verifyMiniAppInitData(raw, options), "TELEGRAM_PROOF_INVALID");
+  });
 
   it("accepts exact age and future-skew boundaries and rejects one second beyond them", async () => {
     const ageBoundary = await signedMiniAppData({ botToken, authDate: now - 3600 });
@@ -179,12 +228,21 @@ describe("Telegram Mini App proof", () => {
 
     await expect(verifyMiniAppInitData(ageBoundary, options)).resolves.toBeDefined();
     await expect(verifyMiniAppInitData(futureBoundary, options)).resolves.toBeDefined();
-    await expectProofCode(verifyMiniAppInitData(expired, options), "TELEGRAM_PROOF_EXPIRED");
-    await expectProofCode(verifyMiniAppInitData(future, options), "TELEGRAM_PROOF_INVALID");
+    await expectProofCode(
+      verifyMiniAppInitData(expired, options),
+      "TELEGRAM_PROOF_EXPIRED",
+      "expired",
+    );
+    await expectProofCode(
+      verifyMiniAppInitData(future, options),
+      "TELEGRAM_PROOF_INVALID",
+      "future",
+    );
 
     await expectProofCode(
       verifyMiniAppInitData(withHash(expired, "f".repeat(64)), options),
       "TELEGRAM_PROOF_INVALID",
+      "signature",
     );
   });
 
@@ -214,6 +272,7 @@ describe("Telegram Mini App proof", () => {
       await expectProofCode(
         verifyMiniAppInitData(forged, { ...options, ...override } as typeof options),
         "TELEGRAM_PROOF_INVALID",
+        "configuration",
       );
     },
   );
@@ -231,7 +290,7 @@ describe("Telegram Mini App proof", () => {
       expect(serialized).not.toContain(raw);
       expect(serialized).not.toContain("987654321");
       expect(serialized).toBe(
-        'TelegramProofError: TELEGRAM_PROOF_INVALID {"code":"TELEGRAM_PROOF_INVALID","name":"TelegramProofError"}',
+        'TelegramProofError: TELEGRAM_PROOF_INVALID {"code":"TELEGRAM_PROOF_INVALID","stage":"input","name":"TelegramProofError"}',
       );
     }
   });

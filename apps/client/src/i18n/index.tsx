@@ -182,7 +182,18 @@ const systemMessages: Readonly<Record<string, TranslationKey>> = {
   "Telegram sign-in was cancelled. Guest progress is still available.": "shell.telegramCancelled",
 };
 
-export function localizedSystemMessage(message: string, locale: Locale, t: Translate): string {
-  const key = systemMessages[message];
+const systemErrorCodes = new Map<string, TranslationKey>([
+  ["TELEGRAM_PROOF_EXPIRED", "shell.telegramMiniAppExpired"],
+  ["TELEGRAM_PROOF_INVALID", "shell.telegramMiniAppInvalid"],
+  ["RATE_LIMITED", "shell.dailyRateLimit"],
+]);
+
+export function localizedSystemMessage(
+  message: string,
+  locale: Locale,
+  t: Translate,
+  errorCode?: string,
+): string {
+  const key = systemErrorCodes.get(errorCode ?? "") ?? systemMessages[message];
   return key ? t(key) : locale === "en" ? message : t("shell.operationFailed");
 }

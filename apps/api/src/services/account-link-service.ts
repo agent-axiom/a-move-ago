@@ -6,7 +6,7 @@ import {
   claimHandoffForSession,
   findClaimableHandoff,
 } from "../db/auth-flows";
-import { transferClueStatement } from "../db/gameplay";
+import { preserveMergeAwardsStatement, transferClueStatement } from "../db/gameplay";
 import { findPlayer, prepareMiniAppPlayerUpsert, toTelegramProfile } from "../db/players";
 import type { Env, SessionActor } from "../env";
 import { ApiError } from "../http/api-error";
@@ -102,6 +102,7 @@ export async function linkGuestToPlayer(
             AND s.revoked_at IS NULL
             AND s.expires_at > unixepoch()`,
       ).bind(sessionId, tokenHash, now, expiresAt, now, identity.telegramUserId, guest.sessionId),
+      preserveMergeAwardsStatement(env.DB, guest.sessionId, sessionId),
       env.DB.prepare(
         `UPDATE attempts
             SET player_id = (SELECT id FROM players WHERE telegram_user_id = ?)
@@ -189,13 +190,13 @@ export async function linkGuestToPlayer(
       ),
     ]);
 
-    if (results.length !== 6) {
+    if (results.length !== 7) {
       throw new Error("Account link transaction returned an unexpected result count.");
     }
     const playerResult = results[0];
     const insertResult = results[1];
-    const revokeResult = results[4];
-    const guardResult = results[5];
+    const revokeResult = results[5];
+    const guardResult = results[6];
     if (
       !playerResult ||
       !insertResult ||
@@ -361,6 +362,7 @@ export async function exchangeHandoffAndLinkGuest(
         input.channel,
         now,
       ),
+      preserveMergeAwardsStatement(env.DB, guest.sessionId, replacementSessionId),
       env.DB.prepare(
         `UPDATE attempts
             SET player_id = ?
@@ -517,13 +519,13 @@ export async function exchangeHandoffAndLinkGuest(
     );
   }
 
-  if (results?.length !== 6) {
+  if (results?.length !== 7) {
     throw new Error("Handoff transaction returned an unexpected result count.");
   }
   const claimResult = results[0];
   const insertResult = results[1];
-  const revokeResult = results[4];
-  const guardResult = results[5];
+  const revokeResult = results[5];
+  const guardResult = results[6];
   if (
     !claimResult ||
     !insertResult ||

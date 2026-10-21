@@ -149,6 +149,26 @@ it("localizes session errors and uses a translated fallback for unknown server m
   expect(localizedSystemMessage("Unknown service error", "en", ru)).toBe("Unknown service error");
 });
 
+it.each(["en", "ru", "zh"] as const)(
+  "uses Mini App error codes for recovery instructions in %s",
+  (locale) => {
+    const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+    const originalMessage = "Telegram proof is invalid or expired.";
+    expect(localizedSystemMessage(originalMessage, locale, t, "TELEGRAM_PROOF_EXPIRED")).toBe(
+      t("shell.telegramMiniAppExpired"),
+    );
+    expect(localizedSystemMessage(originalMessage, locale, t, "TELEGRAM_PROOF_INVALID")).toBe(
+      t("shell.telegramMiniAppInvalid"),
+    );
+    expect(localizedSystemMessage("Changed server wording.", locale, t, "RATE_LIMITED")).toBe(
+      t("shell.dailyRateLimit"),
+    );
+    expect(localizedSystemMessage(originalMessage, locale, t, "UNKNOWN_ERROR")).toBe(
+      locale === "en" ? originalMessage : t("shell.operationFailed"),
+    );
+  },
+);
+
 it("provides every message and interpolation in all three dictionaries", () => {
   for (const catalog of [shellMessages, gameMessages]) {
     const englishKeys = Object.keys(catalog.en).sort();

@@ -115,6 +115,75 @@ function zeroProgress(): GameProgressRow {
   };
 }
 
+function resolvedProgressQuery(
+  scope: ActorEventScope,
+  puzzlePredicate: string,
+  linked: boolean,
+): string {
+  const query = progressQuery(scope, puzzlePredicate);
+  if (!linked) return query;
+  // Player scopes bind the player ID first. Reuse ?1 to retain the 100-parameter limit.
+  const better = "m.earned_points >= COALESCE(p.earned_points, -1)";
+  return `SELECT p.puzzle_id,
+    CASE WHEN ${better} THEN m.attempt_count ELSE p.attempt_count END AS attempt_count,
+    CASE WHEN ${better} THEN m.assistance_count ELSE p.assistance_count END AS assistance_count,
+    p.clue_unlocked, p.highest_hint_level,
+    CASE WHEN ${better} THEN m.earned_points ELSE p.earned_points END AS earned_points,
+    CASE WHEN ${better} THEN 0 ELSE p.next_attempt_points END AS next_attempt_points,
+    CASE WHEN ${better} THEN m.legacy_solved ELSE p.legacy_solved END AS legacy_solved,
+    CASE WHEN ${better} THEN m.award_attempt_id ELSE p.award_attempt_id END AS award_attempt_id
+    FROM (${query}) p
+    LEFT JOIN merged_puzzle_awards m ON m.player_id = ?1 AND m.puzzle_id = p.puzzle_id`;
+}
+
+// Run after the replacement session is inserted and BEFORE moving attempts or clues,
+// inside the same guarded D1 batch. Otherwise each side's earned score is lost on merge.
+export function preserveMergeAwardsStatement(
+  db: D1Database,
+  guestSessionId: string,
+  replacementSessionId: string,
+): D1PreparedStatement {
+  const guestScope: ActorEventScope = {
+    sql: "",
+    attemptSql: "a.session_id = ? AND a.player_id IS NULL",
+    clueSql: "e.clue_session_id = ? AND e.clue_player_id IS NULL",
+    bindings: [guestSessionId, guestSessionId],
+  };
+  const playerScope: ActorEventScope = {
+    sql: "",
+    attemptSql: "a.player_id = (SELECT player_id FROM sessions WHERE id = ?)",
+    clueSql: "e.clue_player_id = (SELECT player_id FROM sessions WHERE id = ?)",
+    bindings: [replacementSessionId, replacementSessionId],
+  };
+  return db
+    .prepare(`WITH candidates AS MATERIALIZED (
+      SELECT * FROM (${progressQuery(playerScope, "1 = 1")})
+      UNION ALL
+      SELECT * FROM (${progressQuery(guestScope, "1 = 1")})
+    )
+    INSERT INTO merged_puzzle_awards
+      (player_id, puzzle_id, award_attempt_id, earned_points,
+       attempt_count, assistance_count, legacy_solved)
+    SELECT r.player_id, c.puzzle_id, c.award_attempt_id, c.earned_points,
+           c.attempt_count, c.assistance_count, c.legacy_solved
+      FROM candidates c
+      JOIN sessions r ON r.id = ?
+      JOIN sessions original ON original.id = r.rotated_from_session_id
+     WHERE original.id = ? AND original.kind = 'guest' AND original.player_id IS NULL
+       AND original.revoked_at IS NULL AND original.expires_at > unixepoch()
+       AND r.kind = 'telegram' AND r.player_id IS NOT NULL
+       AND r.channel = original.channel AND r.revoked_at IS NULL
+       AND r.expires_at > unixepoch() AND c.award_attempt_id IS NOT NULL
+    ON CONFLICT(player_id, puzzle_id) DO UPDATE SET
+      award_attempt_id = excluded.award_attempt_id,
+      earned_points = excluded.earned_points,
+      attempt_count = excluded.attempt_count,
+      assistance_count = excluded.assistance_count,
+      legacy_solved = excluded.legacy_solved
+    WHERE excluded.earned_points > merged_puzzle_awards.earned_points`)
+    .bind(...playerScope.bindings, ...guestScope.bindings, replacementSessionId, guestSessionId);
+}
+
 function toProgress(row: ProgressQueryRow): GameProgressRow {
   return {
     attemptCount: row.attempt_count,
@@ -144,7 +213,13 @@ export async function readGameProgress(
   if (ids.length === 0) return progress;
   const scope = actorEventScope(actor);
   const result = await db
-    .prepare(progressQuery(scope, `e.puzzle_id IN (${ids.map(() => "?").join(", ")})`))
+    .prepare(
+      resolvedProgressQuery(
+        scope,
+        `e.puzzle_id IN (${ids.map(() => "?").join(", ")})`,
+        actor.kind === "telegram",
+      ),
+    )
     .bind(...scope.bindings, ...ids)
     .all<ProgressQueryRow>();
   for (const row of result.results) progress.set(row.puzzle_id, toProgress(row));
@@ -156,7 +231,7 @@ export async function readTotalPoints(db: D1Database, actor: SessionActor): Prom
   const row = await db
     .prepare(
       `SELECT COALESCE(SUM(earned_points), 0) AS total_points
-         FROM (${progressQuery(scope, "1 = 1")})`,
+         FROM (${resolvedProgressQuery(scope, "1 = 1", actor.kind === "telegram")})`,
     )
     .bind(...scope.bindings)
     .first<{ total_points: number }>();

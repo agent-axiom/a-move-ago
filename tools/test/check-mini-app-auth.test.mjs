@@ -111,6 +111,37 @@ test("rejects foreign workers, other routes and malformed diagnostic fields", as
   assertSafe(result);
 });
 
+test("projects known proof stages and discards unknown stages without losing status", async () => {
+  const stages = ["configuration", "input", "signature", "future", "expired", "profile", "unknown"];
+  const result = await harness({
+    events: [
+      ...stages.map((stage) =>
+        event({
+          ...diagnostic,
+          event: "telegram_mini_app_failure",
+          code: "TELEGRAM_PROOF_INVALID",
+          stage,
+          initData: sensitive,
+          profile: { name: sensitive },
+        }),
+      ),
+      event({ ...diagnostic, stage: sensitive }),
+      event({ ...diagnostic, stage: { message: sensitive } }),
+      event(diagnostic),
+    ],
+  }).run();
+  assert.equal(result.count, stages.length + 3);
+  assert.deepEqual(
+    result.entries.slice(0, stages.length).map((item) => item.stage),
+    stages,
+  );
+  for (const item of result.entries.slice(stages.length)) {
+    assert.equal(Object.hasOwn(item, "stage"), false);
+    assert.equal(item.status, 401);
+  }
+  assertSafe(result);
+});
+
 test("rejects invalid telemetry configuration before network access", async () => {
   for (const input of [{}, { ...config, accountId: "../escape" }, { ...config, apiToken: "" }]) {
     const check = harness();

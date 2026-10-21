@@ -269,7 +269,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             tag: "auth-error",
             me: previous,
             message: apiError?.message ?? "Telegram sign-in did not finish.",
-            ...(apiError ? { requestId: apiError.requestId } : {}),
+            ...(apiError ? { requestId: apiError.requestId, errorCode: apiError.code } : {}),
           });
         } finally {
           finishAction(action);

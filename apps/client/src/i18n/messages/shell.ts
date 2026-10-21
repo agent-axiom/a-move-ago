@@ -133,6 +133,10 @@ const en = {
     "Telegram return expired or was already consumed. Start Save progress again.",
   "shell.guestStartupFailed": "Could not start a guest session.",
   "shell.telegramIncomplete": "Telegram sign-in did not finish.",
+  "shell.telegramMiniAppExpired":
+    "Telegram sign-in expired. Close and reopen the game in Telegram, then try again. Your guest progress is saved.",
+  "shell.telegramMiniAppInvalid":
+    "Telegram sign-in could not be verified. Close and reopen the game in Telegram, then try again. Your guest progress is saved.",
   "shell.telegramRetry":
     "Telegram sign-in could not be exchanged. Retry when the connection recovers.",
   "shell.telegramCancelled": "Telegram sign-in was cancelled. Guest progress is still available.",
@@ -277,6 +281,10 @@ const ru = {
     "Ссылка возврата из Telegram истекла или уже использована. Снова выберите сохранение прогресса.",
   "shell.guestStartupFailed": "Не удалось начать гостевую сессию.",
   "shell.telegramIncomplete": "Вход через Telegram не завершён.",
+  "shell.telegramMiniAppExpired":
+    "Срок подтверждения Telegram истёк. Закройте игру и откройте её снова в Telegram, затем повторите вход. Гостевой прогресс сохранён.",
+  "shell.telegramMiniAppInvalid":
+    "Не удалось подтвердить вход. Закройте игру и откройте её снова в Telegram, затем повторите вход. Гостевой прогресс сохранён.",
   "shell.telegramRetry":
     "Не удалось завершить вход через Telegram. Повторите попытку после восстановления связи.",
   "shell.telegramCancelled": "Вход через Telegram отменён. Гостевой прогресс сохранён.",
@@ -433,6 +441,10 @@ const zh = {
   "shell.telegramExpired": "Telegram 返回链接已过期或已使用。请重新开始保存进度。",
   "shell.guestStartupFailed": "无法启动访客会话。",
   "shell.telegramIncomplete": "Telegram 登录未完成。",
+  "shell.telegramMiniAppExpired":
+    "Telegram 登录验证已过期。请关闭游戏后在 Telegram 中重新打开，再次登录。访客进度已保留。",
+  "shell.telegramMiniAppInvalid":
+    "无法验证 Telegram 登录。请关闭游戏后在 Telegram 中重新打开，再次登录。访客进度已保留。",
   "shell.telegramRetry": "无法完成 Telegram 登录交换。连接恢复后请重试。",
   "shell.telegramCancelled": "Telegram 登录已取消。访客进度仍然可用。",
   "shell.operationFailed": "无法完成请求。请重试。",

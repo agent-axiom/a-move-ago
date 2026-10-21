@@ -34,6 +34,21 @@ miniAppAuth.post("/", requireSession, requireAllowedMutationOrigin, async (conte
     return context.json(await linkGuestToPlayer(context.env, guest, identity, now));
   } catch (error) {
     if (error instanceof TelegramProofError) {
+      try {
+        console.log(
+          JSON.stringify({
+            event: "telegram_mini_app_failure",
+            requestId: context.get("requestId"),
+            path: "/v1/auth/telegram/mini-app",
+            status: 401,
+            sessionKind: "guest",
+            code: error.code,
+            stage: error.stage,
+          }),
+        );
+      } catch {
+        // Diagnostics must never interfere with the authentication response.
+      }
       throw new ApiError(401, error.code, "Telegram proof is invalid or expired.");
     }
     throw error;

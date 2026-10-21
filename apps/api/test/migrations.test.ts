@@ -18,6 +18,7 @@ const gameplayTables = [
   "puzzle_localizations",
   "gameplay_events",
   "puzzle_feedback",
+  "merged_puzzle_awards",
 ];
 const digest = "a".repeat(64);
 const migrationNames = [
@@ -26,6 +27,7 @@ const migrationNames = [
   { name: "0003_content_localizations.sql" },
   { name: "0004_gameplay_progress.sql" },
   { name: "0005_puzzle_feedback.sql" },
+  { name: "0006_merged_puzzle_awards.sql" },
 ];
 const testEnv = env as Env & { TEST_MIGRATIONS: D1Migration[] };
 type SqlCase = [sql: string, values?: unknown[]];
