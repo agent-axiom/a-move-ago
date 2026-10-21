@@ -149,6 +149,7 @@ export async function completeOidcCallback(input: {
   state: string;
   code: string;
   now: number;
+  requestId?: string;
 }): Promise<string> {
   const expiresAt = handoffExpiry(input.env, input.now);
   resolveAuthReturnTarget(input.env, "web");
@@ -191,6 +192,21 @@ export async function completeOidcCallback(input: {
     return fixedReturnUrl(input.env, flow.channel, { handoff: handoffCode });
   } catch (error) {
     if (error instanceof OidcProviderError) {
+      try {
+        console.log(
+          JSON.stringify({
+            event: "telegram_oidc_failure",
+            requestId: input.requestId,
+            code: error.code,
+            ...error.diagnostic,
+          }),
+        );
+      } catch {
+        // Diagnostics must never interfere with the login response.
+      }
+      if (flow.channel === "web") {
+        return fixedReturnUrl(input.env, "web", { authError: "login_failed" });
+      }
       throw new ApiError(
         error.code === "OIDC_PROVIDER_ERROR" ? 503 : 401,
         error.code,

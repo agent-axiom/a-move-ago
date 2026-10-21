@@ -232,4 +232,69 @@ describe("Telegram OIDC provider", () => {
     ).rejects.toMatchObject({ code: "OIDC_PROVIDER_ERROR" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("retains only an allowlisted OAuth error and HTTP status for diagnostics", async () => {
+    for (const oauthError of ["invalid_client", "invalid_grant", "secret-provider-detail"]) {
+      const fetchMock = vi.fn<typeof fetch>(async () =>
+        Response.json(
+          {
+            error: oauthError,
+            error_description: "secret-provider-detail",
+            id_token: "secret-token",
+          },
+          { status: 401 },
+        ),
+      );
+      const failure = exchangeAndVerifyTelegramCode(validInput, { fetch: fetchMock, jwks });
+      await expect(failure).rejects.toMatchObject({
+        code: "OIDC_PROVIDER_ERROR",
+        diagnostic: {
+          stage: "token_http",
+          status: 401,
+          ...(oauthError === "secret-provider-detail" ? {} : { oauthError }),
+        },
+      });
+      try {
+        await failure;
+      } catch (error) {
+        expect(JSON.stringify(error)).not.toContain("secret-provider-detail");
+        expect(JSON.stringify(error)).not.toContain("secret-token");
+        expect(JSON.stringify(error)).not.toContain(validInput.clientSecret);
+      }
+    }
+  });
+
+  it("distinguishes transport, response parsing and JWKS failure stages", async () => {
+    const cases: [typeof fetch, JWTVerifyGetKey, string][] = [
+      [
+        async () => {
+          throw new Error("private network detail");
+        },
+        jwks,
+        "token_network",
+      ],
+      [async () => new Response("private HTML"), jwks, "token_content_type"],
+      [
+        async () => new Response("{", { headers: { "content-type": "application/json" } }),
+        jwks,
+        "token_json",
+      ],
+      [async () => Response.json({ access_token: "private token" }), jwks, "token_schema"],
+      [
+        async () => jsonTokens(await token()),
+        async () => {
+          throw new joseErrors.JWKSTimeout();
+        },
+        "jwks",
+      ],
+    ];
+    for (const [fetchMock, getKey, stage] of cases) {
+      await expect(
+        exchangeAndVerifyTelegramCode(validInput, { fetch: fetchMock, jwks: getKey }),
+      ).rejects.toMatchObject({
+        code: "OIDC_PROVIDER_ERROR",
+        diagnostic: { stage },
+      });
+    }
+  });
 });

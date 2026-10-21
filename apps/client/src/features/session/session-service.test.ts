@@ -9,6 +9,7 @@ import {
   retryHandoff,
   saveProgress,
   TelegramAuthDeniedError,
+  TelegramAuthFailedError,
 } from "./session-service";
 
 const handoffCode = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
@@ -164,21 +165,24 @@ describe("session service", () => {
     expect(runtime.token.get()).toBe("telegram-token");
   });
 
-  it("does not downgrade a restored Telegram session for a stale denial", async () => {
-    const runtime = runtimeFixture({ storedToken: "telegram-token", platformKind: "web" });
-    runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
+  it.each(["access_denied", "login_failed"])(
+    "does not downgrade a restored Telegram session for a stale %s return",
+    async (authError) => {
+      const runtime = runtimeFixture({ storedToken: "telegram-token", platformKind: "web" });
+      runtime.api.getMe = vi.fn(async () => ({ kind: "telegram" as const, profile }));
 
-    await expect(
-      bootstrapSession(
-        runtime,
-        new URL("https://app.test/a-move-ago/?authError=access_denied"),
-        vi.fn(),
-      ),
-    ).resolves.toEqual({ kind: "telegram", profile });
+      await expect(
+        bootstrapSession(
+          runtime,
+          new URL(`https://app.test/a-move-ago/?authError=${authError}`),
+          vi.fn(),
+        ),
+      ).resolves.toEqual({ kind: "telegram", profile });
 
-    expect(runtime.api.exchangeHandoff).not.toHaveBeenCalled();
-    expect(runtime.token.get()).toBe("telegram-token");
-  });
+      expect(runtime.api.exchangeHandoff).not.toHaveBeenCalled();
+      expect(runtime.token.get()).toBe("telegram-token");
+    },
+  );
 
   it("clears a stored token only when getMe returns 401 and installs a fresh guest", async () => {
     const runtime = runtimeFixture({ storedToken: "expired-token", platformKind: "web" });
@@ -431,6 +435,32 @@ describe("session service", () => {
     expect((error as TelegramAuthDeniedError).me).toEqual({ kind: "guest", profile: null });
     expect(replace).toHaveBeenCalledWith("/a-move-ago/?case=2026-08-03");
     expect(runtime.api.exchangeHandoff).not.toHaveBeenCalled();
+    expect(runtime.token.get()).toBe("guest-token");
+  });
+
+  it("consumes a failed web login return while retaining the guest and selected case", async () => {
+    const runtime = runtimeFixture({ storedToken: "guest-token", platformKind: "web" });
+    const replace = vi.fn();
+    runtime.platform.tokenStore.read = vi.fn(async () => {
+      expect(replace).toHaveBeenCalledWith("/a-move-ago/?case=2026-08-03#board");
+      return "guest-token";
+    });
+
+    const error = await bootstrapSession(
+      runtime,
+      new URL("https://app.test/a-move-ago/?case=2026-08-03&authError=login_failed#board"),
+      replace,
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(TelegramAuthFailedError);
+    expect(error).toMatchObject({
+      me: { kind: "guest", profile: null },
+      message: "Telegram sign-in did not finish.",
+    });
+    expect(runtime.api.exchangeHandoff).not.toHaveBeenCalled();
+    expect(runtime.api.createGuest).not.toHaveBeenCalled();
+    expect(runtime.platform.tokenStore.write).not.toHaveBeenCalled();
+    expect(runtime.platform.tokenStore.clear).not.toHaveBeenCalled();
     expect(runtime.token.get()).toBe("guest-token");
   });
 

@@ -1,7 +1,7 @@
 export interface EntryQuery {
   caseDate: string | null;
   handoff: string | null;
-  authError: "access_denied" | null;
+  authError: "access_denied" | "login_failed" | null;
 }
 
 function validDate(value: string | null): value is string {
@@ -22,7 +22,7 @@ export function parseEntryQuery(url: URL): EntryQuery {
   return {
     caseDate: validDate(caseDate) ? caseDate : null,
     handoff: handoff && /^[A-Za-z0-9_-]{43}$/.test(handoff) ? handoff : null,
-    authError: authError === "access_denied" ? authError : null,
+    authError: authError === "access_denied" || authError === "login_failed" ? authError : null,
   };
 }
 

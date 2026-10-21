@@ -17,6 +17,7 @@ import {
   RetryableHandoffError,
   saveProgress,
   TelegramAuthDeniedError,
+  TelegramAuthFailedError,
 } from "./session-service";
 import type { SessionState } from "./session-state";
 
@@ -46,7 +47,7 @@ function authReturnKey(source: URL): string {
 }
 
 function sessionFailure(error: unknown, setState: (state: SessionState) => void): void {
-  if (error instanceof TelegramAuthDeniedError) {
+  if (error instanceof TelegramAuthDeniedError || error instanceof TelegramAuthFailedError) {
     setState({ tag: "auth-error", me: error.me, message: error.message });
     return;
   }
@@ -250,6 +251,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const action = beginAction();
         if (!action) return;
         handledReturnKeysRef.current.delete("auth-error:access_denied");
+        handledReturnKeysRef.current.delete("auth-error:login_failed");
         handledReturnKeysRef.current.delete("invalid-auth-return");
         const previous = state.me;
         setState({ tag: "authenticating", me: previous });

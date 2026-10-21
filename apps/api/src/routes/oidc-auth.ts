@@ -100,6 +100,7 @@ export function createTelegramOidcRoutes(provider: TelegramOidcProvider) {
       state: parsed.state,
       code: parsed.code,
       now,
+      requestId: context.get("requestId"),
     });
     return context.redirect(location, 302);
   });

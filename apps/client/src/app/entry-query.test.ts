@@ -58,10 +58,21 @@ describe("entry query", () => {
     });
   });
 
-  it("allowlists only the fixed provider denial", () => {
+  it("allowlists only fixed denial and login failure values", () => {
     expect(parseEntryQuery(new URL("https://x.test/?authError=access_denied")).authError).toBe(
       "access_denied",
     );
+    expect(parseEntryQuery(new URL("https://x.test/?authError=login_failed")).authError).toBe(
+      "login_failed",
+    );
+    expect(
+      parseEntryQuery(new URL("https://x.test/?authError=login_failed&authError=login_failed"))
+        .authError,
+    ).toBeNull();
+    expect(
+      parseEntryQuery(new URL("https://x.test/?authError=login_failed&authError=access_denied"))
+        .authError,
+    ).toBeNull();
     expect(parseEntryQuery(new URL("https://x.test/?authError=server_error")).authError).toBeNull();
     expect(parseEntryQuery(new URL("https://x.test/?authError=")).authError).toBeNull();
   });
