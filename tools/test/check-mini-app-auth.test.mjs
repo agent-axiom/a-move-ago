@@ -131,7 +131,10 @@ test("projects known proof stages and discards unknown stages without losing sta
     ],
   }).run();
   assert.equal(result.count, stages.length + 3);
-  assert.deepEqual(result.entries.slice(0, stages.length).map((item) => item.stage), stages);
+  assert.deepEqual(
+    result.entries.slice(0, stages.length).map((item) => item.stage),
+    stages,
+  );
   for (const item of result.entries.slice(stages.length)) {
     assert.equal(Object.hasOwn(item, "stage"), false);
     assert.equal(item.status, 401);

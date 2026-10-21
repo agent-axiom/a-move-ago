@@ -211,17 +211,14 @@ describe("Telegram Mini App proof", () => {
     "ftp://example.test/a",
     "not-a-url",
     " ",
-  ])(
-    "rejects a non-HTTP profile URL: %s",
-    async (photoUrl) => {
-      const raw = await signedMiniAppData({
-        botToken,
-        authDate: now,
-        user: { ...defaultWebAppUser, photo_url: photoUrl },
-      });
-      await expectProofCode(verifyMiniAppInitData(raw, options), "TELEGRAM_PROOF_INVALID");
-    },
-  );
+  ])("rejects a non-HTTP profile URL: %s", async (photoUrl) => {
+    const raw = await signedMiniAppData({
+      botToken,
+      authDate: now,
+      user: { ...defaultWebAppUser, photo_url: photoUrl },
+    });
+    await expectProofCode(verifyMiniAppInitData(raw, options), "TELEGRAM_PROOF_INVALID");
+  });
 
   it("accepts exact age and future-skew boundaries and rejects one second beyond them", async () => {
     const ageBoundary = await signedMiniAppData({ botToken, authDate: now - 3600 });
