@@ -190,6 +190,11 @@ jobs:
           ANDROID_SDK_ROOT="$ANDROID_HOME" \
             RELEASE_METADATA_PATH="$RUNNER_TEMP/a-move-ago-synthetic-release-metadata.json" \
             node tools/scripts/android-release.mjs verify-apk
+      - name: Verify the actual packaged launcher icons against the store artwork
+        run: >-
+          node tools/scripts/check-android-branding.mjs
+          --apk apps/client/android/app/build/outputs/apk/release/app-release.apk
+          --output "${{ runner.temp }}/rustore-media"
       - name: Destroy the synthetic signing key and release artifact
         if: always()
         shell: bash
