@@ -119,6 +119,13 @@ jobs:
         run: |
           export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           node tools/scripts/android-release.mjs verify-apk
+      - name: Verify the packaged icon and export matching RuStore media
+        id: branding
+        env:
+          ANDROID_APK_PATH: apps/client/android/app/build/outputs/apk/release/app-release.apk
+        run: |
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          node tools/scripts/check-android-branding.mjs --apk "$ANDROID_APK_PATH" --output "$RUNNER_TEMP/rustore-media"
       - name: Verify production App Links for the APK signing certificate
         if: needs.verify.outputs.mode == 'publish'
         env:
@@ -139,7 +146,7 @@ jobs:
         if: always()
         run: node tools/scripts/android-release.mjs cleanup
       - name: Retain the signed APK and safe verification metadata
-        if: ${{ always() && steps.apk.outcome == 'success' }}
+        if: ${{ always() && steps.apk.outcome == 'success' && steps.branding.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: a-move-ago-rustore-${{ needs.verify.outputs.version_name }}-${{ needs.verify.outputs.version_code }}
@@ -148,3 +155,4 @@ jobs:
           path: |
             apps/client/android/app/build/outputs/apk/release/app-release.apk
             ${{ runner.temp }}/android-release-metadata.json
+            ${{ runner.temp }}/rustore-media/

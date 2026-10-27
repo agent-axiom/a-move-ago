@@ -10,6 +10,12 @@ The workflow checks the exact release commit against successful `CI` and
 identity, signature, version, App Link and packaged web configuration. Release
 commits must belong to `main`. Concurrent releases are serialized.
 
+Every signed artifact also includes `app-icon-512.png` for the Console listing
+and `branding-verification.json`. The release checks the compiled legacy, round,
+adaptive and themed launcher artwork against `assets/branding/app-icon.svg` and
+rejects obsolete raster icons. For a rejected first release, replace its APK in
+Console with the new signed APK and use the included PNG as the listing icon.
+
 ## One-time setup
 
 1. Create the application in RuStore Console with package name
