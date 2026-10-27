@@ -40,20 +40,36 @@ export function verifyPackagedBranding(files, inspect, paths, table) {
     !files.some((file) => /\/ic_launcher(?:_foreground|_round)?\.(?:png|webp|jpe?g)$/.test(file)),
     "BRAND_OBSOLETE_RASTER_ICON",
   );
-  const foregrounds = files.filter((file) =>
-    /^res\/drawable[^/]*\/ic_launcher_foreground\.xml$/.test(file),
-  );
-  const monochromes = files.filter((file) =>
-    /^res\/drawable[^/]*\/ic_launcher_monochrome\.xml$/.test(file),
-  );
-  const launchers = files.filter((file) =>
-    /^res\/mipmap-anydpi(?:-v\d+)?\/ic_launcher(?:_round)?\.xml$/.test(file),
-  );
+  const entries = new Map();
+  let entry;
+  for (const line of table.split("\n")) {
+    const resource = /^\s*resource (0x[0-9a-f]+) (?:[^:\s]+:)?([\w]+\/[\w]+)/i.exec(line);
+    if (resource) {
+      entry = [];
+      entries.set(resource[2], entry);
+    } else if (entry) {
+      const value = /\(([^)]*)\).*\(file\)\s+(res\/[^\s]+\.xml)/.exec(line);
+      if (value) entry.push({ config: value[1], file: value[2] });
+    }
+  }
+  const foregrounds =
+    entries.get("drawable/ic_launcher_foreground")?.map((value) => value.file) ?? [];
+  const monochromes =
+    entries.get("drawable/ic_launcher_monochrome")?.map((value) => value.file) ?? [];
+  const variants = [
+    ...(entries.get("mipmap/ic_launcher") ?? []),
+    ...(entries.get("mipmap/ic_launcher_round") ?? []),
+  ];
+  const launchers = [...new Set(variants.map((value) => value.file))];
   ensure(
-    foregrounds.length > 0 && monochromes.length > 0 && launchers.length >= 6,
+    foregrounds.length > 0 && monochromes.length > 0 && launchers.length >= 4,
     "BRAND_ICON_VARIANTS_MISSING",
   );
   const checked = [...foregrounds, ...monochromes];
+  ensure(
+    [...checked, ...launchers].every((file) => files.includes(file)),
+    "BRAND_PACKAGED_RESOURCE_MISSING",
+  );
   for (const file of checked) {
     const xml = inspect(file);
     ensure(
@@ -68,7 +84,9 @@ export function verifyPackagedBranding(files, inspect, paths, table) {
       for (const [element, name] of [
         ["background", "color/ic_launcher_background"],
         ["foreground", "drawable/ic_launcher_foreground"],
-        ...(/-v33\//.test(file) ? [["monochrome", "drawable/ic_launcher_monochrome"]] : []),
+        ...(variants.some((value) => value.file === file && /(?:^|-)v33(?:-|$)/.test(value.config))
+          ? [["monochrome", "drawable/ic_launcher_monochrome"]]
+          : []),
       ]) {
         const id = new RegExp(`resource (0x[0-9a-f]+) (?:[^:\\s]+:)?${name}(?:\\s|$)`, "i").exec(
           table,
@@ -92,6 +110,11 @@ export function verifyPackagedBranding(files, inspect, paths, table) {
     checked.push(file);
   }
   ensure(legacyCount === 2, "BRAND_LEGACY_ICONS_MISSING");
+  ensure(
+    variants.some((value) => /(?:^|-)v26(?:-|$)/.test(value.config)) &&
+      variants.some((value) => /(?:^|-)v33(?:-|$)/.test(value.config)),
+    "BRAND_ADAPTIVE_VARIANTS_MISSING",
+  );
   return { checkedVectors: checked, adaptiveVariants: launchers.length - legacyCount };
 }
 
@@ -129,6 +152,9 @@ export async function main(args = process.argv.slice(2)) {
   const run = (file, argv) =>
     execFileSync(file, argv, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
   const files = run("unzip", ["-Z", "-1", apk]).trim().split("\n");
+  console.log(
+    JSON.stringify({ packagedIconFiles: files.filter((file) => file.includes("ic_launcher")) }),
+  );
   const aapt = join(sdk, "build-tools/36.0.0/aapt2");
   const table = run(aapt, ["dump", "resources", apk]);
   verifyLauncherReferences(
